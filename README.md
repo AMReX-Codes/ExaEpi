@@ -13,6 +13,13 @@ This demo uses CMake version 3.14 or higher. To build it:
      cmake ..
      make -j8
 
+To build with GPU support, use the `-DAMReX_GPU_BACKEND=CUDA` CMake option.
+
+For convenience, a script for setting up the module environment for Perlmutter is
+provided in etc/perlmutter_environment.sh. To use it, do:
+
+    source etc/perlmutter_environment.sh
+
 ## Running the code
 
 Navigate to build/bin and run the executable using one of the "inputs" files in "examples".
