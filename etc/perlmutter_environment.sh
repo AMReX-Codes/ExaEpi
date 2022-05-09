@@ -8,10 +8,10 @@ module load cudatoolkit
 
 # an alias to request an interactive batch node for one hour
 #   for parallel execution, start on the batch node: srun <command>
-alias getNode="salloc -N 1 --ntasks-per-node=4 -t 1:00:00 -q interactive -C gpu --gpu-bind=single:1 -c 32 -G 4 -A $proj"
+alias getNode="salloc -N 1 --ntasks-per-node=1 -t 1:00:00 -q interactive -C gpu --gpu-bind=single:1 -c 32 -G 1 -A $proj"
 # an alias to run a command on a batch node for up to 30min
 #   usage: runNode <command>
-alias runNode="srun -N 1 --ntasks-per-node=4 -t 0:30:00 -q interactive -C gpu --gpu-bind=single:1 -c 32 -G 4 -A $proj"
+alias runNode="srun -N 1 --ntasks-per-node=1 -t 0:30:00 -q interactive -C gpu --gpu-bind=single:1 -c 32 -G 1 -A $proj"
 
 # GPU-aware MPI
 export MPICH_GPU_SUPPORT_ENABLED=1

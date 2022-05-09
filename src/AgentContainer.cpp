@@ -81,30 +81,37 @@ void AgentContainer::initAgents ()
 
     auto cell_offsets_ptr = cell_offsets_d.data();
 
-    amrex::ParallelForRNG( total_agents,
-    [=] AMREX_GPU_DEVICE (int i, RandomEngine const& engine) noexcept
+    amrex::Print() << "About to fill data \n";
+    
+    amrex::ParallelForRNG( ncell * ncell,
+    [=] AMREX_GPU_DEVICE (int cell_id, RandomEngine const& engine) noexcept
     {
-        // find out which cell particle i needs to go in.
-        int cell_id = 0;
-        while (cell_offsets_ptr[cell_id] < i) {++cell_id;}
-
+        int cell_start = cell_offsets_ptr[cell_id];
+        int cell_stop = cell_offsets_ptr[cell_id+1];
+        
         int idx = cell_id % ncell;
         int idy = cell_id / ncell;
 
-        auto& p = pstruct_ptr[i];
-        p.pos(0) = idx + 0.5;
-        p.pos(1) = idy + 0.5;
-        p.id() = i;
-        p.cpu() = 0;
+        for (int i = cell_start; i < cell_stop; ++i) {
+            auto& p = pstruct_ptr[i];
+            p.pos(0) = idx + 0.5;
+            p.pos(1) = idy + 0.5;
+            p.id() = i;
+            p.cpu() = 0;
 
-        timer_ptr[i] = 0.0;
+            timer_ptr[i] = 0.0;
 
-        if (amrex::Random(engine) < 0.05) {
-            status_ptr[i] = 1;
+            if (amrex::Random(engine) < 0.05) {
+                status_ptr[i] = 1;
+            }
         }
     });
 
+    amrex::Print() << "Finished filling data \n";
+    
     Redistribute();
+
+    amrex::Print() << "finished initialization \n";
 }
 
 void AgentContainer::moveAgents ()

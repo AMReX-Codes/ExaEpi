@@ -41,13 +41,15 @@ void runAgent ()
     get_test_params(params, "agent");
 
     int is_per[BL_SPACEDIM];
-    for (int i = 0; i < BL_SPACEDIM; i++)
+    for (int i = 0; i < BL_SPACEDIM; i++) {
         is_per[i] = true;
-
+    }
+    
     Vector<IntVect> rr(params.nlevs-1);
-    for (int lev = 1; lev < params.nlevs; lev++)
+    for (int lev = 1; lev < params.nlevs; lev++) {
         rr[lev-1] = IntVect(AMREX_D_DECL(2,2,2));
-
+    }
+    
     RealBox real_box;
     for (int n = 0; n < BL_SPACEDIM; n++)
     {
@@ -85,9 +87,9 @@ void runAgent ()
 
     for (int i = 0; i < params.nsteps; ++i)
     {
+        amrex::Print() << "Taking step " << i << "\n";
         pc.interactAgents();
         pc.moveAgents();
         pc.Redistribute();
-        pc.WriteAsciiFile(amrex::Concatenate("particles", i, 5));
     }
 }
