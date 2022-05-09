@@ -36,12 +36,14 @@ int main (int argc, char* argv[])
     amrex::Finalize();
 }
 
-void writePlotFile (const AgentContainer& pc, int step) {
-    MultiFab dummy_mf(pc.ParticleBoxArray(0),
+void writePlotFile (AgentContainer& pc, int step) {
+    amrex::Print() << "Writing plotfile \n";
+    MultiFab particle_count(pc.ParticleBoxArray(0),
                       pc.ParticleDistributionMap(0), 1, 0);
-    dummy_mf.setVal(0.0);
-    WriteSingleLevelPlotfile(amrex::Concatenate("plt", step, 5), dummy_mf,
-                             {"dummy"}, pc.ParticleGeom(0), 0.0, 0);
+    particle_count.setVal(0.0);
+    pc.Increment(particle_count, 0);
+    WriteSingleLevelPlotfile(amrex::Concatenate("plt", step, 5), particle_count,
+                             {"count"}, pc.ParticleGeom(0), 0.0, 0);
     pc.WritePlotFile(amrex::Concatenate("plt", step, 5), "agents");
 }
 
