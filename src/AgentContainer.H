@@ -174,11 +174,10 @@ class AgentContainer
 
 public:
 
-    AgentContainer (const amrex::Vector<amrex::Geometry>            & a_geom,
-                    const amrex::Vector<amrex::DistributionMapping> & a_dmap,
-                    const amrex::Vector<amrex::BoxArray>            & a_ba,
-                    const amrex::Vector<amrex::IntVect>             & a_rr)
-        : amrex::ParticleContainer<0, 0, RealIdx::nattribs, IntIdx::nattribs>(a_geom, a_dmap, a_ba, a_rr)
+    AgentContainer (const amrex::Geometry            & a_geom,
+                    const amrex::DistributionMapping & a_dmap,
+                    const amrex::BoxArray            & a_ba)
+        : amrex::ParticleContainer<0, 0, RealIdx::nattribs, IntIdx::nattribs>(a_geom, a_dmap, a_ba)
     {}
 
     void initAgents ();

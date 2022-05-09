@@ -138,12 +138,7 @@ void AgentContainer::moveAgents ()
                 ParticleType& p = pstruct[i];
 
                 p.pos(0) += static_cast<ParticleReal> ((2*amrex::Random(engine)-1)*dx[0]);
-#if AMREX_SPACEDIM > 1
                 p.pos(1) += static_cast<ParticleReal> ((2*amrex::Random(engine)-1)*dx[1]);
-#endif
-#if AMREX_SPACEDIM > 2
-                p.pos(2) += static_cast<ParticleReal> ((2*amrex::Random(engine)-1)*dx[2]);
-#endif
             });
         }
     }
