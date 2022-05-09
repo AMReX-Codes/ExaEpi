@@ -43,7 +43,7 @@ if(NOT ${amrex}_POPULATED)
 
   if (AMReX_GPU_BACKEND STREQUAL "CUDA")
      enable_language(CUDA)
-     include(AMReX_SetupCUDA)
+#     include(AMReX_SetupCUDA)
   endif ()
 
   # Bring the populated content into the build
