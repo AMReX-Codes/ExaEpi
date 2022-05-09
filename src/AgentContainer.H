@@ -8,6 +8,8 @@
 #include <AMReX_Particles.H>
 #include <AMReX_Vector.H>
 
+#if 0  // uncomment for EpiCast particle type
+
 struct RealIdx
 {
     enum {
@@ -144,6 +146,25 @@ struct IntIdx
           strain2,
 #endif
           nattribs
+    };
+};
+
+#endif
+
+// simplified particle type
+struct RealIdx
+{
+    enum {
+        timer = 0,
+        nattribs
+    };
+};
+
+struct IntIdx
+{
+    enum {
+        status = 0,
+        nattribs
     };
 };
 
