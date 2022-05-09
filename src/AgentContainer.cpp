@@ -180,16 +180,17 @@ void AgentContainer::interactAgents ()
             {
                 auto cell_start = offsets[i_cell];
                 auto cell_stop  = offsets[i_cell+1];
+
+                int num_infected = 0;
                 for (unsigned int i = cell_start; i < cell_stop; ++i) {
                     auto pindex = inds[i];
-                    if (d_ptr[pindex] == 1) {
-                        for (unsigned int j = cell_start; j < cell_stop; ++j) {
-                            if (i == j) { continue; }
-                            auto pindex2 = inds[j];
-                            if (amrex::Random(engine) < 0.5) {
-                                d_ptr[pindex2] = 1;
-                            }
-                        }
+                    if (d_ptr[pindex] == 1) { ++num_infected; }
+                }
+
+                for (unsigned int i = cell_start; i < cell_stop; ++i) {
+                    auto pindex = inds[i];
+                    if ( (d_ptr[pindex] != 1) && (amrex::Random(engine) < 0.0001*num_infected)) {
+                        d_ptr[pindex] = 1;
                     }
                 }
             });
