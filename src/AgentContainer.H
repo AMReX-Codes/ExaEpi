@@ -155,6 +155,10 @@ struct IntIdx
 struct RealIdx
 {
     enum {
+        /*
+          The meaning of the timer depends on the status flag.
+          Agents are infected for 5 days, then immune for 6 months.
+         */
         timer = 0,
         nattribs
     };
@@ -163,6 +167,12 @@ struct RealIdx
 struct IntIdx
 {
     enum {
+        /*
+          0 = never infected
+          1 = infected
+          2 = immune
+          3 = previously infected, but no longer immune
+         */
         status = 0,
         nattribs
     };
@@ -184,6 +194,10 @@ public:
 
     void moveAgents ();
 
+    void moveRandomTravel ();
+
+    void updateStatus ();
+    
     void interactAgents ();
 };
 

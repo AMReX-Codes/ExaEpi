@@ -84,11 +84,18 @@ void runAgent ()
 
     for (int i = 0; i < params.nsteps; ++i)
     {
-        if (i % 100 == 0) { writePlotFile(pc, i); }
-
         amrex::Print() << "Taking step " << i << "\n";
+        
+        if (i % 168 == 0) { writePlotFile(pc, i); }  // every week
+
+        pc.updateStatus();        
         pc.interactAgents();
+
         pc.moveAgents();
+        if (i % 24 == 0) { pc.moveRandomTravel(); }  // once a day
+        
         pc.Redistribute();
     }
+
+    if (params.nsteps % 168 == 0) { writePlotFile(pc, params.nsteps); }
 }

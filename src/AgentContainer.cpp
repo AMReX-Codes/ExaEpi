@@ -101,7 +101,7 @@ void AgentContainer::initAgents ()
 
             timer_ptr[i] = 0.0;
 
-            if (amrex::Random(engine) < 0.05) {
+            if (amrex::Random(engine) < 0.01) {
                 status_ptr[i] = 1;
             }
         }
@@ -136,9 +136,86 @@ void AgentContainer::moveAgents ()
             [=] AMREX_GPU_DEVICE (int i, RandomEngine const& engine) noexcept
             {
                 ParticleType& p = pstruct[i];
-
                 p.pos(0) += static_cast<ParticleReal> ((2*amrex::Random(engine)-1)*dx[0]);
                 p.pos(1) += static_cast<ParticleReal> ((2*amrex::Random(engine)-1)*dx[1]);
+            });
+        }
+    }
+}
+
+void AgentContainer::moveRandomTravel ()
+{
+    BL_PROFILE("AgentContainer::moveRandomTravel");
+
+    for (int lev = 0; lev <= finestLevel(); ++lev)
+    {
+        const auto dx = Geom(lev).CellSizeArray();
+        auto& plev  = GetParticles(lev);
+
+        for(MFIter mfi = MakeMFIter(lev); mfi.isValid(); ++mfi)
+        {
+            int gid = mfi.index();
+            int tid = mfi.LocalTileIndex();
+            auto& ptile = plev[std::make_pair(gid, tid)];
+            auto& aos   = ptile.GetArrayOfStructs();
+            ParticleType* pstruct = &(aos[0]);
+            const size_t np = aos.numParticles();
+
+            amrex::ParallelForRNG( np,
+            [=] AMREX_GPU_DEVICE (int i, RandomEngine const& engine) noexcept
+            {
+                ParticleType& p = pstruct[i];
+
+                if (amrex::Random(engine) < 0.0001) {
+                    p.pos(0) = 3000*amrex::Random(engine);
+                    p.pos(1) = 3000*amrex::Random(engine);
+                }
+            });
+        }
+    }
+}
+
+void AgentContainer::updateStatus ()
+{
+    BL_PROFILE("AgentContainer::updateStatus");
+
+    for (int lev = 0; lev <= finestLevel(); ++lev)
+    {
+        const auto dx = Geom(lev).CellSizeArray();
+        auto& plev  = GetParticles(lev);
+
+        for(MFIter mfi = MakeMFIter(lev); mfi.isValid(); ++mfi)
+        {
+            int gid = mfi.index();
+            int tid = mfi.LocalTileIndex();
+            auto& ptile = plev[std::make_pair(gid, tid)];
+            auto& soa   = ptile.GetStructOfArrays();
+            const auto np = ptile.numParticles();
+            auto status_ptr = soa.GetIntData(IntIdx::status).data();
+            auto timer_ptr = soa.GetRealData(RealIdx::timer).data();
+
+            amrex::ParallelFor( np,
+            [=] AMREX_GPU_DEVICE (int i) noexcept
+            {
+                // enum would be good here
+                if ( (status_ptr[i] == 0) || (status_ptr[i] == 3) ) {
+                    return;
+                }
+                else if (status_ptr[i] == 1) { // infected 
+                    if (timer_ptr[i] == 0.0) { 
+                        status_ptr[i] = 2;
+                        timer_ptr[i] = 6*30*24; // 6 months in hours
+                    } else {
+                        timer_ptr[i] -= 1.0;
+                    }
+                }
+                else if (status_ptr[i] == 2) { // immune
+                    if (timer_ptr[i] == 0.0) {
+                        status_ptr[i] = 3;
+                    } else {
+                        timer_ptr[i] -= 1.0;
+                    }
+                }
             });
         }
     }
@@ -173,7 +250,8 @@ void AgentContainer::interactAgents ()
             auto offsets = bins.offsetsPtr();
 
             auto& soa   = ptile.GetStructOfArrays();
-            auto d_ptr = soa.GetIntData(IntIdx::status).data();
+            auto status_ptr = soa.GetIntData(IntIdx::status).data();
+            auto timer_ptr = soa.GetRealData(RealIdx::timer).data();
 
             amrex::ParallelForRNG( bins.numBins(),
             [=] AMREX_GPU_DEVICE (int i_cell, amrex::RandomEngine const& engine) noexcept
@@ -181,16 +259,21 @@ void AgentContainer::interactAgents ()
                 auto cell_start = offsets[i_cell];
                 auto cell_stop  = offsets[i_cell+1];
 
+                // compute the number of infected in this cell
                 int num_infected = 0;
                 for (unsigned int i = cell_start; i < cell_stop; ++i) {
                     auto pindex = inds[i];
-                    if (d_ptr[pindex] == 1) { ++num_infected; }
+                    if (status_ptr[pindex] == 1) { ++num_infected; }
                 }
 
+                // second pass - infection prob is propto num_infected
                 for (unsigned int i = cell_start; i < cell_stop; ++i) {
                     auto pindex = inds[i];
-                    if ( (d_ptr[pindex] != 1) && (amrex::Random(engine) < 0.0001*num_infected)) {
-                        d_ptr[pindex] = 1;
+                    if ( (status_ptr[pindex] != 1) // not currently infected
+                      && (status_ptr[pindex] != 2) // not immune
+                      && (amrex::Random(engine) < 0.0001*num_infected)) {
+                        status_ptr[pindex] = 1;
+                        timer_ptr[pindex] = 5.0*24; // 5 days in hours
                     }
                 }
             });
