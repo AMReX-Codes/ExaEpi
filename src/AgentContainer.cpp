@@ -2,6 +2,14 @@
 
 using namespace amrex;
 
+namespace {
+    void randomShuffle (std::vector<int>& vec) {
+        std::random_device rd;
+        std::mt19937 g(rd());
+        std::shuffle(vec.begin(), vec.end(), g);
+    }
+}
+
 void AgentContainer::initAgents ()
 {
     BL_PROFILE("AgentContainer::initAgents");
@@ -47,9 +55,7 @@ void AgentContainer::initAgents ()
 
     std::vector<int> perm(ncell*ncell);
     std::iota(perm.begin(), perm.end(), 0);
-    std::random_device rd;
-    std::mt19937 g(rd());
-    std::shuffle(perm.begin(), perm.end(), g);
+    randomShuffle(perm);
 
     Vector<int> offsets(num_pop_bins+1);
     offsets[0] = 0;
@@ -64,11 +70,78 @@ void AgentContainer::initAgents ()
         }
     }
 
+    amrex::Print() << "Splitting up population into interior and border \n";
+    // we now have a list of populations for each cell. We want 1/3
+    // of the population to be within 200 cells of the border. We
+    // maintain two separate lists, one for the interior, one for the exterior
+    int interior_size = 2600*2600;
+    int border_size = ncell*ncell - interior_size;
+
+    // First we sort the vector of cell pops
+    Vector<int> sorted_cell_pops(cell_pops);
+    std::sort(sorted_cell_pops.begin(), sorted_cell_pops.end());
+    amrex::Real border_pop = 0;
+    int i = sorted_cell_pops.size()-1;
+    std::vector<int> border_ids;
+    std::vector<int> interior_ids;
+    while ((border_pop < 100e6) && (i >= 0)) {
+        amrex::Real pop = sorted_cell_pops[i];
+        if (amrex::Random() < 0.5) {
+            border_ids.push_back(i);
+            border_pop += pop;
+        }
+        else {
+            interior_ids.push_back(i);
+        }
+        --i;
+    }
+
+    while (interior_ids.size() < interior_size) {
+        interior_ids.push_back(i);
+        --i;
+    }
+    
+    while (i >= 0) {
+        amrex::Real pop = sorted_cell_pops[i];
+        border_pop += pop;
+        border_ids.push_back(i);
+        --i;
+    }
+
+    // if these conditions are not met, then something has gone wrong with the border pop
+    AMREX_ALWAYS_ASSERT(i == -1);
+    AMREX_ALWAYS_ASSERT(interior_ids.size() == interior_size);
+    AMREX_ALWAYS_ASSERT(border_ids.size() == border_size);
+
+    amrex::Print() << "Population within 200 cells of border is " << border_pop << "\n";
+
+    randomShuffle(border_ids);
+    randomShuffle(interior_ids);
+    
+    std::vector<int> cell_indices;
+    for (int cell_id = 0; cell_id < ncell*ncell; ++cell_id) {
+        int idx = cell_id % ncell;
+        int idy = cell_id / ncell;
+        if ((idx < 200) || (idx >= 2800) || (idy < 200) || (idy >= 2800)) {
+            cell_indices.push_back(border_ids.back());
+            border_ids.pop_back();
+        } else {
+            cell_indices.push_back(interior_ids.back());
+            interior_ids.pop_back();
+        }
+    }
+    AMREX_ALWAYS_ASSERT(interior_ids.size() == 0);
+    AMREX_ALWAYS_ASSERT(border_ids.size() == 0);
+    
     amrex::Gpu::DeviceVector<int> cell_pops_d(cell_pops.size());
     amrex::Gpu::DeviceVector<int> cell_offsets_d(cell_pops.size()+1);
-    Gpu::copy(Gpu::hostToDevice, cell_pops.begin(), cell_pops.end(), cell_pops_d.begin());
+    Gpu::copy(Gpu::hostToDevice, sorted_cell_pops.begin(), sorted_cell_pops.end(),
+              cell_pops_d.begin());
     Gpu::exclusive_scan(cell_pops_d.begin(), cell_pops_d.end(), cell_offsets_d.begin());
 
+    amrex::Gpu::DeviceVector<int> cell_indices_d(cell_indices.size());
+    Gpu::copy(Gpu::hostToDevice, cell_indices.begin(), cell_indices.end(), cell_indices_d.begin());
+    
     // Fill in particle data in each cell
     auto& ptile = DefineAndReturnParticleTile(0, 0, 0);
     ptile.resize(total_agents);
@@ -80,14 +153,17 @@ void AgentContainer::initAgents ()
     auto timer_ptr = soa.GetIntData(RealIdx::timer).data();
 
     auto cell_offsets_ptr = cell_offsets_d.data();
+    auto cell_indices_ptr = cell_indices_d.data();
 
     amrex::Print() << "About to fill data \n";
     
     amrex::ParallelForRNG( ncell * ncell,
     [=] AMREX_GPU_DEVICE (int cell_id, RandomEngine const& engine) noexcept
     {
-        int cell_start = cell_offsets_ptr[cell_id];
-        int cell_stop = cell_offsets_ptr[cell_id+1];
+        int ind = cell_indices_ptr[cell_id];
+
+        int cell_start = cell_offsets_ptr[ind];
+        int cell_stop = cell_offsets_ptr[ind+1];
         
         int idx = cell_id % ncell;
         int idy = cell_id / ncell;
