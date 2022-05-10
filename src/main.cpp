@@ -18,10 +18,11 @@ struct TestParams
 void get_test_params(TestParams& params, const std::string& prefix)
 {
     ParmParse pp(prefix);
-    params.plot_int = -1;
     pp.get("size", params.size);
     pp.get("max_grid_size", params.max_grid_size);
     pp.get("nsteps", params.nsteps);
+
+    params.plot_int = -1;
     pp.query("plot_int", params.plot_int);
 }
 
@@ -39,11 +40,12 @@ int main (int argc, char* argv[])
 void writePlotFile (AgentContainer& pc, int step) {
     amrex::Print() << "Writing plotfile \n";
     MultiFab particle_count(pc.ParticleBoxArray(0),
-                      pc.ParticleDistributionMap(0), 1, 0);
+                      pc.ParticleDistributionMap(0), 5, 0);
     particle_count.setVal(0.0);
-    pc.Increment(particle_count, 0);
+    pc.generateCellData(particle_count);
     WriteSingleLevelPlotfile(amrex::Concatenate("plt", step, 5), particle_count,
-                             {"count"}, pc.ParticleGeom(0), 0.0, 0);
+                             {"total", "never_infected", "infected", "immune", "previously_infected"},
+                             pc.ParticleGeom(0), 0.0, 0);
     pc.WritePlotFile(amrex::Concatenate("plt", step, 5), "agents");
 }
 

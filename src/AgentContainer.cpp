@@ -281,3 +281,38 @@ void AgentContainer::interactAgents ()
         }
     }
 }
+
+void AgentContainer::generateCellData (MultiFab& mf)
+{
+    BL_PROFILE("AgentContainer::generateCellData");
+
+    const int lev = 0;
+
+    AMREX_ASSERT(OK());
+    AMREX_ASSERT(numParticlesOutOfRange(*this, 0) == 0);
+
+    const auto& geom = Geom(lev);
+    const auto plo = geom.ProbLoArray();
+    const auto dxi = geom.InvCellSizeArray();
+    const auto domain = geom.Domain();
+    amrex::ParticleToMesh(*this, mf, lev,
+        [=] AMREX_GPU_DEVICE (const SuperParticleType& p,
+                              amrex::Array4<amrex::Real> const& count)
+        {
+            int status = p.idata(0);
+            auto iv = getParticleCell(p, plo, dxi, domain);
+            amrex::Gpu::Atomic::AddNoRet(&count(iv, 0), 1.0_rt);
+            if (status == 0) {
+                amrex::Gpu::Atomic::AddNoRet(&count(iv, 1), 1.0_rt);
+            }
+            else if (status == 1) {
+                amrex::Gpu::Atomic::AddNoRet(&count(iv, 2), 1.0_rt);
+            }
+            else if (status == 2) {
+                amrex::Gpu::Atomic::AddNoRet(&count(iv, 3), 1.0_rt);
+            }
+            else if (status == 3) {
+                amrex::Gpu::Atomic::AddNoRet(&count(iv, 4), 1.0_rt);
+            }
+        }, false);
+}

@@ -199,6 +199,8 @@ public:
     void updateStatus ();
     
     void interactAgents ();
+
+    void generateCellData (amrex::MultiFab& mf);
 };
 
 #endif
