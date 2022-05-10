@@ -39,6 +39,7 @@ int main (int argc, char* argv[])
 
 void writePlotFile (AgentContainer& pc, int step) {
     amrex::Print() << "Writing plotfile \n";
+
     MultiFab particle_count(pc.ParticleBoxArray(0),
                       pc.ParticleDistributionMap(0), 5, 0);
     particle_count.setVal(0.0);
@@ -46,7 +47,9 @@ void writePlotFile (AgentContainer& pc, int step) {
     WriteSingleLevelPlotfile(amrex::Concatenate("plt", step, 5), particle_count,
                              {"total", "never_infected", "infected", "immune", "previously_infected"},
                              pc.ParticleGeom(0), 0.0, 0);
-    pc.WritePlotFile(amrex::Concatenate("plt", step, 5), "agents");
+
+    // uncomment this to write all the particles
+    //pc.WritePlotFile(amrex::Concatenate("plt", step, 5), "agents");
 }
 
 void runAgent ()

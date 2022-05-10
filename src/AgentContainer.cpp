@@ -150,7 +150,7 @@ void AgentContainer::initAgents ()
     auto& aos   = ptile.GetArrayOfStructs();
     auto pstruct_ptr = aos().data();
     auto status_ptr = soa.GetIntData(IntIdx::status).data();
-    auto timer_ptr = soa.GetIntData(RealIdx::timer).data();
+    auto timer_ptr = soa.GetRealData(RealIdx::timer).data();
 
     auto cell_offsets_ptr = cell_offsets_d.data();
     auto cell_indices_ptr = cell_indices_d.data();
@@ -179,6 +179,7 @@ void AgentContainer::initAgents ()
 
             if (amrex::Random(engine) < 0.01) {
                 status_ptr[i] = 1;
+                timer_ptr[i] = 5.0*24;
             }
         }
     });
