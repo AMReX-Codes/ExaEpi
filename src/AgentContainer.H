@@ -8,6 +8,8 @@
 #include <AMReX_Particles.H>
 #include <AMReX_Vector.H>
 
+#if 0  // uncomment for EpiCast particle type
+
 struct RealIdx
 {
     enum {
@@ -147,24 +149,58 @@ struct IntIdx
     };
 };
 
+#endif
+
+// simplified particle type
+struct RealIdx
+{
+    enum {
+        /*
+          The meaning of the timer depends on the status flag.
+          Agents are infected for 5 days, then immune for 6 months.
+         */
+        timer = 0,
+        nattribs
+    };
+};
+
+struct IntIdx
+{
+    enum {
+        /*
+          0 = never infected
+          1 = infected
+          2 = immune
+          3 = previously infected, but no longer immune
+         */
+        status = 0,
+        nattribs
+    };
+};
+
 class AgentContainer
     : public amrex::ParticleContainer<0, 0, RealIdx::nattribs, IntIdx::nattribs>
 {
 
 public:
 
-    AgentContainer (const amrex::Vector<amrex::Geometry>            & a_geom,
-                    const amrex::Vector<amrex::DistributionMapping> & a_dmap,
-                    const amrex::Vector<amrex::BoxArray>            & a_ba,
-                    const amrex::Vector<amrex::IntVect>             & a_rr)
-        : amrex::ParticleContainer<0, 0, RealIdx::nattribs, IntIdx::nattribs>(a_geom, a_dmap, a_ba, a_rr)
+    AgentContainer (const amrex::Geometry            & a_geom,
+                    const amrex::DistributionMapping & a_dmap,
+                    const amrex::BoxArray            & a_ba)
+        : amrex::ParticleContainer<0, 0, RealIdx::nattribs, IntIdx::nattribs>(a_geom, a_dmap, a_ba)
     {}
 
     void initAgents ();
 
     void moveAgents ();
 
+    void moveRandomTravel ();
+
+    void updateStatus ();
+    
     void interactAgents ();
+
+    void generateCellData (amrex::MultiFab& mf);
 };
 
 #endif

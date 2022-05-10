@@ -11,6 +11,7 @@ set(AMReX_PARTICLES       ON)
 set(AMReX_FORTRAN        OFF)
 set(AMReX_LINEAR_SOLVERS OFF)
 set(AMReX_AMRLEVEL       OFF)
+set(AMReX_TINY_PROFILE    ON)
 set(AMReX_SPACEDIM 2 CACHE INTERNAL "")
 
 #
@@ -43,7 +44,7 @@ if(NOT ${amrex}_POPULATED)
 
   if (AMReX_GPU_BACKEND STREQUAL "CUDA")
      enable_language(CUDA)
-     include(AMReX_SetupCUDA)
+#     include(AMReX_SetupCUDA)
   endif ()
 
   # Bring the populated content into the build
