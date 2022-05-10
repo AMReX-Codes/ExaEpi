@@ -28,7 +28,9 @@ For example:
     cd build/bin
     ./agent ../../examples/inputs
 
-## Visualizing the output
+## Looing at the output
 
-Running the code succesfully will create a number of "particles?????" files. You can visualize
-the using the notebook at etc/Visualization.ipynb.
+Running the code succesfully will create a number of "plt?????" files. You can visualize
+these using the script at etc/plot.py. This will require the "yt" package to be installed:
+
+    https://yt-project.org/
