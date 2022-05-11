@@ -177,7 +177,7 @@ void AgentContainer::initAgents ()
 
             timer_ptr[i] = 0.0;
 
-            if (amrex::Random(engine) < 0.01) {
+            if (amrex::Random(engine) < 2e-8) {
                 status_ptr[i] = 1;
                 timer_ptr[i] = 5.0*24;
             }
@@ -348,7 +348,7 @@ void AgentContainer::interactAgents ()
                     auto pindex = inds[i];
                     if ( (status_ptr[pindex] != 1) // not currently infected
                       && (status_ptr[pindex] != 2) // not immune
-                      && (amrex::Random(engine) < 0.0001*num_infected)) {
+                      && (amrex::Random(engine) < 0.001*num_infected)) {
                         status_ptr[pindex] = 1;
                         timer_ptr[pindex] = 5.0*24; // 5 days in hours
                     }
@@ -392,4 +392,21 @@ void AgentContainer::generateCellData (MultiFab& mf)
                 amrex::Gpu::Atomic::AddNoRet(&count(iv, 4), 1.0_rt);
             }
         }, false);
+}
+
+void AgentContainer::printTotals () {
+    BL_PROFILE("printTotals");
+    amrex::ReduceOps<ReduceOpSum, ReduceOpSum, ReduceOpSum, ReduceOpSum> reduce_ops;
+    auto r = amrex::ParticleReduce<ReduceData<int,int,int,int>> (
+                  *this, [=] AMREX_GPU_DEVICE (const SuperParticleType& p) noexcept
+                  -> amrex::GpuTuple<int,int,int,int>
+              {
+                  int s[4] = {0, 0, 0, 0};
+                  s[p.idata(IntIdx::status)] = 1;
+                  return {s[0], s[1], s[2], s[4]};
+              }, reduce_ops);
+    amrex::Print() << "Never infected: " << amrex::get<0>(r) << "\n";
+    amrex::Print() << "Infected: " << amrex::get<1>(r) << "\n";
+    amrex::Print() << "Immune: " << amrex::get<2>(r) << "\n";
+    amrex::Print() << "Previously infected: " << amrex::get<3>(r) << "\n";
 }

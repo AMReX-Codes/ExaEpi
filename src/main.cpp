@@ -100,6 +100,8 @@ void runAgent ()
         if (i % 24 == 0) { pc.moveRandomTravel(); }  // once a day
         
         pc.Redistribute();
+
+        pc.printTotals();
     }
 
     if (params.nsteps % 168 == 0) { writePlotFile(pc, params.nsteps); }

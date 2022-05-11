@@ -149,7 +149,7 @@ struct IntIdx
     };
 };
 
-#endif
+#endif // Epicast particle type
 
 // simplified particle type
 struct RealIdx
@@ -201,6 +201,8 @@ public:
     void interactAgents ();
 
     void generateCellData (amrex::MultiFab& mf);
+
+    void printTotals ();
 };
 
 #endif
