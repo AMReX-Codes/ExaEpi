@@ -177,7 +177,7 @@ void AgentContainer::initAgents ()
 
             timer_ptr[i] = 0.0;
 
-            if (amrex::Random(engine) < 1e-8) {
+            if (amrex::Random(engine) < 2e-8) {
                 status_ptr[i] = 1;
                 timer_ptr[i] = 5.0*24;
             }
