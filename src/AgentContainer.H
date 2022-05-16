@@ -164,15 +164,19 @@ struct RealIdx
     };
 };
 
+struct Status
+{
+    enum {
+        never = 0,   // never infected
+        infected,    // infected
+        immune,      // no longer infected, immune
+        susceptible  // no longer infected, no longer immnune
+    };
+};
+
 struct IntIdx
 {
     enum {
-        /*
-          0 = never infected
-          1 = infected
-          2 = immune
-          3 = previously infected, but no longer immune
-         */
         status = 0,
         nattribs
     };

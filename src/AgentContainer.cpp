@@ -275,20 +275,21 @@ void AgentContainer::updateStatus ()
             [=] AMREX_GPU_DEVICE (int i) noexcept
             {
                 // enum would be good here
-                if ( (status_ptr[i] == 0) || (status_ptr[i] == 3) ) {
+                if ( (status_ptr[i] == Status::never) ||
+                     (status_ptr[i] == Status::susceptible) ) {
                     return;
                 }
-                else if (status_ptr[i] == 1) { // infected 
+                else if (status_ptr[i] == Status::infected) {
                     if (timer_ptr[i] == 0.0) { 
-                        status_ptr[i] = 2;
+                        status_ptr[i] = Status::immune;
                         timer_ptr[i] = 6*30*24; // 6 months in hours
                     } else {
                         timer_ptr[i] -= 1.0;
                     }
                 }
-                else if (status_ptr[i] == 2) { // immune
+                else if (status_ptr[i] == Status::immune) {
                     if (timer_ptr[i] == 0.0) {
-                        status_ptr[i] = 3;
+                        status_ptr[i] = Status::susceptible;
                     } else {
                         timer_ptr[i] -= 1.0;
                     }
@@ -346,10 +347,10 @@ void AgentContainer::interactAgents ()
                 // second pass - infection prob is propto num_infected
                 for (unsigned int i = cell_start; i < cell_stop; ++i) {
                     auto pindex = inds[i];
-                    if ( (status_ptr[pindex] != 1) // not currently infected
-                      && (status_ptr[pindex] != 2) // not immune
+                    if ( (status_ptr[pindex] != Status::infected)
+                      && (status_ptr[pindex] != Status::immune)
                       && (amrex::Random(engine) < 0.001*num_infected)) {
-                        status_ptr[pindex] = 1;
+                        status_ptr[pindex] = Status::infected;
                         timer_ptr[pindex] = 5.0*24; // 5 days in hours
                     }
                 }
@@ -379,16 +380,16 @@ void AgentContainer::generateCellData (MultiFab& mf)
             int status = p.idata(0);
             auto iv = getParticleCell(p, plo, dxi, domain);
             amrex::Gpu::Atomic::AddNoRet(&count(iv, 0), 1.0_rt);
-            if (status == 0) {
+            if (status == Status::never) {
                 amrex::Gpu::Atomic::AddNoRet(&count(iv, 1), 1.0_rt);
             }
-            else if (status == 1) {
+            else if (status == Status::infected) {
                 amrex::Gpu::Atomic::AddNoRet(&count(iv, 2), 1.0_rt);
             }
-            else if (status == 2) {
+            else if (status == Status::immune) {
                 amrex::Gpu::Atomic::AddNoRet(&count(iv, 3), 1.0_rt);
             }
-            else if (status == 3) {
+            else if (status == Status::susceptible) {
                 amrex::Gpu::Atomic::AddNoRet(&count(iv, 4), 1.0_rt);
             }
         }, false);
