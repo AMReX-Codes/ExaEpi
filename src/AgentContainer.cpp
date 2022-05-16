@@ -406,8 +406,11 @@ void AgentContainer::printTotals () {
                   s[p.idata(IntIdx::status)] = 1;
                   return {s[0], s[1], s[2], s[4]};
               }, reduce_ops);
-    amrex::Print() << "Never infected: " << amrex::get<0>(r) << "\n";
-    amrex::Print() << "Infected: " << amrex::get<1>(r) << "\n";
-    amrex::Print() << "Immune: " << amrex::get<2>(r) << "\n";
-    amrex::Print() << "Previously infected: " << amrex::get<3>(r) << "\n";
+
+    Long counts[4] = {amrex::get<0>(r), amrex::get<1>(r), amrex::get<2>(r), amrex::get<3>(r)};
+    ParallelDescriptor::ReduceLongSum(&counts[0], 4, ParallelDescriptor::IOProcessorNumber());
+    amrex::Print() << "Never infected: " << counts[0] << "\n";
+    amrex::Print() << "Infected: " << counts[1] << "\n";
+    amrex::Print() << "Immune: " << counts[2] << "\n";
+    amrex::Print() << "Previously infected: " << counts[3] << "\n";
 }
