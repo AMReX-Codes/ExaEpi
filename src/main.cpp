@@ -85,23 +85,30 @@ void runAgent ()
     dm.define(ba);
 
     AgentContainer pc(geom, dm, ba);
-    pc.initAgents();
 
-    for (int i = 0; i < params.nsteps; ++i)
     {
-        amrex::Print() << "Taking step " << i << "\n";
+        BL_PROFILE_REGION("Initialization");
+        pc.initAgents();
+    }
+
+    {
+        BL_PROFILE_REGION("Evolution");
+        for (int i = 0; i < params.nsteps; ++i)
+        {
+            amrex::Print() << "Taking step " << i << "\n";
         
-        if (i % 168 == 0) { writePlotFile(pc, i); }  // every week
+            if (i % 168 == 0) { writePlotFile(pc, i); }  // every week
 
-        pc.updateStatus();        
-        pc.interactAgents();
+            pc.updateStatus();        
+            pc.interactAgents();
 
-        pc.moveAgents();
-        if (i % 24 == 0) { pc.moveRandomTravel(); }  // once a day
+            pc.moveAgents();
+            if (i % 24 == 0) { pc.moveRandomTravel(); }  // once a day
         
-        pc.Redistribute();
+            pc.Redistribute();
 
-        pc.printTotals();
+            pc.printTotals();
+        }
     }
 
     if (params.nsteps % 168 == 0) { writePlotFile(pc, params.nsteps); }

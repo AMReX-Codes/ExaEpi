@@ -3,10 +3,150 @@
 using namespace amrex;
 
 namespace {
-    void randomShuffle (std::vector<int>& vec) {
+
+    void randomShuffle (std::vector<int>& vec)
+    {
         std::random_device rd;
         std::mt19937 g(rd());
         std::shuffle(vec.begin(), vec.end(), g);
+    }
+
+    void compute_initial_distribution (amrex::Vector<int>& cell_pops,
+                                       amrex::Vector<int>& cell_indices, int ncell)
+    {
+        BL_PROFILE("compute_initial_distribution");
+
+        AMREX_ALWAYS_ASSERT(ncell == 3000); // hard-coded right now
+
+        cell_pops.resize(0);
+        cell_pops.resize(ncell*ncell, -1);
+
+        // we compute the initial distribution on Rank 0 and broadcast to all ranks
+        if (ParallelDescriptor::IOProcessor())
+        {
+            int num_pop_bins = 1000;
+            amrex::Real log_min_pop = 1.062;
+            amrex::Real log_max_pop = 4.0;
+            amrex::Vector<amrex::Real> cell_pop_bins_r(num_pop_bins);
+            amrex::Vector<amrex::Real> num_cells_per_bin_r(num_pop_bins);
+
+            for (int i = 0; i < cell_pop_bins_r.size(); ++i) {
+                cell_pop_bins_r[i] = std::pow(10.0,
+                    log_min_pop + i*(log_max_pop - log_min_pop)/(num_pop_bins-1));
+                num_cells_per_bin_r[i] = std::pow(cell_pop_bins_r[i], -1.5);
+            }
+
+            amrex::Real norm = 0;
+            for (int i = 0; i < num_cells_per_bin_r.size(); ++i) {
+                norm += num_cells_per_bin_r[i];
+            }
+
+            amrex::Vector<int> cell_pop_bins(num_pop_bins);
+            amrex::Vector<int> num_cells_per_bin(num_pop_bins);
+            for (int i = 0; i < num_cells_per_bin.size(); ++i) {
+                num_cells_per_bin_r[i] *= (ncell*ncell/norm);
+                num_cells_per_bin[i] = std::round(num_cells_per_bin_r[i]);
+                cell_pop_bins[i] = std::round(cell_pop_bins_r[i]);
+            }
+
+            int total_cells = 0;
+            for (int i = 0; i < num_cells_per_bin.size(); ++i) {
+                total_cells += num_cells_per_bin[i];
+            }
+            num_cells_per_bin[0] += (ncell*ncell - total_cells);
+
+            std::vector<int> perm(ncell*ncell);
+            std::iota(perm.begin(), perm.end(), 0);
+            randomShuffle(perm);
+
+            Vector<int> offsets(num_pop_bins+1);
+            offsets[0] = 0;
+            for (int i = 1; i < num_pop_bins+1; ++i) {
+                offsets[i] = offsets[i-1] + num_cells_per_bin[i-1];
+            }
+
+            for (int i = 0; i < num_pop_bins; ++i) {
+                for (int j = offsets[i]; j < offsets[i+1]; ++j) {
+                    cell_pops[perm[j]] = cell_pop_bins[i];
+                }
+            }
+
+            int total_agents = 0;
+            for (int i = 0; i < cell_pops.size(); ++i) {
+                total_agents += cell_pops[i];
+            }
+            amrex::Print() << "Total number of agents: " << total_agents << "\n";
+    
+            amrex::Print() << "Splitting up population into interior and border\n";
+            // we now have a list of populations for each cell. We want 1/3
+            // of the population to be within 200 cells of the border. We
+            // maintain two separate lists, one for the interior, one for the exterior
+            int interior_size = 2600*2600;
+            int border_size = ncell*ncell - interior_size;
+
+            // First we sort the vector of cell pops
+            std::sort(cell_pops.begin(), cell_pops.end());
+            amrex::Real border_pop = 0;
+            int i = cell_pops.size()-1;
+            std::vector<int> border_ids;
+            std::vector<int> interior_ids;
+            while ((border_pop < 100e6) && (i >= 0)) {
+                amrex::Real pop = cell_pops[i];
+                if (amrex::Random() < 0.5) {
+                    border_ids.push_back(i);
+                    border_pop += pop;
+                }
+                else {
+                    interior_ids.push_back(i);
+                }
+                --i;
+            }
+
+            while (interior_ids.size() < interior_size) {
+                interior_ids.push_back(i);
+                --i;
+            }
+
+            while (i >= 0) {
+                amrex::Real pop = cell_pops[i];
+                border_pop += pop;
+                border_ids.push_back(i);
+                --i;
+            }
+
+            // if these conditions are not met, then something has gone wrong with the border pop
+            AMREX_ALWAYS_ASSERT(i == -1);
+            AMREX_ALWAYS_ASSERT(interior_ids.size() == interior_size);
+            AMREX_ALWAYS_ASSERT(border_ids.size() == border_size);
+
+            amrex::Print() << "Population within 200 cells of border is " << border_pop << "\n";
+
+            randomShuffle(border_ids);
+            randomShuffle(interior_ids);
+
+            for (int cell_id = 0; cell_id < ncell*ncell; ++cell_id) {
+                int idx = cell_id % ncell;
+                int idy = cell_id / ncell;
+                if ((idx < 200) || (idx >= 2800) || (idy < 200) || (idy >= 2800)) {
+                    cell_indices.push_back(border_ids.back());
+                    border_ids.pop_back();
+                } else {
+                    cell_indices.push_back(interior_ids.back());
+                    interior_ids.pop_back();
+                }
+            }
+            AMREX_ALWAYS_ASSERT(interior_ids.size() == 0);
+            AMREX_ALWAYS_ASSERT(border_ids.size() == 0);
+        } else {
+            cell_indices.resize(0);
+            cell_indices.resize(ncell*ncell);
+        }
+
+        // Broadcast
+        ParallelDescriptor::Bcast(&cell_pops[0], cell_pops.size(),
+                                  ParallelDescriptor::IOProcessorNumber());
+        ParallelDescriptor::Bcast(&cell_indices[0], cell_indices.size(),
+                                  ParallelDescriptor::IOProcessorNumber());
     }
 }
 
@@ -15,127 +155,41 @@ void AgentContainer::initAgents ()
     BL_PROFILE("AgentContainer::initAgents");
 
     int ncell = 3000;
+    Vector<int> cell_pops;
+    Vector<int> cell_indices;
 
-    int num_pop_bins = 1000;
-    amrex::Real log_min_pop = 1.062;
-    amrex::Real log_max_pop = 4.0;
-    amrex::Vector<amrex::Real> cell_pop_bins_r(num_pop_bins);
-    amrex::Vector<amrex::Real> num_cells_per_bin_r(num_pop_bins);
+    compute_initial_distribution(cell_pops, cell_indices, ncell);
 
-    for (int i = 0; i < cell_pop_bins_r.size(); ++i) {
-        cell_pop_bins_r[i] = std::pow(10.0,
-            log_min_pop + i*(log_max_pop - log_min_pop)/(num_pop_bins-1));
-        num_cells_per_bin_r[i] = std::pow(cell_pop_bins_r[i], -1.5);
-    }
-
-    amrex::Real norm = 0;
-    for (int i = 0; i < num_cells_per_bin_r.size(); ++i) {
-        norm += num_cells_per_bin_r[i];
-    }
-
-    amrex::Vector<int> cell_pop_bins(num_pop_bins);
-    amrex::Vector<int> num_cells_per_bin(num_pop_bins);
-    for (int i = 0; i < num_cells_per_bin.size(); ++i) {
-        num_cells_per_bin_r[i] *= (ncell*ncell/norm);
-        num_cells_per_bin[i] = std::round(num_cells_per_bin_r[i]);
-        cell_pop_bins[i] = std::round(cell_pop_bins_r[i]);
-    }
-
-    int total_cells = 0;
-    for (int i = 0; i < num_cells_per_bin.size(); ++i) {
-        total_cells += num_cells_per_bin[i];
-    }
-    num_cells_per_bin[0] += (ncell*ncell - total_cells);
-
-    int total_agents = 0;
-    for (int i = 0; i < num_cells_per_bin.size(); ++i) {
-        total_agents += cell_pop_bins[i]*num_cells_per_bin[i];
-    }
-    amrex::Print() << "Total number of agents: " << total_agents << "\n";
-
-    std::vector<int> perm(ncell*ncell);
-    std::iota(perm.begin(), perm.end(), 0);
-    randomShuffle(perm);
-
-    Vector<int> offsets(num_pop_bins+1);
-    offsets[0] = 0;
-    for (int i = 1; i < num_pop_bins+1; ++i) {
-        offsets[i] = offsets[i-1] + num_cells_per_bin[i-1];
-    }
-
-    Vector<int> cell_pops(ncell*ncell, -1);
-    for (int i = 0; i < num_pop_bins; ++i) {
-        for (int j = offsets[i]; j < offsets[i+1]; ++j) {
-            cell_pops[perm[j]] = cell_pop_bins[i];
-        }
-    }
-
-    amrex::Print() << "Splitting up population into interior and border \n";
-    // we now have a list of populations for each cell. We want 1/3
-    // of the population to be within 200 cells of the border. We
-    // maintain two separate lists, one for the interior, one for the exterior
-    int interior_size = 2600*2600;
-    int border_size = ncell*ncell - interior_size;
-
-    // First we sort the vector of cell pops
-    Vector<int> sorted_cell_pops(cell_pops);
-    std::sort(sorted_cell_pops.begin(), sorted_cell_pops.end());
-    amrex::Real border_pop = 0;
-    int i = sorted_cell_pops.size()-1;
-    std::vector<int> border_ids;
-    std::vector<int> interior_ids;
-    while ((border_pop < 100e6) && (i >= 0)) {
-        amrex::Real pop = sorted_cell_pops[i];
-        if (amrex::Random() < 0.5) {
-            border_ids.push_back(i);
-            border_pop += pop;
-        }
-        else {
-            interior_ids.push_back(i);
-        }
-        --i;
-    }
-
-    while (interior_ids.size() < interior_size) {
-        interior_ids.push_back(i);
-        --i;
-    }
-    
-    while (i >= 0) {
-        amrex::Real pop = sorted_cell_pops[i];
-        border_pop += pop;
-        border_ids.push_back(i);
-        --i;
-    }
-
-    // if these conditions are not met, then something has gone wrong with the border pop
-    AMREX_ALWAYS_ASSERT(i == -1);
-    AMREX_ALWAYS_ASSERT(interior_ids.size() == interior_size);
-    AMREX_ALWAYS_ASSERT(border_ids.size() == border_size);
-
-    amrex::Print() << "Population within 200 cells of border is " << border_pop << "\n";
-
-    randomShuffle(border_ids);
-    randomShuffle(interior_ids);
-    
-    std::vector<int> cell_indices;
-    for (int cell_id = 0; cell_id < ncell*ncell; ++cell_id) {
-        int idx = cell_id % ncell;
-        int idy = cell_id / ncell;
-        if ((idx < 200) || (idx >= 2800) || (idy < 200) || (idy >= 2800)) {
-            cell_indices.push_back(border_ids.back());
-            border_ids.pop_back();
+    // now each rank will only actually add a subset of the particles
+    int ibegin, iend;
+    {
+        int myproc = ParallelDescriptor::MyProc();
+        int nprocs = ParallelDescriptor::NProcs();
+        int navg = ncell*ncell/nprocs;
+        int nleft = ncell*ncell - navg * nprocs;
+        if (myproc < nleft) {
+            ibegin = myproc*(navg+1);
+            iend = ibegin + navg+1;
         } else {
-            cell_indices.push_back(interior_ids.back());
-            interior_ids.pop_back();
+            ibegin = myproc*navg + nleft;
+            iend = ibegin + navg;
         }
     }
-    AMREX_ALWAYS_ASSERT(interior_ids.size() == 0);
-    AMREX_ALWAYS_ASSERT(border_ids.size() == 0);
-    
+    std::size_t ncell_this_rank = iend-ibegin;
+
+    std::size_t np_this_rank = 0;
+    for (int i = 0; i < ncell*ncell; ++i) {
+        if ((i < ibegin) or (i >= iend)) {
+            cell_pops[cell_indices[i]] = 0;
+        } else {
+            np_this_rank += cell_pops[cell_indices[i]];
+        }
+    }
+
+    // copy data to GPU
     amrex::Gpu::DeviceVector<int> cell_pops_d(cell_pops.size());
     amrex::Gpu::DeviceVector<int> cell_offsets_d(cell_pops.size()+1);
-    Gpu::copy(Gpu::hostToDevice, sorted_cell_pops.begin(), sorted_cell_pops.end(),
+    Gpu::copy(Gpu::hostToDevice, cell_pops.begin(), cell_pops.end(),
               cell_pops_d.begin());
     Gpu::exclusive_scan(cell_pops_d.begin(), cell_pops_d.end(), cell_offsets_d.begin());
 
@@ -144,7 +198,7 @@ void AgentContainer::initAgents ()
     
     // Fill in particle data in each cell
     auto& ptile = DefineAndReturnParticleTile(0, 0, 0);
-    ptile.resize(total_agents);
+    ptile.resize(np_this_rank);
 
     auto& soa   = ptile.GetStructOfArrays();
     auto& aos   = ptile.GetArrayOfStructs();
@@ -155,11 +209,10 @@ void AgentContainer::initAgents ()
     auto cell_offsets_ptr = cell_offsets_d.data();
     auto cell_indices_ptr = cell_indices_d.data();
 
-    amrex::Print() << "About to fill data \n";
-    
-    amrex::ParallelForRNG( ncell * ncell,
-    [=] AMREX_GPU_DEVICE (int cell_id, RandomEngine const& engine) noexcept
+    amrex::ParallelForRNG( ncell_this_rank,
+    [=] AMREX_GPU_DEVICE (int i_this_rank, RandomEngine const& engine) noexcept
     {
+        int cell_id = i_this_rank + ibegin;
         int ind = cell_indices_ptr[cell_id];
 
         int cell_start = cell_offsets_ptr[ind];
@@ -184,11 +237,11 @@ void AgentContainer::initAgents ()
         }
     });
 
-    amrex::Print() << "Finished filling data \n";
+    amrex::Print() << "Initial Redistribute... ";
     
     Redistribute();
 
-    amrex::Print() << "finished initialization \n";
+    amrex::Print() << "... finished initialization\n";
 }
 
 void AgentContainer::moveAgents ()
