@@ -327,7 +327,6 @@ void AgentContainer::updateStatus ()
             amrex::ParallelFor( np,
             [=] AMREX_GPU_DEVICE (int i) noexcept
             {
-                // enum would be good here
                 if ( (status_ptr[i] == Status::never) ||
                      (status_ptr[i] == Status::susceptible) ) {
                     return;
