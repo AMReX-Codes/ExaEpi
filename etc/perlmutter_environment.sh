@@ -3,7 +3,7 @@ export proj=m3623_g
 
 # required dependencies
 module load cmake/3.22.0
-module swap PrgEnv-nvidia PrgEnv-gnu
+module load PrgEnv-gnu
 module load cudatoolkit
 
 # an alias to request an interactive batch node for one hour
