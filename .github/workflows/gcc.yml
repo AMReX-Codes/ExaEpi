@@ -1,0 +1,102 @@
+# -Wextra-semi: GCC < 10 does not have this.
+# -Wunreachable-code: GCC no longer has this option.
+
+name: Linux GCC
+
+on: [push, pull_request]
+
+concurrency:
+  group: ${{ github.ref }}-${{ github.head_ref }}-linux-gcc
+  cancel-in-progress: true
+
+jobs:
+  # Build ExaEpi
+  # Note: this is an intentional "minimal" build that does not enable (many) options
+  library:
+    name: GNU@8.4 C++17 Release
+    runs-on: ubuntu-20.04
+    env: {CXXFLAGS: "-fno-operator-names -Werror -Wall -Wextra -Wpedantic -Wnull-dereference -Wfloat-conversion -Wshadow -Woverloaded-virtual -Wnon-virtual-dtor -Wlogical-op -Wmisleading-indentation -Wduplicated-cond -Wduplicated-branches -Wmissing-include-dirs"}
+    steps:
+    - uses: actions/checkout@v3
+    - name: Dependencies
+      run: .github/workflows/dependencies/dependencies_gcc8.sh
+    - name: Build & Install
+      run: |
+        mkdir build
+        cd build
+        cmake ..                                  \
+            -DCMAKE_VERBOSE_MAKEFILE=ON           \
+            -DCMAKE_C_COMPILER=$(which gcc-8)     \
+            -DCMAKE_CXX_COMPILER=$(which g++-8)   \
+            -DCMAKE_Fortran_COMPILER=$(which gfortran-8)
+        make -j 2
+
+  # Build ExaEpi [Debug]
+  build_debug:
+    name: GNU@9.3 C++17 Debug
+    runs-on: ubuntu-20.04
+    env: {CXXFLAGS: "-fno-operator-names -Werror -Wall -Wextra -Wpedantic -Wnull-dereference -Wfloat-conversion -Wshadow -Woverloaded-virtual -O1 -Wnon-virtual-dtor -Wlogical-op -Wmisleading-indentation -Wduplicated-cond -Wduplicated-branches -Wmissing-include-dirs"}
+      # It's too slow with -O0
+    steps:
+    - uses: actions/checkout@v3
+    - name: Dependencies
+      run: .github/workflows/dependencies/dependencies.sh
+    - name: Build & Install
+      run: |
+        cmake -S . -B build             \
+            -DCMAKE_BUILD_TYPE=Debug    \
+            -DCMAKE_VERBOSE_MAKEFILE=ON
+        cmake --build build -j 2
+
+  # Build ExaEpi
+  tests_cxx20:
+    name: GNU@10.1 C++20 OMP
+    runs-on: ubuntu-20.04
+    env: {CXXFLAGS: "-fno-operator-names -Werror -Wall -Wextra -Wpedantic -Wnull-dereference -Wfloat-conversion -Wshadow -Woverloaded-virtual -Wextra-semi -Wnon-virtual-dtor -Wlogical-op -Wmisleading-indentation -Wduplicated-cond -Wduplicated-branches -Wmissing-include-dirs"}
+    steps:
+    - uses: actions/checkout@v3
+    - name: Dependencies
+      run: .github/workflows/dependencies/dependencies_gcc10.sh
+    - name: Build & Install
+      run: |
+        mkdir build
+        cd build
+        cmake ..                        \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DCMAKE_VERBOSE_MAKEFILE=ON \
+            -DAMReX_ASSERTIONS=ON       \
+            -DAMReX_TESTING=ON          \
+            -DAMReX_BOUND_CHECK=ON      \
+            -DAMReX_FPE=ON              \
+            -DAMReX_OMP=ON              \
+            -DCMAKE_CXX_STANDARD=20     \
+            -DCMAKE_C_COMPILER=$(which gcc-10)              \
+            -DCMAKE_CXX_COMPILER=$(which g++-10)            \
+            -DCMAKE_Fortran_COMPILER=$(which gfortran-10)
+        make -j 2
+
+  # Build ExaEpi w/o MPI
+  tests-nonmpi:
+    name: GNU@8.4 C++17 NOMPI
+    runs-on: ubuntu-20.04
+    env: {CXXFLAGS: "-fno-operator-names -Werror -Wall -Wextra -Wpedantic -Wnull-dereference -Wfloat-conversion -Wshadow -Woverloaded-virtual -Wnon-virtual-dtor -Wlogical-op -Wmisleading-indentation -Wduplicated-cond -Wduplicated-branches -Wmissing-include-dirs"}
+    steps:
+    - uses: actions/checkout@v3
+    - name: Dependencies
+      run: .github/workflows/dependencies/dependencies_gcc8.sh
+    - name: Build & Install
+      run: |
+        mkdir build
+        cd build
+        cmake ..                        \
+            -DCMAKE_BUILD_TYPE=Release  \
+            -DCMAKE_VERBOSE_MAKEFILE=ON \
+            -DAMReX_ASSERTIONS=ON       \
+            -DAMReX_TESTING=ON          \
+            -DAMReX_BOUND_CHECK=ON      \
+            -DAMReX_FPE=ON              \
+            -DAMReX_MPI=OFF             \
+            -DCMAKE_C_COMPILER=$(which gcc-8)     \
+            -DCMAKE_CXX_COMPILER=$(which g++-8)   \
+            -DCMAKE_Fortran_COMPILER=$(which gfortran-8)
+        make -j 2
