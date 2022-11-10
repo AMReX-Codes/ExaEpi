@@ -76,7 +76,7 @@ namespace {
                 total_agents += cell_pops[i];
             }
             amrex::Print() << "Total number of agents: " << total_agents << "\n";
-    
+
             amrex::Print() << "Splitting up population into interior and border\n";
             // we now have a list of populations for each cell. We want 1/3
             // of the population to be within 200 cells of the border. We
@@ -195,7 +195,7 @@ void AgentContainer::initAgents ()
 
     amrex::Gpu::DeviceVector<int> cell_indices_d(cell_indices.size());
     Gpu::copy(Gpu::hostToDevice, cell_indices.begin(), cell_indices.end(), cell_indices_d.begin());
-    
+
     // Fill in particle data in each cell
     auto& ptile = DefineAndReturnParticleTile(0, 0, 0);
     ptile.resize(np_this_rank);
@@ -217,7 +217,7 @@ void AgentContainer::initAgents ()
 
         int cell_start = cell_offsets_ptr[ind];
         int cell_stop = cell_offsets_ptr[ind+1];
-        
+
         int idx = cell_id % ncell;
         int idy = cell_id / ncell;
 
@@ -238,7 +238,7 @@ void AgentContainer::initAgents ()
     });
 
     amrex::Print() << "Initial Redistribute... ";
-    
+
     Redistribute();
 
     amrex::Print() << "... finished initialization\n";
@@ -332,7 +332,7 @@ void AgentContainer::updateStatus ()
                     return;
                 }
                 else if (status_ptr[i] == Status::infected) {
-                    if (timer_ptr[i] == 0.0) { 
+                    if (timer_ptr[i] == 0.0) {
                         status_ptr[i] = Status::immune;
                         timer_ptr[i] = 6*30*24; // 6 months in hours
                     } else {
