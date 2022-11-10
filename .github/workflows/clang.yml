@@ -49,6 +49,7 @@ jobs:
             -DCMAKE_BUILD_TYPE=Debug                  \
             -DCMAKE_VERBOSE_MAKEFILE=ON               \
             -DAMReX_PRECISION=DOUBLE                  \
+            -DAMReX_MPI=OFF                           \
             -DAMReX_PARTICLES_PRECISION=SINGLE        \
             -DCMAKE_C_COMPILER=$(which clang)         \
             -DCMAKE_CXX_COMPILER=$(which clang++)
@@ -70,6 +71,7 @@ jobs:
         cmake ..                                      \
             -DCMAKE_BUILD_TYPE=Debug                  \
             -DCMAKE_VERBOSE_MAKEFILE=ON               \
+            -DAMReX_MPI=OFF                           \
             -DCMAKE_C_COMPILER=$(which clang)         \
             -DCMAKE_CXX_COMPILER=$(which clang++)
         make -j 2
