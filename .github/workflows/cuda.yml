@@ -30,6 +30,8 @@ jobs:
             -DCMAKE_CXX_COMPILER=$(which g++-6)            \
             -DCMAKE_CUDA_HOST_COMPILER=$(which g++-6)      \
             -DAMReX_CUDA_ARCH=7.0                          \
+            -DCMAKE_CUDA_STANDARD=14                       \
+            -DCMAKE_CXX_STANDARD=14                        \
             -DAMReX_CUDA_ERROR_CROSS_EXECUTION_SPACE_CALL=ON
         make -j 2
 
