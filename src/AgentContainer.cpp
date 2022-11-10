@@ -45,8 +45,8 @@ namespace {
             amrex::Vector<int> num_cells_per_bin(num_pop_bins);
             for (int i = 0; i < num_cells_per_bin.size(); ++i) {
                 num_cells_per_bin_r[i] *= (ncell*ncell/norm);
-                num_cells_per_bin[i] = std::round(num_cells_per_bin_r[i]);
-                cell_pop_bins[i] = std::round(cell_pop_bins_r[i]);
+                num_cells_per_bin[i] = static_cast<int>(std::round(num_cells_per_bin_r[i]));
+                cell_pop_bins[i] = static_cast<int>(std::round(cell_pop_bins_r[i]));
             }
 
             int total_cells = 0;
@@ -102,7 +102,7 @@ namespace {
                 --i;
             }
 
-            while (interior_ids.size() < interior_size) {
+            while (interior_ids.size() < static_cast<std::size_t>(interior_size)) {
                 interior_ids.push_back(i);
                 --i;
             }
@@ -116,8 +116,8 @@ namespace {
 
             // if these conditions are not met, then something has gone wrong with the border pop
             AMREX_ALWAYS_ASSERT(i == -1);
-            AMREX_ALWAYS_ASSERT(interior_ids.size() == interior_size);
-            AMREX_ALWAYS_ASSERT(border_ids.size() == border_size);
+            AMREX_ALWAYS_ASSERT(interior_ids.size() == static_cast<std::size_t>(interior_size));
+            AMREX_ALWAYS_ASSERT(border_ids.size() == static_cast<std::size_t>(border_size));
 
             amrex::Print() << "Population within 200 cells of border is " << border_pop << "\n";
 
@@ -179,7 +179,7 @@ void AgentContainer::initAgents ()
 
     std::size_t np_this_rank = 0;
     for (int i = 0; i < ncell*ncell; ++i) {
-        if ((i < ibegin) or (i >= iend)) {
+        if ((i < ibegin) || (i >= iend)) {
             cell_pops[cell_indices[i]] = 0;
         } else {
             np_this_rank += cell_pops[cell_indices[i]];
@@ -279,7 +279,6 @@ void AgentContainer::moveRandomTravel ()
 
     for (int lev = 0; lev <= finestLevel(); ++lev)
     {
-        const auto dx = Geom(lev).CellSizeArray();
         auto& plev  = GetParticles(lev);
 
         for(MFIter mfi = MakeMFIter(lev); mfi.isValid(); ++mfi)
@@ -311,7 +310,6 @@ void AgentContainer::updateStatus ()
 
     for (int lev = 0; lev <= finestLevel(); ++lev)
     {
-        const auto dx = Geom(lev).CellSizeArray();
         auto& plev  = GetParticles(lev);
 
         for(MFIter mfi = MakeMFIter(lev); mfi.isValid(); ++mfi)
@@ -456,7 +454,7 @@ void AgentContainer::printTotals () {
               {
                   int s[4] = {0, 0, 0, 0};
                   s[p.idata(IntIdx::status)] = 1;
-                  return {s[0], s[1], s[2], s[4]};
+                  return {s[0], s[1], s[2], s[3]};
               }, reduce_ops);
 
     Long counts[4] = {amrex::get<0>(r), amrex::get<1>(r), amrex::get<2>(r), amrex::get<3>(r)};
