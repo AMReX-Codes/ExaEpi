@@ -28,7 +28,7 @@ For example:
     cd build/bin
     ./agent ../../examples/inputs
 
-## Looing at the output
+## Looking at the output
 
 Running the code succesfully will create a number of "plt?????" files. You can visualize
 these using the script at etc/plot.py. This will require the "yt" package to be installed:
