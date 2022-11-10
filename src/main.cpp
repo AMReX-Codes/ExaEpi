@@ -62,7 +62,7 @@ void runAgent ()
     for (int i = 0; i < BL_SPACEDIM; i++) {
         is_per[i] = true;
     }
-    
+
     RealBox real_box;
     for (int n = 0; n < BL_SPACEDIM; n++)
     {
@@ -96,15 +96,15 @@ void runAgent ()
         for (int i = 0; i < params.nsteps; ++i)
         {
             amrex::Print() << "Taking step " << i << "\n";
-        
+
             if (i % 168 == 0) { writePlotFile(pc, i); }  // every week
 
-            pc.updateStatus();        
+            pc.updateStatus();
             pc.interactAgents();
 
             pc.moveAgents();
             if (i % 24 == 0) { pc.moveRandomTravel(); }  // once a day
-        
+
             pc.Redistribute();
 
             pc.printTotals();

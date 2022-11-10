@@ -201,7 +201,7 @@ public:
     void moveRandomTravel ();
 
     void updateStatus ();
-    
+
     void interactAgents ();
 
     void generateCellData (amrex::MultiFab& mf);
