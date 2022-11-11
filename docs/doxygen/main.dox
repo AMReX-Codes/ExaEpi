@@ -1,0 +1,54 @@
+// This is the main landing page for Doxygen
+
+/**
+\mainpage ExaEpi: C++ Reference
+
+  \tableofcontents
+
+  \section welcome_to_ExaEpi Welcome to ExaEpi's C++ Reference
+
+  This document provides searchable low-level information useful for developers and
+  experienced users.
+
+
+  \subsection overview_of_exaepi Overview
+
+  ExaEpi is a next generation, agent-based epidemiological modeling code based on <a href="https://github.com/AMReX-Codes/amrex">AMReX</a>.
+  ExaEpi is freely available on Github at
+  <a href="https://github.com/AMReX-Codes/ExaEpi">AMReX-Codes/ExaEpi</a>
+
+  ExaEpi is supported by...
+
+  \subsection manual_of_exaepi Manual
+
+  If you are looking for the manual of ExaEpi, please go over to our
+  documentation at <a href="https://exaepi.readthedocs.io">exaepi.readthedocs.io</a> .
+  The manual also contains introductions for new developers that are best
+  read first.
+
+
+  \subsection development_of_exaepi Development
+
+  All of ExaEpi's development is done in the GitHub repository under the
+  <a href="https://github.com/AMReX-Codes/ExaEpi/tree/development">
+  development branch</a>; anyone can see the latest updates. A monthly release is
+  tagged at the beginning of each month.
+
+
+  \subsection contribute_to_exaepi Contribute
+
+  We are always happy to have users contribute to the ExaEpi source code. To
+  contribute, issue a pull request against the development branch.
+  Any level of changes are welcome: documentation, bug fixes,
+  new test problems, new solvers, etc.
+  For more complex projects, consider opening an
+  <a href="https://github.com/AMReX-Codes/ExaEpi/issues">issue</a>
+  first to coordinate development and gather feedback.
+
+  To obtain help, simply post a
+  <a href="https://github.com/AMReX-Codes/ExaEpi/discussions">discussion</a>
+  or an
+  <a href="https://github.com/AMReX-Codes/ExaEpi/issues">issue</a>
+  on the ExaEpi GitHub page.
+
+*/
