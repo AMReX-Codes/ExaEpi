@@ -87,8 +87,6 @@ Geometry get_geometry (const DemographicData& demo,
             real_box.setHi(n, 3000.0);
         }
 
-        geom.define(base_domain, &real_box, CoordSys::cartesian, is_per);
-        return geom;
     } else if (params.ic_type == ICType::Census) {
         IntVect iv;
         iv[0] = iv[1] = (int) std::floor(std::sqrt((double) demo.Ncommunity));
@@ -97,7 +95,6 @@ Geometry get_geometry (const DemographicData& demo,
         }
         base_domain = Box(IntVect(AMREX_D_DECL(0, 0, 0)), iv-1);
 
-        real_box;
         for (int n = 0; n < BL_SPACEDIM; n++)
         {
             real_box.setLo(n, 0.0);
@@ -109,6 +106,7 @@ Geometry get_geometry (const DemographicData& demo,
     return geom;
 }
 
+/*
 void WritePlotFile (iMultiFab& num_residents, iMultiFab& unit_mf, iMultiFab& comm_mf,
                     const Geometry& geom, const AgentContainer& agents) {
     const auto& ba = num_residents.boxArray();
@@ -126,6 +124,7 @@ void WritePlotFile (iMultiFab& num_residents, iMultiFab& unit_mf, iMultiFab& com
                              geom, 0.0, 0);
     agents.WritePlotFile("plt00000", "agents");
 }
+*/
 
 void writePlotFile (AgentContainer& pc, int step) {
     amrex::Print() << "Writing plotfile \n";
@@ -153,8 +152,7 @@ void runAgent ()
 
     BoxArray ba;
     DistributionMapping dm;
-    IntVect lo = IntVect(AMREX_D_DECL(0, 0, 0));
-    ba.define(Box(lo, lo+params.size-1));
+    ba.define(geom.Domain());
     ba.maxSize(params.max_grid_size);
     dm.define(ba);
 

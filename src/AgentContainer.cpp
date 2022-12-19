@@ -477,7 +477,7 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,
                 //agent.rdata(0) = age_group;
                 agent.pos(0) = (i + 0.5)*dx[0];
                 agent.pos(1) = (j + 0.5)*dx[1];
-                agent.pos(2) = (k + 0.5)*dx[2];
+                //agent.pos(2) = (k + 0.5)*dx[2];
                 agent.id()  = pid+ip;
                 agent.cpu() = my_proc;
 
