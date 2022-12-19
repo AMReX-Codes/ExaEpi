@@ -6,7 +6,10 @@
 #include <AMReX_Geometry.H>
 #include <AMReX_IntVect.H>
 #include <AMReX_Particles.H>
+#include <AMReX_iMultiFab.H>
 #include <AMReX_Vector.H>
+
+#include "DemographicData.H"
 
 #if 0  // uncomment for EpiCast particle type
 
@@ -194,7 +197,15 @@ public:
         : amrex::ParticleContainer<0, 0, RealIdx::nattribs, IntIdx::nattribs>(a_geom, a_dmap, a_ba)
     {}
 
-    void initAgents ();
+    void initAgentsDemo (amrex::iMultiFab& /*num_residents*/,
+                         amrex::iMultiFab& /*unit_mf*/,
+                         amrex::iMultiFab& /*comm_mf*/,
+                         DemographicData& /*demo*/);
+
+    void initAgentsCensus (amrex::iMultiFab& num_residents,
+                           amrex::iMultiFab& unit_mf,
+                           amrex::iMultiFab& comm_mf,
+                           DemographicData& demo);
 
     void moveAgents ();
 
