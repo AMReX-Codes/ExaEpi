@@ -412,7 +412,7 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,
                 community_size = 2000;   /* Standard 2000-person community */
             }
 
-            int p_schoolage;
+            int p_schoolage = 0;
             if (community_size) {  // Only bother for residential communities
                 if (N5[unit] + N17[unit]) {
                     p_schoolage = 100*N17[unit] / (N5[unit] + N17[unit]);
