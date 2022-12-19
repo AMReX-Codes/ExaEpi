@@ -1,5 +1,5 @@
 # List of source files
-set(_sources main.cpp  AgentContainer.cpp  AgentContainer.H)
+set(_sources main.cpp  AgentContainer.cpp  AgentContainer.H DemographicData.H DemographicData.cpp)
 
 # List of input files
 set(_input_files )
