@@ -1,0 +1,5 @@
+agent.size = (3000, 3000)
+agent.max_grid_size = 1500
+
+agent.ic_type = "census"
+agent.nsteps = 0
