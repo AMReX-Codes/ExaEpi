@@ -441,7 +441,7 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,
                         else if (il3 < 62) { age_group = 3; }  /* one parent 30-64 (ASSUME 60%) */
                         else { age_group = 2; }                /* one parent 19-29 */
                         nr_arr(i, j, k, age_group) += 1;
-                        if (amrex::Random_int(100, engine) < p_schoolage) {
+                        if (((int) amrex::Random_int(100, engine)) < p_schoolage) {
                             age_group = 1; /* 22.0% of total population ages 5-18 */
                         } else {
                             age_group = 0;   /* 6.8% of total population ages 0-4 */
@@ -465,7 +465,7 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,
 
                     /* Now pick the children's age groups */
                     for (int nc = 2; nc < family_size; ++nc) {
-                        if (amrex::Random_int(100, engine) < p_schoolage) {
+                        if (((int) amrex::Random_int(100, engine)) < p_schoolage) {
                             age_group = 1; /* 22.0% of total population ages 5-18 */
                         } else {
                             age_group = 0;   /* 6.8% of total population ages 0-4 */
