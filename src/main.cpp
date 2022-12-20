@@ -147,7 +147,8 @@ void runAgent ()
     TestParams params;
     get_test_params(params, "agent");
 
-    DemographicData demo("data/CensusData/CA.dat");
+    DemographicData demo;
+    if (params.ic_type == ICType::Census) { demo.InitFromFile("data/CensusData/CA.dat"); }
     Geometry geom = get_geometry(demo, params);
 
     BoxArray ba;

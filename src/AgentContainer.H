@@ -181,6 +181,7 @@ struct IntIdx
 {
     enum {
         status = 0,
+        strain,
         nattribs
     };
 };
