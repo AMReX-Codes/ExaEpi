@@ -207,6 +207,7 @@ void AgentContainer::initAgentsDemo (iMultiFab& /*num_residents*/,
     auto& aos   = ptile.GetArrayOfStructs();
     auto pstruct_ptr = aos().data();
     auto status_ptr = soa.GetIntData(IntIdx::status).data();
+    auto strain_ptr = soa.GetIntData(IntIdx::strain).data();
     auto timer_ptr = soa.GetRealData(RealIdx::timer).data();
 
     auto cell_offsets_ptr = cell_offsets_d.data();
@@ -232,9 +233,13 @@ void AgentContainer::initAgentsDemo (iMultiFab& /*num_residents*/,
             p.cpu() = 0;
 
             timer_ptr[i] = 0.0;
+            strain_ptr[i] = 0;
 
             if (amrex::Random(engine) < 2e-8) {
                 status_ptr[i] = 1;
+                if (amrex::Random(engine) < 0.3) {
+                    strain_ptr[i] = 1;
+                }
                 timer_ptr[i] = 5.0*24;
             }
         }
@@ -630,6 +635,7 @@ void AgentContainer::interactAgents ()
 
             auto& soa   = ptile.GetStructOfArrays();
             auto status_ptr = soa.GetIntData(IntIdx::status).data();
+            auto strain_ptr = soa.GetIntData(IntIdx::strain).data();
             auto timer_ptr = soa.GetRealData(RealIdx::timer).data();
 
             amrex::ParallelForRNG( bins.numBins(),
@@ -639,20 +645,28 @@ void AgentContainer::interactAgents ()
                 auto cell_stop  = offsets[i_cell+1];
 
                 // compute the number of infected in this cell
-                int num_infected = 0;
+                int num_infected[2] = {0, 0};
                 for (unsigned int i = cell_start; i < cell_stop; ++i) {
                     auto pindex = inds[i];
-                    if (status_ptr[pindex] == 1) { ++num_infected; }
+                    if (status_ptr[pindex] == 1) {
+                        ++num_infected[strain_ptr[pindex]];
+                    }
                 }
 
                 // second pass - infection prob is propto num_infected
                 for (unsigned int i = cell_start; i < cell_stop; ++i) {
                     auto pindex = inds[i];
                     if ( (status_ptr[pindex] != Status::infected)
-                      && (status_ptr[pindex] != Status::immune)
-                      && (amrex::Random(engine) < 0.001*num_infected)) {
-                        status_ptr[pindex] = Status::infected;
-                        timer_ptr[pindex] = 5.0*24; // 5 days in hours
+                         && (status_ptr[pindex] != Status::immune)) {
+                        if (amrex::Random(engine) < 0.001*num_infected[0]) {
+                            strain_ptr[pindex] = 0;
+                            status_ptr[pindex] = Status::infected;
+                            timer_ptr[pindex] = 5.0*24; // 5 days in hours
+                        } else if (amrex::Random(engine) < 0.002*num_infected[1]) {
+                            strain_ptr[pindex] = 1;
+                            status_ptr[pindex] = Status::infected;
+                            timer_ptr[pindex] = 5.0*24; // 5 days in hours
+                        }
                     }
                 }
             });

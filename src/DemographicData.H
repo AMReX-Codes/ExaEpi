@@ -8,6 +8,8 @@
 
 struct DemographicData
 {
+    DemographicData () {}
+
     DemographicData (const::std::string& fname);
 
     void InitFromFile (const std::string& fname);
