@@ -30,6 +30,7 @@ struct TestParams
     int nsteps;
     int plot_int;
     short ic_type;
+    std::string census_filename;
 };
 
 void get_test_params(TestParams& params, const std::string& prefix)
@@ -48,6 +49,7 @@ void get_test_params(TestParams& params, const std::string& prefix)
         params.ic_type = ICType::Demo;
     } else if (ic_type == "census") {
         params.ic_type = ICType::Census;
+        pp.get("census_filename", params.census_filename);
     } else {
         amrex::Abort("ic type not recognized");
     }
@@ -148,7 +150,7 @@ void runAgent ()
     get_test_params(params, "agent");
 
     DemographicData demo;
-    if (params.ic_type == ICType::Census) { demo.InitFromFile("data/CensusData/CA.dat"); }
+    if (params.ic_type == ICType::Census) { demo.InitFromFile(params.census_filename); }
     Geometry geom = get_geometry(demo, params);
 
     BoxArray ba;
