@@ -128,19 +128,25 @@ void WritePlotFile (iMultiFab& num_residents, iMultiFab& unit_mf, iMultiFab& com
 }
 */
 
-void writePlotFile (AgentContainer& pc, int step) {
+void writePlotFile (AgentContainer& pc, iMultiFab& num_residents, iMultiFab& unit_mf,
+                    iMultiFab& FIPS_mf, iMultiFab& comm_mf, int step) {
     amrex::Print() << "Writing plotfile \n";
 
-    MultiFab particle_count(pc.ParticleBoxArray(0),
-                      pc.ParticleDistributionMap(0), 5, 0);
-    particle_count.setVal(0.0);
-    pc.generateCellData(particle_count);
-    WriteSingleLevelPlotfile(amrex::Concatenate("plt", step, 5), particle_count,
-                             {"total", "never_infected", "infected", "immune", "previously_infected"},
+    MultiFab output_mf(pc.ParticleBoxArray(0),
+                       pc.ParticleDistributionMap(0), 9, 0);
+    output_mf.setVal(0.0);
+    pc.generateCellData(output_mf);
+
+    amrex::Copy(output_mf, unit_mf, 0, 5, 1, 0);
+    amrex::Copy(output_mf, FIPS_mf, 0, 6, 2, 0);
+    amrex::Copy(output_mf, comm_mf, 0, 8, 1, 0);
+
+    WriteSingleLevelPlotfile(amrex::Concatenate("plt", step, 5), output_mf,
+                             {"total", "never_infected", "infected", "immune", "previously_infected", "unit", "FIPS", "Tract", "comm"},
                              pc.ParticleGeom(0), 0.0, 0);
 
     // uncomment this to write all the particles
-    //pc.WritePlotFile(amrex::Concatenate("plt", step, 5), "agents");
+    pc.WritePlotFile(amrex::Concatenate("plt", step, 5), "agents");
 }
 
 void runAgent ()
@@ -161,6 +167,7 @@ void runAgent ()
 
     iMultiFab num_residents(ba, dm, 6, 0);
     iMultiFab unit_mf(ba, dm, 1, 0);
+    iMultiFab FIPS_mf(ba, dm, 2, 0);
     iMultiFab comm_mf(ba, dm, 1, 0);
 
     AgentContainer pc(geom, dm, ba);
@@ -168,9 +175,9 @@ void runAgent ()
     {
         BL_PROFILE_REGION("Initialization");
         if (params.ic_type == ICType::Demo) {
-            pc.initAgentsDemo(num_residents, unit_mf, comm_mf, demo);
+            pc.initAgentsDemo(num_residents, unit_mf, FIPS_mf, comm_mf, demo);
         } else if (params.ic_type == ICType::Census) {
-            pc.initAgentsCensus(num_residents, unit_mf, comm_mf, demo);
+            pc.initAgentsCensus(num_residents, unit_mf, FIPS_mf, comm_mf, demo);
         }
     }
 
@@ -180,7 +187,9 @@ void runAgent ()
         {
             amrex::Print() << "Taking step " << i << "\n";
 
-            if (i % 168 == 0) { writePlotFile(pc, i); }  // every week
+            if (i % 168 == 0) {
+                writePlotFile(pc, num_residents, unit_mf, FIPS_mf, comm_mf, i);
+            }  // every week
 
             pc.updateStatus();
             pc.interactAgents();
@@ -194,5 +203,7 @@ void runAgent ()
         }
     }
 
-    if (params.nsteps % 168 == 0) { writePlotFile(pc, params.nsteps); }
+    if (params.nsteps % 168 == 0) {
+        writePlotFile(pc, num_residents, unit_mf, FIPS_mf, comm_mf, params.nsteps);
+    }
 }

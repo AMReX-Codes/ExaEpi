@@ -152,6 +152,7 @@ namespace {
 
 void AgentContainer::initAgentsDemo (iMultiFab& /*num_residents*/,
                                      iMultiFab& /*unit_mf*/,
+                                     iMultiFab& /*FIPS_mf*/,
                                      iMultiFab& /*comm_mf*/,
                                      DemographicData& /*demo*/)
 {
@@ -254,6 +255,7 @@ void AgentContainer::initAgentsDemo (iMultiFab& /*num_residents*/,
 
 void AgentContainer::initAgentsCensus (iMultiFab& num_residents,
                                        iMultiFab& unit_mf,
+                                       iMultiFab& FIPS_mf,
                                        iMultiFab& comm_mf,
                                        DemographicData& demo)
 {
@@ -265,6 +267,7 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,
 
     num_residents.setVal(0);
     unit_mf.setVal(-1);
+    FIPS_mf.setVal(-1);
     comm_mf.setVal(-1);
 
     iMultiFab num_families(num_residents.boxArray(), num_residents.DistributionMap(), 7, 0);
@@ -277,12 +280,15 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,
     for (MFIter mfi(unit_mf, TilingIfNotGPU()); mfi.isValid(); ++mfi)
     {
         auto unit_arr = unit_mf[mfi].array();
+        auto FIPS_arr = FIPS_mf[mfi].array();
         auto comm_arr = comm_mf[mfi].array();
         auto nf_arr = num_families[mfi].array();
         auto nr_arr = num_residents[mfi].array();
 
         auto unit_on_proc = demo.Unit_on_proc_d.data();
         auto Start = demo.Start_d.data();
+        auto FIPS = demo.FIPS_d.data();
+        auto Tract = demo.Tract_d.data();
         auto Population = demo.Population_d.data();
 
         auto H1 = demo.H1_d.data();
@@ -312,6 +318,8 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,
             while (community >= Start[unit+1]) { unit++; }
             unit_on_proc[unit] = 1;
             unit_arr(i, j, k) = unit;
+            FIPS_arr(i, j, k, 0) = FIPS[unit];
+            FIPS_arr(i, j, k, 1) = Tract[unit];
 
             int community_size;
             if (Population[unit] < (1000 + 2000*(community - Start[unit]))) {
@@ -378,10 +386,10 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,
         }
 
         auto offset_arr = fam_offsets[mfi].array();
-        auto& agents_tile = DefineAndReturnParticleTile(0,mfi.index(),mfi.LocalTileIndex());
+        auto& agents_tile = GetParticles(0)[std::make_pair(mfi.index(),mfi.LocalTileIndex())];
         agents_tile.resize(nagents);
         auto aos = &agents_tile.GetArrayOfStructs()[0];
-        auto soa = agents_tile.GetStructOfArrays();
+        auto& soa = agents_tile.GetStructOfArrays();
         auto status_ptr = soa.GetIntData(IntIdx::status).data();
         auto timer_ptr = soa.GetRealData(RealIdx::timer).data();
         auto dx = ParticleGeom(0).CellSizeArray();
@@ -486,11 +494,12 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,
                 agent.id()  = pid+ip;
                 agent.cpu() = my_proc;
 
-                timer_ptr[i] = 0.0;
+                status_ptr[ip] = 0;
+                timer_ptr[ip] = 0.0;
 
                 if (amrex::Random(engine) < 2e-8) {
-                    status_ptr[i] = 1;
-                    timer_ptr[i] = 5.0*24;
+                    status_ptr[ip] = 1;
+                    timer_ptr[ip] = 5.0*24;
                 }
             }
         });
