@@ -108,27 +108,7 @@ Geometry get_geometry (const DemographicData& demo,
     return geom;
 }
 
-/*
-void WritePlotFile (iMultiFab& num_residents, iMultiFab& unit_mf, iMultiFab& comm_mf,
-                    const Geometry& geom, const AgentContainer& agents) {
-    const auto& ba = num_residents.boxArray();
-    const auto& dm = num_residents.DistributionMap();
-    const int nc = num_residents.nComp() + unit_mf.nComp() + comm_mf.nComp();
-
-    MultiFab output_mf(ba, dm, nc, 0);
-    amrex::Copy(output_mf, num_residents, 0, 0, num_residents.nComp(), 0);
-    amrex::Copy(output_mf, unit_mf, 0, num_residents.nComp(), unit_mf.nComp(), 0);
-    amrex::Copy(output_mf, comm_mf, 0, num_residents.nComp() + unit_mf.nComp(),
-                comm_mf.nComp(), 0);
-
-    WriteSingleLevelPlotfile("plt00000", output_mf,
-                             {"N0", "N1", "N2", "N3", "N4", "N5", "unit", "community"},
-                             geom, 0.0, 0);
-    agents.WritePlotFile("plt00000", "agents");
-}
-*/
-
-void writePlotFile (AgentContainer& pc, iMultiFab& num_residents, iMultiFab& unit_mf,
+void writePlotFile (AgentContainer& pc, iMultiFab& /*num_residents*/, iMultiFab& unit_mf,
                     iMultiFab& FIPS_mf, iMultiFab& comm_mf, int step) {
     amrex::Print() << "Writing plotfile \n";
 
