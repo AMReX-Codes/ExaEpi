@@ -6,54 +6,10 @@
 #include "AgentContainer.H"
 #include "DemographicData.H"
 #include "IO.H"
+#include "Utils.H"
 
 using namespace amrex;
-
-/**
-  * \brief enum for the different initial condition options.
-  *        demo is for an initial power law
-  *        census reads in census data.
-  *
-  *        default is demo.
-  */
-struct ICType {
-    enum {
-        Demo = 0,
-        Census = 1
-    };
-};
-
-struct TestParams
-{
-    IntVect size;
-    int max_grid_size;
-    int nsteps;
-    int plot_int;
-    short ic_type;
-    std::string census_filename;
-};
-
-void get_test_params(TestParams& params, const std::string& prefix)
-{
-    ParmParse pp(prefix);
-    pp.get("size", params.size);
-    pp.get("max_grid_size", params.max_grid_size);
-    pp.get("nsteps", params.nsteps);
-
-    params.plot_int = -1;
-    pp.query("plot_int", params.plot_int);
-
-    std::string ic_type = "demo";
-    pp.query( "ic_type", ic_type );
-    if (ic_type == "demo") {
-        params.ic_type = ICType::Demo;
-    } else if (ic_type == "census") {
-        params.ic_type = ICType::Census;
-        pp.get("census_filename", params.census_filename);
-    } else {
-        amrex::Abort("ic type not recognized");
-    }
-}
+using namespace ExaEpi;
 
 void runAgent();
 
@@ -112,7 +68,7 @@ void runAgent ()
 {
     BL_PROFILE("runAgent");
     TestParams params;
-    get_test_params(params, "agent");
+    ExaEpi::Utils::get_test_params(params, "agent");
 
     DemographicData demo;
     if (params.ic_type == ICType::Census) { demo.InitFromFile(params.census_filename); }
