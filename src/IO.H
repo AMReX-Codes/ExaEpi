@@ -14,6 +14,6 @@ namespace IO
                         amrex::iMultiFab& FIPS_mf, amrex::iMultiFab& comm_mf, int step);
 
 }
-};
+}
 
 #endif

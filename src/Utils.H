@@ -45,6 +45,6 @@ namespace Utils
                                   const ExaEpi::TestParams& params);
 
 }
-};
+}
 
 #endif
