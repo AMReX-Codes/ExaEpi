@@ -238,9 +238,6 @@ void AgentContainer::initAgentsDemo (iMultiFab& /*num_residents*/,
 
             if (amrex::Random(engine) < 2e-8) {
                 status_ptr[i] = 1;
-                if (amrex::Random(engine) < 0.3) {
-                    strain_ptr[i] = 1;
-                }
                 timer_ptr[i] = 5.0*24;
             }
         }
@@ -538,6 +535,41 @@ void AgentContainer::moveAgents ()
     }
 }
 
+void AgentContainer::initStrain2 ()
+{
+    BL_PROFILE("AgentContainer::initStrain2");
+
+    for (int lev = 0; lev <= finestLevel(); ++lev)
+    {
+        const auto dx = Geom(lev).CellSizeArray();
+        auto& plev  = GetParticles(lev);
+
+        for(MFIter mfi = MakeMFIter(lev); mfi.isValid(); ++mfi)
+        {
+            int gid = mfi.index();
+            int tid = mfi.LocalTileIndex();
+            auto& ptile = plev[std::make_pair(gid, tid)];
+            auto& soa   = ptile.GetStructOfArrays();
+            auto status_ptr = soa.GetIntData(IntIdx::status).data();
+            auto strain_ptr = soa.GetIntData(IntIdx::strain).data();
+            auto timer_ptr = soa.GetRealData(RealIdx::timer).data();
+            const size_t np = soa.numParticles();
+
+            amrex::ParallelForRNG( np,
+            [=] AMREX_GPU_DEVICE (int i, RandomEngine const& engine) noexcept
+            {
+                if (status_ptr[i] != Status::infected) {
+                    if (amrex::Random(engine) < 2e-8) {
+                        status_ptr[i] = 1;
+                        strain_ptr[i] = 1;
+                        timer_ptr[i] = 5.0*24;
+                    }
+                }
+            });
+        }
+    }
+}
+
 void AgentContainer::moveRandomTravel ()
 {
     BL_PROFILE("AgentContainer::moveRandomTravel");
@@ -585,6 +617,7 @@ void AgentContainer::updateStatus ()
             auto& soa   = ptile.GetStructOfArrays();
             const auto np = ptile.numParticles();
             auto status_ptr = soa.GetIntData(IntIdx::status).data();
+            auto strain_ptr = soa.GetIntData(IntIdx::strain).data();
             auto timer_ptr = soa.GetRealData(RealIdx::timer).data();
 
             amrex::ParallelFor( np,
@@ -596,13 +629,18 @@ void AgentContainer::updateStatus ()
                 }
                 else if (status_ptr[i] == Status::infected) {
                     if (timer_ptr[i] == 0.0) {
-                        status_ptr[i] = Status::immune;
+                        if (strain_ptr[i] == 0) {
+                            status_ptr[i] = Status::immune1;
+                        } else if (strain_ptr[i] == 1) {
+                            status_ptr[i] = Status::immune2;
+                        }
                         timer_ptr[i] = 6*30*24; // 6 months in hours
                     } else {
                         timer_ptr[i] -= 1.0;
                     }
                 }
-                else if (status_ptr[i] == Status::immune) {
+                else if ( (status_ptr[i] == Status::immune1) ||
+                          (status_ptr[i] == Status::immune2) ) {
                     if (timer_ptr[i] == 0.0) {
                         status_ptr[i] = Status::susceptible;
                     } else {
@@ -665,19 +703,32 @@ void AgentContainer::interactAgents ()
                 // second pass - infection prob is propto num_infected
                 for (unsigned int i = cell_start; i < cell_stop; ++i) {
                     auto pindex = inds[i];
-                    if ( (status_ptr[pindex] != Status::infected)
-                         && (status_ptr[pindex] != Status::immune)) {
-                        if (amrex::Random(engine) < 0.001*num_infected[0]) {
-                            strain_ptr[pindex] = 0;
-                            status_ptr[pindex] = Status::infected;
-                            timer_ptr[pindex] = 5.0*24; // 5 days in hours
-                        } else if (amrex::Random(engine) < 0.002*num_infected[1]) {
-                            strain_ptr[pindex] = 1;
-                            status_ptr[pindex] = Status::infected;
-                            timer_ptr[pindex] = 5.0*24; // 5 days in hours
+                    if (status_ptr[pindex] == Status::infected) {
+                        continue;
+                    }
+                    if (amrex::Random(engine) < 0.001*num_infected[0]) {
+                        if ( (status_ptr[pindex] == Status::immune1) ||
+                             (status_ptr[pindex] == Status::immune2) ) {
+                            continue;
+                        }
+                        strain_ptr[pindex] = 0;
+                        status_ptr[pindex] = Status::infected;
+                        timer_ptr[pindex] = 5.0*24; // 5 days in hours
+                    }
+
+                    if (amrex::Random(engine) < 0.002*num_infected[1]) {
+                        if (status_ptr[pindex] == Status::immune2) {
+                            continue;
+                        }
+                        if ( (status_ptr[pindex] == Status::immune1)
+                             && (amrex::Random(engine) > 0.3) ) {
+                            continue;
+                        }
+                        strain_ptr[pindex] = 1;
+                        status_ptr[pindex] = Status::infected;
+                        timer_ptr[pindex] = 5.0*24; // 5 days in hours
                         }
                     }
-                }
             });
             amrex::Gpu::synchronize();
         }
@@ -710,7 +761,7 @@ void AgentContainer::generateCellData (MultiFab& mf)
             else if (status == Status::infected) {
                 amrex::Gpu::Atomic::AddNoRet(&count(iv, 2), 1.0_rt);
             }
-            else if (status == Status::immune) {
+            else if ( (status == Status::immune1) || (status == Status::immune2) ) {
                 amrex::Gpu::Atomic::AddNoRet(&count(iv, 3), 1.0_rt);
             }
             else if (status == Status::susceptible) {

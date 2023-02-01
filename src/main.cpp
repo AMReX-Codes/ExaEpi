@@ -102,6 +102,10 @@ void runAgent ()
         {
             amrex::Print() << "Taking step " << i << "\n";
 
+            if (i == 800) {
+                pc.initStrain2();
+            }
+            
             if (i % 168 == 0) {
                 ExaEpi::IO::writePlotFile(pc, num_residents, unit_mf, FIPS_mf, comm_mf, i);
             }  // every week

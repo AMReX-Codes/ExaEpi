@@ -172,7 +172,8 @@ struct Status
     enum {
         never = 0,   // never infected
         infected,    // infected
-        immune,      // no longer infected, immune
+        immune1,      // no longer infected, immune
+        immune2,      // no longer infected, immune
         susceptible  // no longer infected, no longer immnune
     };
 };
@@ -212,6 +213,8 @@ public:
 
     void moveAgents ();
 
+    void initStrain2 ();
+    
     void moveRandomTravel ();
 
     void updateStatus ();
