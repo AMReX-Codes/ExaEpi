@@ -19,6 +19,7 @@ struct TestParams
     int plot_int;
     short ic_type;
     std::string census_filename;
+    std::string workerflow_filename;
 };
 
 /**

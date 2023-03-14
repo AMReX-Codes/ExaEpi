@@ -85,10 +85,9 @@ void read_workerflow (const DemographicData& demo,
     std::ifstream ifs;
     ifs.rdbuf()->pubsetbuf(io_buffer.dataPtr(), io_buffer.size());
 
-    std::string file = "../../data/CensusData/CA-wf.bin";
-    ifs.open(file.c_str(), std::ios::in|std::ios::binary);
+    ifs.open(params.workerflow_filename.c_str(), std::ios::in|std::ios::binary);
     if (!ifs.good()) {
-        amrex::FileOpenFailed(file);
+        amrex::FileOpenFailed(params.workerflow_filename);
     }
 
     const std::streamoff CURPOS = ifs.tellg();
