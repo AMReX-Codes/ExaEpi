@@ -182,6 +182,11 @@ struct IntIdx
     enum {
         status = 0,
         strain,
+        age_group,
+        home_i,
+        home_j,
+        work_i,
+        work_j,
         nattribs
     };
 };
@@ -210,7 +215,11 @@ public:
                            amrex::iMultiFab& comm_mf,
                            DemographicData& demo);
 
-    void moveAgents ();
+    void moveAgentsRandomWalk ();
+
+    void moveAgentsToWork ();
+
+    void moveAgentsToHome ();
 
     void moveRandomTravel ();
 

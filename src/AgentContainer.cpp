@@ -390,7 +390,14 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,
         agents_tile.resize(nagents);
         auto aos = &agents_tile.GetArrayOfStructs()[0];
         auto& soa = agents_tile.GetStructOfArrays();
+
         auto status_ptr = soa.GetIntData(IntIdx::status).data();
+        auto age_group_ptr = soa.GetIntData(IntIdx::age_group).data();
+        auto home_i_ptr = soa.GetIntData(IntIdx::home_i).data();
+        auto home_j_ptr = soa.GetIntData(IntIdx::home_j).data();
+        auto work_i_ptr = soa.GetIntData(IntIdx::work_i).data();
+        auto work_j_ptr = soa.GetIntData(IntIdx::work_j).data();
+
         auto timer_ptr = soa.GetRealData(RealIdx::timer).data();
         auto dx = ParticleGeom(0).CellSizeArray();
         auto my_proc = ParallelDescriptor::MyProc();
@@ -487,15 +494,18 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,
                     }
                 }
 
-                //agent.rdata(0) = age_group;
                 agent.pos(0) = (i + 0.5)*dx[0];
                 agent.pos(1) = (j + 0.5)*dx[1];
-                //agent.pos(2) = (k + 0.5)*dx[2];
                 agent.id()  = pid+ip;
                 agent.cpu() = my_proc;
 
                 status_ptr[ip] = 0;
                 timer_ptr[ip] = 0.0;
+                age_group_ptr[ip] = age_group;
+                home_i_ptr[ip] = i;
+                home_j_ptr[ip] = j;
+                work_i_ptr[ip] = i;
+                work_j_ptr[ip] = j;
 
                 if (amrex::Random(engine) < 2e-8) {
                     status_ptr[ip] = 1;
@@ -509,9 +519,9 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,
     amrex::Gpu::streamSynchronize();
 }
 
-void AgentContainer::moveAgents ()
+void AgentContainer::moveAgentsRandomWalk ()
 {
-    BL_PROFILE("AgentContainer::moveAgents");
+    BL_PROFILE("AgentContainer::moveAgentsRandomWalk");
 
     for (int lev = 0; lev <= finestLevel(); ++lev)
     {
@@ -533,6 +543,72 @@ void AgentContainer::moveAgents ()
                 ParticleType& p = pstruct[i];
                 p.pos(0) += static_cast<ParticleReal> ((2*amrex::Random(engine)-1)*dx[0]);
                 p.pos(1) += static_cast<ParticleReal> ((2*amrex::Random(engine)-1)*dx[1]);
+            });
+        }
+    }
+}
+
+void AgentContainer::moveAgentsToWork ()
+{
+    BL_PROFILE("AgentContainer::moveAgentsToWork");
+
+    for (int lev = 0; lev <= finestLevel(); ++lev)
+    {
+        const auto dx = Geom(lev).CellSizeArray();
+        auto& plev  = GetParticles(lev);
+
+        for(MFIter mfi = MakeMFIter(lev); mfi.isValid(); ++mfi)
+        {
+            int gid = mfi.index();
+            int tid = mfi.LocalTileIndex();
+            auto& ptile = plev[std::make_pair(gid, tid)];
+            auto& aos   = ptile.GetArrayOfStructs();
+            ParticleType* pstruct = &(aos[0]);
+            const size_t np = aos.numParticles();
+
+            auto& soa = ptile.GetStructOfArrays();
+            auto work_i_ptr = soa.GetIntData(IntIdx::work_i).data();
+            auto work_j_ptr = soa.GetIntData(IntIdx::work_j).data();
+
+            amrex::ParallelFor( np,
+            [=] AMREX_GPU_DEVICE (int ip) noexcept
+            {
+                ParticleType& p = pstruct[ip];
+                p.pos(0) = (work_i_ptr[ip] + 0.5)*dx[0];
+                p.pos(1) = (work_j_ptr[ip] + 0.5)*dx[1];
+            });
+        }
+    }
+}
+
+void AgentContainer::moveAgentsToHome ()
+{
+    BL_PROFILE("AgentContainer::moveAgentsToHome");
+
+    for (int lev = 0; lev <= finestLevel(); ++lev)
+    {
+        const auto dx = Geom(lev).CellSizeArray();
+        auto& plev  = GetParticles(lev);
+
+        for(MFIter mfi = MakeMFIter(lev); mfi.isValid(); ++mfi)
+        {
+            int gid = mfi.index();
+            int tid = mfi.LocalTileIndex();
+            auto& ptile = plev[std::make_pair(gid, tid)];
+            auto& aos   = ptile.GetArrayOfStructs();
+            ParticleType* pstruct = &(aos[0]);
+            const size_t np = aos.numParticles();
+
+            auto& soa = ptile.GetStructOfArrays();
+            auto home_i_ptr = soa.GetIntData(IntIdx::home_i).data();
+            auto home_j_ptr = soa.GetIntData(IntIdx::home_j).data();
+
+            amrex::ParallelFor( np,
+            [=] AMREX_GPU_DEVICE (int ip) noexcept
+            {
+                ParticleType& p = pstruct[ip];
+                p.pos(0) = (home_i_ptr[ip] + 0.5)*dx[0];
+                p.pos(1) = (home_j_ptr[ip] + 0.5)*dx[1];
             });
         }
     }
