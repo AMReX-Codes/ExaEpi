@@ -68,7 +68,9 @@ unsigned int **flow;   /* Workerflow matrix */
 
 void read_workerflow (const DemographicData& demo,
                       const TestParams& params,
-                      const iMultiFab& unit_mf) {
+                      const iMultiFab& unit_mf,
+                      const iMultiFab& comm_mf,
+                      AgentContainer& pc) {
 
   /* Allocate worker-flow matrix, only from units with nighttime
      communities on this processor (Unit_on_proc[] flag) */
@@ -135,24 +137,64 @@ void read_workerflow (const DemographicData& demo,
         }
     }
 
+    const Box& domain = pc.Geom(0).Domain();
+
     /* This is where workplaces should be assigned */
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
 #endif
     for (MFIter mfi(unit_mf, TilingIfNotGPU()); mfi.isValid(); ++mfi)
     {
+        auto& agents_tile = pc.GetParticles(0)[std::make_pair(mfi.index(),mfi.LocalTileIndex())];
+        auto& soa = agents_tile.GetStructOfArrays();
+        auto age_group_ptr = soa.GetIntData(IntIdx::age_group).data();
+        auto home_i_ptr = soa.GetIntData(IntIdx::home_i).data();
+        auto home_j_ptr = soa.GetIntData(IntIdx::home_j).data();
+        auto work_i_ptr = soa.GetIntData(IntIdx::work_i).data();
+        auto work_j_ptr = soa.GetIntData(IntIdx::work_j).data();
+
+        auto np = soa.numParticles();
+
         auto unit_arr = unit_mf[mfi].array();
-        auto bx = mfi.tilebox();
-        amrex::ParallelForRNG(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k, amrex::RandomEngine const& engine) noexcept
-        {
-            int from = unit_arr(i, j, k);
+        auto comm_arr = comm_mf[mfi].array();
 
-            /* Randomly assign the eligible working-age population */
-            double number = (unsigned int) rint(((double) demo.Population[from]) / 2000.0);
-            double nwork = 2000.0 * number * .586; /* 58.6% of population is working-age */
+        amrex::ParallelForRNG( np,
+            [=] AMREX_GPU_DEVICE (int ip, RandomEngine const& engine) noexcept
+            {
+                auto from = unit_arr(home_i_ptr[ip], home_j_ptr[ip], 0);
 
-            if (!nwork) { return; }
-        });
+                /* Randomly assign the eligible working-age population */
+                unsigned int number = (unsigned int) rint(((Real) demo.Population[from]) / 2000.0);
+                unsigned int nwork = 2000.0 * number * .586; /* 58.6% of population is working-age */
+                if (nwork == 0) { return; }
+
+                int age_group = age_group_ptr[ip];
+                /* Check working-age population */
+                if ((age_group == 2) || (age_group == 3)) {
+                    unsigned int irnd = amrex::Random_int(nwork, engine);
+                    int to, comm_to;
+                    if (irnd < flow[from][demo.Nunit-1]) {
+                        /* Choose a random destination unit */
+                        to = 0;
+                        while (irnd >= flow[from][to]) { to++; }
+                    }
+
+                    /*If from=to unit, 25% EXTRA chance of working in home community*/
+                    if ((from == to) && (amrex::Random(engine) < 0.25)) {
+                        comm_to = comm_arr(home_i_ptr[ip], home_j_ptr[ip], 0);
+                    } else {
+                        /* Choose a random community within that destination unit */
+                        comm_to = demo.Start[to] + amrex::Random_int(demo.Start[to+1] - demo.Start[to]);
+                        AMREX_ALWAYS_ASSERT(comm_to < demo.Ncommunity);
+                    }
+
+                    IntVect comm_to_iv = domain.atOffset(comm_to);
+                    work_i_ptr[ip] = comm_to_iv[0];
+                    work_j_ptr[ip] = comm_to_iv[1];
+
+                    // still need to handle workgroups, neighborboods
+                }
+            });
     }
 }
 
@@ -187,7 +229,7 @@ void runAgent ()
             pc.initAgentsCensus(num_residents, unit_mf, FIPS_mf, comm_mf, demo);
         }
 
-        read_workerflow(demo, params, unit_mf);
+        read_workerflow(demo, params, unit_mf, comm_mf, pc);
     }
 
     {
