@@ -64,6 +64,99 @@ Geometry get_geometry (const DemographicData& demo,
     return geom;
 }
 
+unsigned int **flow;   /* Workerflow matrix */
+
+void read_workerflow (const DemographicData& demo,
+                      const TestParams& params,
+                      const iMultiFab& unit_mf) {
+
+  /* Allocate worker-flow matrix, only from units with nighttime
+     communities on this processor (Unit_on_proc[] flag) */
+    flow = (unsigned int **) amrex::The_Arena()->alloc(demo.Nunit*sizeof(unsigned int *));
+    for (int i = 0; i < demo.Nunit; i++) {
+        if (demo.Unit_on_proc[i]) {
+            flow[i] = (unsigned int *) amrex::The_Arena()->alloc(demo.Nunit*sizeof(unsigned int));
+            for (int j = 0; j < demo.Nunit; j++) flow[i][j] = 0;
+        }
+    }
+
+    VisMF::IO_Buffer io_buffer(VisMF::IO_Buffer_Size);
+
+    std::ifstream ifs;
+    ifs.rdbuf()->pubsetbuf(io_buffer.dataPtr(), io_buffer.size());
+
+    std::string file = "../../data/CensusData/CA-wf.bin";
+    ifs.open(file.c_str(), std::ios::in|std::ios::binary);
+    if (!ifs.good()) {
+        amrex::FileOpenFailed(file);
+    }
+
+    const std::streamoff CURPOS = ifs.tellg();
+    ifs.seekg(0,std::ios::end);
+    const std::streamoff ENDPOS = ifs.tellg();
+    const long num_work = (ENDPOS - CURPOS) / (3*sizeof(unsigned int));
+
+    ifs.seekg(CURPOS, std::ios::beg);
+
+    for (int work = 0; work < num_work; ++work) {
+        unsigned int from, to, number;
+        ifs.read((char*)&from, sizeof(from));
+        ifs.read((char*)&to, sizeof(to));
+        ifs.read((char*)&number, sizeof(number));
+        int i = demo.myIDtoUnit[from];
+        if (demo.Unit_on_proc[i]) {
+            int j = demo.myIDtoUnit[to];
+            if (demo.Start[j+1] != demo.Start[j]) { // if there are communities in this unit
+                flow[i][j] = number;
+            }
+        }
+    }
+
+    /* Convert to cumulative numbers to enable random selection */
+    for (int i = 0; i < demo.Nunit; i++) {
+        if (demo.Unit_on_proc[i]) {
+            for (int j = 1; j < demo.Nunit; j++) {
+                flow[i][j] += flow[i][j-1];
+            }
+        }
+    }
+
+    /* These numbers were for the true population, and do not include
+       the roughly 2% of people who were on vacation or sick during the
+       Census 2000 reporting week.  We need to scale the worker flow to
+       the model tract residential populations, and might as well add
+       the 2% back in while we're at it.... */
+    for (int i = 0; i < demo.Nunit; i++) {
+        if (demo.Unit_on_proc[i] && demo.Population[i]) {
+            unsigned int number = (unsigned int) rint(((double) demo.Population[i]) / 2000.0);
+            double scale = 1.02 * (2000.0 * number) / ((double) demo.Population[i]);
+            for (int j = 0; j < demo.Nunit; j++) {
+                flow[i][j] = rint((double) flow[i][j] * scale);
+            }
+        }
+    }
+
+    /* This is where workplaces should be assigned */
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (Gpu::notInLaunchRegion())
+#endif
+    for (MFIter mfi(unit_mf, TilingIfNotGPU()); mfi.isValid(); ++mfi)
+    {
+        auto unit_arr = unit_mf[mfi].array();
+        auto bx = mfi.tilebox();
+        amrex::ParallelForRNG(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k, amrex::RandomEngine const& engine) noexcept
+        {
+            int from = unit_arr(i, j, k);
+
+            /* Randomly assign the eligible working-age population */
+            double number = (unsigned int) rint(((double) demo.Population[from]) / 2000.0);
+            double nwork = 2000.0 * number * .586; /* 58.6% of population is working-age */
+
+            if (!nwork) { return; }
+        });
+    }
+}
+
 void runAgent ()
 {
     BL_PROFILE("runAgent");
@@ -94,6 +187,8 @@ void runAgent ()
         } else if (params.ic_type == ICType::Census) {
             pc.initAgentsCensus(num_residents, unit_mf, FIPS_mf, comm_mf, demo);
         }
+
+        read_workerflow(demo, params, unit_mf);
     }
 
     {
@@ -109,7 +204,7 @@ void runAgent ()
             pc.updateStatus();
             pc.interactAgents();
 
-            pc.moveAgents();
+            pc.moveAgentsRandomWalk();
             if (i % 24 == 0) { pc.moveRandomTravel(); }  // once a day
 
             pc.Redistribute();
