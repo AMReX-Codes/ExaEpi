@@ -192,7 +192,15 @@ void read_workerflow (const DemographicData& demo,
                     work_i_ptr[ip] = comm_to_iv[0];
                     work_j_ptr[ip] = comm_to_iv[1];
 
-                    // still need to handle workgroups, neighborboods
+                    // still need to handle workgroups
+                    /* Number of workgroups,  cd->Nworkgroup */
+                    // number = (unsigned int) rint( ((Real) demo.Ndaywork[to]) /
+                    //((Real) WG_size * (demo.Start[to+1] - demo.Start[to])) );
+
+                    /* Choose a random workgroup 1, 2, ..., cd->Nworkgroup */
+                    //if (number) pt->workgroup = 1 + lrand48() % number;
+
+                    // still need to handle neighborboods
                 }
             });
     }

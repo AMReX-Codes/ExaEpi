@@ -163,6 +163,7 @@ struct RealIdx
           Agents are infected for 5 days, then immune for 6 months.
          */
         timer = 0,
+        prob,
         nattribs
     };
 };
@@ -226,6 +227,10 @@ public:
     void updateStatus ();
 
     void interactAgents ();
+
+    void interactAgentsHomeWork ();
+
+    void infectAgents ();
 
     void generateCellData (amrex::MultiFab& mf);
 
