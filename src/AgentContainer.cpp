@@ -397,6 +397,8 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,
         auto home_j_ptr = soa.GetIntData(IntIdx::home_j).data();
         auto work_i_ptr = soa.GetIntData(IntIdx::work_i).data();
         auto work_j_ptr = soa.GetIntData(IntIdx::work_j).data();
+        auto nborhood_ptr = soa.GetIntData(IntIdx::nborhood).data();
+        auto school_ptr = soa.GetIntData(IntIdx::school).data();
 
         auto timer_ptr = soa.GetRealData(RealIdx::timer).data();
         auto dx = ParticleGeom(0).CellSizeArray();
@@ -446,8 +448,9 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,
             for (int ip = start; ip < start + num_to_add; ++ip) {
                 auto& agent = aos[ip];
                 int il2 = amrex::Random_int(100, engine);
-
+                int nborhood = amrex::Random_int(4, engine);
                 int age_group;
+
                 if (family_size == 1) {
                     if (il2 < 28) { age_group = 4; }      /* single adult age 65+   */
                     else if (il2 < 68) { age_group = 3; } /* age 30-64 (ASSUME 40%) */
@@ -506,7 +509,15 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,
                 home_j_ptr[ip] = j;
                 work_i_ptr[ip] = i;
                 work_j_ptr[ip] = j;
+                nborhood_ptr[ip] = nborhood;
 
+                if (age_group == 0) {
+                    school_ptr[ip] = 5; // note - need to handle playgroups
+                } else if (age_group == 1) {
+                    school_ptr[ip] = assign_school(nborhood, engine);
+                } else{
+                    school_ptr[ip] = -1;
+                }
                 if (amrex::Random(engine) < 2e-8) {
                     status_ptr[ip] = 1;
                     timer_ptr[ip] = 5.0*24;

@@ -188,9 +188,31 @@ struct IntIdx
         home_j,
         work_i,
         work_j,
+        nborhood,
+        school,
         nattribs
     };
 };
+
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+int assign_school (const int nborhood, const amrex::RandomEngine& engine) {
+    int il4 = amrex::Random_int(100, engine);
+    int school = -1;
+
+    if (il4 < 36) {
+        school = 3 + (nborhood / 2);  /* elementary school */
+    }
+    else if (il4 < 68) {
+        school = 2;  /* middle school */
+    }
+    else if (il4 < 93) {
+        school = 1;  /* high school */
+    }
+    else {
+        school = 0;  /* not in school, presumably 18-year-olds or some home-schooled */
+    }
+    return school;
+}
 
 class AgentContainer
     : public amrex::ParticleContainer<0, 0, RealIdx::nattribs, IntIdx::nattribs>
