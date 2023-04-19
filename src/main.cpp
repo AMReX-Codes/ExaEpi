@@ -152,7 +152,9 @@ void read_workerflow (const DemographicData& demo,
         auto home_j_ptr = soa.GetIntData(IntIdx::home_j).data();
         auto work_i_ptr = soa.GetIntData(IntIdx::work_i).data();
         auto work_j_ptr = soa.GetIntData(IntIdx::work_j).data();
-
+        auto nborhood_ptr = soa.GetIntData(IntIdx::nborhood).data();
+        auto workgroup_ptr = soa.GetIntData(IntIdx::workgroup).data();
+        auto work_nborhood_ptr = soa.GetIntData(IntIdx::work_nborhood).data();
         auto np = soa.numParticles();
 
         auto unit_arr = unit_mf[mfi].array();
@@ -192,15 +194,15 @@ void read_workerflow (const DemographicData& demo,
                     work_i_ptr[ip] = comm_to_iv[0];
                     work_j_ptr[ip] = comm_to_iv[1];
 
-                    // still need to handle workgroups
-                    /* Number of workgroups,  cd->Nworkgroup */
-                    // number = (unsigned int) rint( ((Real) demo.Ndaywork[to]) /
-                    //((Real) WG_size * (demo.Start[to+1] - demo.Start[to])) );
+                    constexpr int WG_size = 20;
+                    number = (unsigned int) rint( ((Real) demo.Ndaywork[to]) /
+                             ((Real) WG_size * (demo.Start[to+1] - demo.Start[to])) );
 
-                    /* Choose a random workgroup 1, 2, ..., cd->Nworkgroup */
-                    //if (number) pt->workgroup = 1 + lrand48() % number;
+                    work_nborhood_ptr[ip]=4*(amrex::Random_int(4, engine))+nborhood_ptr[ip];
 
-                    // still need to handle neighborboods
+                    if (number) {
+                        workgroup_ptr[ip] = 1 + amrex::Random_int(number, engine);
+                    }
                 }
             });
     }

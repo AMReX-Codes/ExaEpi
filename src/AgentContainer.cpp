@@ -399,6 +399,8 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,
         auto work_j_ptr = soa.GetIntData(IntIdx::work_j).data();
         auto nborhood_ptr = soa.GetIntData(IntIdx::nborhood).data();
         auto school_ptr = soa.GetIntData(IntIdx::school).data();
+        auto workgroup_ptr = soa.GetIntData(IntIdx::workgroup).data();
+        auto work_nborhood_ptr = soa.GetIntData(IntIdx::work_nborhood).data();
 
         auto timer_ptr = soa.GetRealData(RealIdx::timer).data();
         auto dx = ParticleGeom(0).CellSizeArray();
@@ -510,6 +512,8 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,
                 work_i_ptr[ip] = i;
                 work_j_ptr[ip] = j;
                 nborhood_ptr[ip] = nborhood;
+                work_nborhood_ptr[ip] = 5*nborhood;
+                workgroup_ptr[ip] = 0;
 
                 if (age_group == 0) {
                     school_ptr[ip] = 5; // note - need to handle playgroups

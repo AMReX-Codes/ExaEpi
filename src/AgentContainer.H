@@ -190,6 +190,8 @@ struct IntIdx
         work_j,
         nborhood,
         school,
+        workgroup,
+        work_nborhood,
         nattribs
     };
 };
