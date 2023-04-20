@@ -34,6 +34,7 @@ void ExaEpi::Utils::get_test_params(TestParams& params, const std::string& prefi
         params.ic_type = ICType::Census;
         pp.get("census_filename", params.census_filename);
         pp.get("workerflow_filename", params.workerflow_filename);
+        pp.get("case_filename", params.case_filename);
     } else {
         amrex::Abort("ic type not recognized");
     }

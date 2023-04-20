@@ -3,6 +3,8 @@ set(_sources
          main.cpp
          AgentContainer.H
          AgentContainer.cpp
+         CaseData.H
+         CaseData.cpp
          DemographicData.H
          DemographicData.cpp
          Initialization.H

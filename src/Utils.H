@@ -20,6 +20,7 @@ struct TestParams
     short ic_type;
     std::string census_filename;
     std::string workerflow_filename;
+    std::string case_filename;
 };
 
 /**

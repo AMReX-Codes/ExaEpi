@@ -4,6 +4,7 @@
 #include <AMReX_MultiFab.H>
 
 #include "AgentContainer.H"
+#include "CaseData.H"
 #include "DemographicData.H"
 #include "Initialization.H"
 #include "IO.H"
@@ -31,6 +32,10 @@ void runAgent ()
 
     DemographicData demo;
     if (params.ic_type == ICType::Census) { demo.InitFromFile(params.census_filename); }
+
+    CaseData cases;
+    if (params.ic_type == ICType::Census) { cases.InitFromFile(params.case_filename); }
+
     Geometry geom = ExaEpi::Utils::get_geometry(demo, params);
 
     BoxArray ba;
