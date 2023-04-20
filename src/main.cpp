@@ -82,4 +82,6 @@ void runAgent ()
     if (params.nsteps % 168 == 0) {
         ExaEpi::IO::writePlotFile(pc, num_residents, unit_mf, FIPS_mf, comm_mf, params.nsteps);
     }
+
+    ExaEpi::IO::writeFIPSData(pc, unit_mf, FIPS_mf, comm_mf, demo);
 }

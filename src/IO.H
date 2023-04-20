@@ -4,15 +4,19 @@
 #include <AMReX_iMultiFab.H>
 
 #include "AgentContainer.H"
+#include "DemographicData.H"
 
 namespace ExaEpi
 {
 namespace IO
 {
 
-    void writePlotFile (AgentContainer& pc, amrex::iMultiFab& num_residents, amrex::iMultiFab& unit_mf,
-                        amrex::iMultiFab& FIPS_mf, amrex::iMultiFab& comm_mf, int step);
+    void writePlotFile (const AgentContainer& pc, const amrex::iMultiFab& num_residents, const amrex::iMultiFab& unit_mf,
+                        const amrex::iMultiFab& FIPS_mf, const amrex::iMultiFab& comm_mf, const int step);
 
+    void writeFIPSData (const AgentContainer& pc, const amrex::iMultiFab& unit_mf,
+                        const amrex::iMultiFab& FIPS_mf, const amrex::iMultiFab& comm_mf,
+                        const DemographicData& demo);
 }
 }
 

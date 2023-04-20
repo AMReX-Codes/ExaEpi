@@ -52,6 +52,7 @@ void DemographicData::InitFromFile (const std::string& fname)
     H7.resize(Nunit);
 
     Ndaywork.resize(Nunit);
+    myIDtoUnit.resize(65334);
     Unit_on_proc.resize(Nunit);
 
     Ncommunity = 0;
@@ -162,5 +163,6 @@ void DemographicData::CopyDataToDevice () {
     CopyToDeviceAsync(H7, H7_d);
 
     CopyToDeviceAsync(Ndaywork, Ndaywork_d);
+    CopyToDeviceAsync(myIDtoUnit, myIDtoUnit_d);
     CopyToDeviceAsync(Unit_on_proc, Unit_on_proc_d);
 }

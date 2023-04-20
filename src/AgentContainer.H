@@ -256,9 +256,11 @@ public:
 
     void infectAgents ();
 
-    void generateCellData (amrex::MultiFab& mf);
+    void generateCellData (amrex::MultiFab& mf) const;
 
     void printTotals ();
 };
+
+using AgentIterator = typename AgentContainer::ParIterType;
 
 #endif

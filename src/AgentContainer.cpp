@@ -880,7 +880,7 @@ void AgentContainer::interactAgentsHomeWork ()
     }
 }
 
-void AgentContainer::generateCellData (MultiFab& mf)
+void AgentContainer::generateCellData (MultiFab& mf) const
 {
     BL_PROFILE("AgentContainer::generateCellData");
 
