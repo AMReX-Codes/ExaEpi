@@ -8,3 +8,6 @@ agent.ic_type = "demo"
 
 # in hours, so 2016 = 12 * 7 * 24, or 12 weeks
 agent.nsteps = 2016
+
+agent.plot_int = 168
+agent.random_travel_int = 24
