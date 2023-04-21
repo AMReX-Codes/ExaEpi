@@ -72,6 +72,10 @@ void runAgent ()
                 ExaEpi::IO::writePlotFile(pc, num_residents, unit_mf, FIPS_mf, comm_mf, i);
             }
 
+            if ((params.aggregated_diag_int > 0) && (i % params.aggregated_diag_int == 0)) {
+                ExaEpi::IO::writeFIPSData(pc, unit_mf, FIPS_mf, comm_mf, demo, params.aggregated_diag_prefix, i);
+            }
+
             pc.updateStatus();
             pc.interactAgents();
 
@@ -90,5 +94,7 @@ void runAgent ()
         ExaEpi::IO::writePlotFile(pc, num_residents, unit_mf, FIPS_mf, comm_mf, params.nsteps);
     }
 
-    ExaEpi::IO::writeFIPSData(pc, unit_mf, FIPS_mf, comm_mf, demo);
+    if ((params.aggregated_diag_int > 0) && (params.nsteps % params.aggregated_diag_int == 0)) {
+        ExaEpi::IO::writeFIPSData(pc, unit_mf, FIPS_mf, comm_mf, demo, params.aggregated_diag_prefix, params.nsteps);
+    }
 }

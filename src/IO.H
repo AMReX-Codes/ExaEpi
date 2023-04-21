@@ -6,6 +6,8 @@
 #include "AgentContainer.H"
 #include "DemographicData.H"
 
+#include <string>
+
 namespace ExaEpi
 {
 namespace IO
@@ -16,7 +18,7 @@ namespace IO
 
     void writeFIPSData (const AgentContainer& pc, const amrex::iMultiFab& unit_mf,
                         const amrex::iMultiFab& FIPS_mf, const amrex::iMultiFab& comm_mf,
-                        const DemographicData& demo);
+                        const DemographicData& demo, const std::string& prefix, const int step);
 }
 }
 

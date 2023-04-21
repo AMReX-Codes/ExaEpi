@@ -41,6 +41,12 @@ void ExaEpi::Utils::get_test_params(TestParams& params, const std::string& prefi
     } else {
         amrex::Abort("ic type not recognized");
     }
+
+    params.aggregated_diag_int = -1;
+    pp.query("aggregated_diag_int", params.aggregated_diag_int);
+    if (params.aggregated_diag_int >= 0) {
+        pp.get("aggregated_diag_prefix", params.aggregated_diag_prefix);
+    }
 }
 
 /* Determine number of cells in each direction required */

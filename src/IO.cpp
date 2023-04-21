@@ -1,6 +1,7 @@
 #include <AMReX_GpuContainers.H>
 #include <AMReX_PlotFileUtil.H>
 #include <AMReX_REAL.H>
+#include <AMReX_Utility.H>
 
 #include "IO.H"
 
@@ -36,7 +37,7 @@ void writePlotFile (const AgentContainer& pc, const iMultiFab& /*num_residents*/
 
 void writeFIPSData (const AgentContainer& agents, const iMultiFab& unit_mf,
                     const iMultiFab& FIPS_mf, const iMultiFab& comm_mf,
-                    const DemographicData& demo) {
+                    const DemographicData& demo, const std::string& prefix, const int step) {
     amrex::Print() << "Generating diagnostic data by FIPS code \n";
 
     std::vector<amrex::Real> data(demo.Nunit, 0.0);
@@ -80,9 +81,8 @@ void writeFIPSData (const AgentContainer& agents, const iMultiFab& unit_mf,
 
     if (ParallelDescriptor::IOProcessor())
     {
-        // open file
-        std::ofstream ofs{"test.txt",
-            std::ofstream::out | std::ofstream::app};
+        std::string fn = amrex::Concatenate(prefix, step, 5);
+        std::ofstream ofs{fn, std::ofstream::out | std::ofstream::app};
 
         // set precision
         ofs << std::fixed << std::setprecision(14) << std::scientific;

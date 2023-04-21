@@ -10,6 +10,9 @@ agent.nsteps = 0
 agent.plot_int = 168
 agent.random_travel_int = 24
 
+agent.aggregated_diag_int = 168
+agent.aggregated_diag_prefix = "cases"
+
 contact.pSC  = 0.2
 contact.pCO  = 1.45
 contact.pNH  = 1.45
