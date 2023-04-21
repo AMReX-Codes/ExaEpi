@@ -17,6 +17,7 @@ struct TestParams
     int max_grid_size;
     int nsteps;
     int plot_int;
+    int random_travel_int;
     short ic_type;
     std::string census_filename;
     std::string workerflow_filename;

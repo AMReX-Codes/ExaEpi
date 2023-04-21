@@ -26,6 +26,9 @@ void ExaEpi::Utils::get_test_params(TestParams& params, const std::string& prefi
     params.plot_int = -1;
     pp.query("plot_int", params.plot_int);
 
+    params.random_travel_int = -1;
+    pp.query("random_travel_int", params.random_travel_int);
+
     std::string ic_type = "demo";
     pp.query( "ic_type", ic_type );
     if (ic_type == "demo") {

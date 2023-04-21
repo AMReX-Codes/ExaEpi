@@ -68,15 +68,17 @@ void runAgent ()
         {
             amrex::Print() << "Taking step " << i << "\n";
 
-            if (i % 168 == 0) {
+            if ((params.plot_int > 0) && (i % params.plot_int == 0)) {
                 ExaEpi::IO::writePlotFile(pc, num_residents, unit_mf, FIPS_mf, comm_mf, i);
-            }  // every week
+            }
 
             pc.updateStatus();
             pc.interactAgents();
 
             pc.moveAgentsRandomWalk();
-            if (i % 24 == 0) { pc.moveRandomTravel(); }  // once a day
+            if ((params.random_travel_int > 0) && (i % params.random_travel_int == 0)) {
+                pc.moveRandomTravel();
+            }
 
             pc.Redistribute();
 
@@ -84,7 +86,7 @@ void runAgent ()
         }
     }
 
-    if (params.nsteps % 168 == 0) {
+    if ((params.plot_int > 0) && (params.nsteps % params.plot_int == 0)) {
         ExaEpi::IO::writePlotFile(pc, num_residents, unit_mf, FIPS_mf, comm_mf, params.nsteps);
     }
 
