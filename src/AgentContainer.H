@@ -4,12 +4,14 @@
 #include <AMReX_BoxArray.H>
 #include <AMReX_DistributionMapping.H>
 #include <AMReX_Geometry.H>
+#include <AMReX_GpuDevice.H>
 #include <AMReX_IntVect.H>
 #include <AMReX_Particles.H>
 #include <AMReX_iMultiFab.H>
 #include <AMReX_Vector.H>
 
 #include "DemographicData.H"
+#include "DiseaseParm.H"
 
 #if 0  // uncomment for EpiCast particle type
 
@@ -226,7 +228,47 @@ public:
                     const amrex::DistributionMapping & a_dmap,
                     const amrex::BoxArray            & a_ba)
         : amrex::ParticleContainer<0, 0, RealIdx::nattribs, IntIdx::nattribs>(a_geom, a_dmap, a_ba)
-    {}
+    {
+        h_parm = new DiseaseParm{};
+        d_parm = (DiseaseParm*)amrex::The_Arena()->alloc(sizeof(DiseaseParm));
+
+        {
+            amrex::ParmParse pp("contact");
+            pp.get("pSC", h_parm->pSC);
+            pp.get("pCO", h_parm->pCO);
+            pp.get("pNH", h_parm->pNH);
+            pp.get("pWO", h_parm->pWO);
+            pp.get("pFA", h_parm->pFA);
+            pp.get("pBAR", h_parm->pBAR);
+        }
+
+        {
+            amrex::ParmParse pp("disease");
+            pp.get("nstrain", h_parm->nstrain);
+            pp.get("reinfect_prob", h_parm->reinfect_prob);
+
+            amrex::Vector<amrex::Real> p_trans(h_parm->nstrain);
+            amrex::Vector<amrex::Real> p_asymp(h_parm->nstrain);
+            amrex::Vector<amrex::Real> reduced_inf(h_parm->nstrain);
+
+            pp.getarr("p_trans", p_trans, 0, h_parm->nstrain);
+            pp.getarr("p_asymp", p_asymp, 0, h_parm->nstrain);
+            pp.getarr("reduced_inf", reduced_inf, 0, h_parm->nstrain);
+
+            for (int i = 0; i < h_parm->nstrain; ++i) {
+                h_parm->p_trans[i] = p_trans[i];
+                h_parm->p_asymp[i] = p_asymp[i];
+                h_parm->reduced_inf[i] = reduced_inf[i];
+            }
+        }
+
+        h_parm->Initialize();
+#ifdef AMREX_USE_GPU
+        amrex::Gpu::htod_memcpy(d_parm, h_parm, sizeof(DiseaseParm));
+#else
+        std::memcpy(d_parm, h_parm, sizeof(DiseaseParm));
+#endif
+    }
 
     void initAgentsDemo (amrex::iMultiFab& /*num_residents*/,
                          amrex::iMultiFab& /*unit_mf*/,
@@ -259,6 +301,9 @@ public:
     void generateCellData (amrex::MultiFab& mf) const;
 
     void printTotals ();
+
+    DiseaseParm* h_parm;
+    DiseaseParm* d_parm;
 };
 
 using AgentIterator = typename AgentContainer::ParIterType;

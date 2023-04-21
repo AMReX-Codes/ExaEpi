@@ -9,3 +9,16 @@ agent.case_filename = "../../data/CaseData/July4.cases"
 agent.nsteps = 0
 agent.plot_int = 168
 agent.random_travel_int = 24
+
+contact.pSC  = 0.2
+contact.pCO  = 1.45
+contact.pNH  = 1.45
+contact.pWO  = 0.5
+contact.pFA  = 1.0
+contact.pBAR = -1.
+
+disease.nstrain = 2
+disease.p_trans = 0.20 0.30
+disease.p_asymp = 0.40 0.40
+disease.reduced_inf = 0.75 0.75
+disease.reinfect_prob = 0.0

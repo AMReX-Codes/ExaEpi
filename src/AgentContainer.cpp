@@ -848,15 +848,10 @@ void AgentContainer::interactAgentsHomeWork ()
             auto timer_ptr = soa.GetRealData(RealIdx::timer).data();
             auto prob_ptr = soa.GetRealData(RealIdx::prob).data();
 
+            auto* lparm = d_parm;
             amrex::ParallelForRNG( bins.numBins(),
             [=] AMREX_GPU_DEVICE (int i_cell, amrex::RandomEngine const& engine) noexcept
             {
-#define CO  1.45
-#define WO  0.5
-                Real xmit_comm[5] = {.0000125*CO, .0000375*CO, .00010*CO, .00010*CO, .00015*CO};
-                Real xmit_work = 0.115*WO;
-                Real infect = 1.0;
-
                 auto cell_start = offsets[i_cell];
                 auto cell_stop  = offsets[i_cell+1];
 
@@ -868,9 +863,9 @@ void AgentContainer::interactAgentsHomeWork ()
                         if (status_ptr[j] == Status::immune) {continue;}
                         if ((status_ptr[i] == Status::infected) and (status_ptr[j] != Status::infected)) {
                             // i can infect j
-                            prob_ptr[j] *= 1.0 - infect*xmit_comm[age_group_ptr[j]];
+                            prob_ptr[j] *= 1.0 - lparm->infect*lparm->xmit_comm[age_group_ptr[j]];
                         } else if ((status_ptr[j] == Status::infected) and (status_ptr[i] != Status::infected)) {
-                            prob_ptr[i] *= 1.0 - infect*xmit_comm[age_group_ptr[i]];
+                            prob_ptr[i] *= 1.0 - lparm->infect*lparm->xmit_comm[age_group_ptr[i]];
                         }
                     }
                 }

@@ -159,5 +159,26 @@ namespace Initialization
             });
     }
 }
+
+    void setInitialCases (AgentContainer& pc, const amrex::iMultiFab& unit_mf,
+                          const amrex::iMultiFab& FIPS_mf, const amrex::iMultiFab& comm_mf,
+                          const CaseData& cases, const DemographicData& demo)
+    {
+        // ToDO
+        // for (int ihub = 0; ihub < 57000; ++ihub) {
+        //     if (cases.num_cases[ihub] > 0) {
+        //         int FIPS = cases.FIPS_hubs[ihub];
+        //         // pick a random community within that census tract
+        //         for (i = 0; i < n; i+=5) {
+        //             ntry = (int) (5.0*scale);
+        //             if (infect_myID(myID[unit], ntry) < ntry) {
+        //                 if (VERBOSE && !My_address) fprintf(stderr,"   trying again\n");
+        //                 i--;  // try again
+        //             } else ninf += ntry;
+        //         }
+        //     }
+        // }
+    }
+
 }
 }
