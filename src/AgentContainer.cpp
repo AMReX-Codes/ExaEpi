@@ -683,8 +683,8 @@ void AgentContainer::updateStatus ()
             [=] AMREX_GPU_DEVICE (int i) noexcept
             {
                 prob_ptr[i] = 1.0;
-                if ( (status_ptr[i] == Status::never) ||
-                     (status_ptr[i] == Status::susceptible) ) {
+                if ( status_ptr[i] == Status::never ||
+                     status_ptr[i] == Status::susceptible ) {
                     return;
                 }
                 else if (status_ptr[i] == Status::infected) {
@@ -758,8 +758,8 @@ void AgentContainer::interactAgents ()
                 // second pass - infection prob is propto num_infected
                 for (unsigned int i = cell_start; i < cell_stop; ++i) {
                     auto pindex = inds[i];
-                    if ( (status_ptr[pindex] != Status::infected)
-                         && (status_ptr[pindex] != Status::immune)) {
+                    if ( status_ptr[pindex] != Status::infected &&
+                         status_ptr[pindex] != Status::immune) {
                         if (amrex::Random(engine) < 0.001*num_infected[0]) {
                             strain_ptr[pindex] = 0;
                             status_ptr[pindex] = Status::infected;
@@ -800,8 +800,8 @@ void AgentContainer::infectAgents ()
             [=] AMREX_GPU_DEVICE (int i, amrex::RandomEngine const& engine) noexcept
             {
                 prob_ptr[i] = 1.0 - prob_ptr[i];
-                if ( (status_ptr[i] == Status::never) ||
-                     (status_ptr[i] == Status::susceptible) ) {
+                if ( status_ptr[i] == Status::never ||
+                     status_ptr[i] == Status::susceptible ) {
                     if (amrex::Random(engine) < prob_ptr[i]) {
                         status_ptr[i] = Status::infected;
                         timer_ptr[i] = 5.0*24; // 5 days in hours
@@ -850,7 +850,7 @@ void AgentContainer::interactAgentsHomeWork ()
 
             auto* lparm = d_parm;
             amrex::ParallelForRNG( bins.numBins(),
-            [=] AMREX_GPU_DEVICE (int i_cell, amrex::RandomEngine const& engine) noexcept
+                                   [=] AMREX_GPU_DEVICE (int i_cell, amrex::RandomEngine const& /*engine*/) noexcept
             {
                 auto cell_start = offsets[i_cell];
                 auto cell_stop  = offsets[i_cell+1];
@@ -861,10 +861,10 @@ void AgentContainer::interactAgentsHomeWork ()
                     for (unsigned int jj = ii+1; jj < cell_stop; ++jj) {
                         auto j = inds[jj];
                         if (status_ptr[j] == Status::immune) {continue;}
-                        if ((status_ptr[i] == Status::infected) and (status_ptr[j] != Status::infected)) {
+                        if (status_ptr[i] == Status::infected and status_ptr[j] != Status::infected) {
                             // i can infect j
                             prob_ptr[j] *= 1.0 - lparm->infect*lparm->xmit_comm[age_group_ptr[j]];
-                        } else if ((status_ptr[j] == Status::infected) and (status_ptr[i] != Status::infected)) {
+                        } else if (status_ptr[j] == Status::infected and status_ptr[i] != Status::infected) {
                             prob_ptr[i] *= 1.0 - lparm->infect*lparm->xmit_comm[age_group_ptr[i]];
                         }
                     }
