@@ -844,8 +844,8 @@ void AgentContainer::interactAgentsHomeWork ()
             auto& soa   = ptile.GetStructOfArrays();
             auto status_ptr = soa.GetIntData(IntIdx::status).data();
             auto age_group_ptr = soa.GetIntData(IntIdx::age_group).data();
-            auto strain_ptr = soa.GetIntData(IntIdx::strain).data();
-            auto timer_ptr = soa.GetRealData(RealIdx::timer).data();
+            //auto strain_ptr = soa.GetIntData(IntIdx::strain).data();
+            //auto timer_ptr = soa.GetRealData(RealIdx::timer).data();
             auto prob_ptr = soa.GetRealData(RealIdx::prob).data();
 
             auto* lparm = d_parm;
