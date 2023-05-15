@@ -861,10 +861,10 @@ void AgentContainer::interactAgentsHomeWork ()
                     for (unsigned int jj = ii+1; jj < cell_stop; ++jj) {
                         auto j = inds[jj];
                         if (status_ptr[j] == Status::immune) {continue;}
-                        if (status_ptr[i] == Status::infected and status_ptr[j] != Status::infected) {
+                        if (status_ptr[i] == Status::infected && status_ptr[j] != Status::infected) {
                             // i can infect j
                             prob_ptr[j] *= 1.0 - lparm->infect*lparm->xmit_comm[age_group_ptr[j]];
-                        } else if (status_ptr[j] == Status::infected and status_ptr[i] != Status::infected) {
+                        } else if (status_ptr[j] == Status::infected && status_ptr[i] != Status::infected) {
                             prob_ptr[i] *= 1.0 - lparm->infect*lparm->xmit_comm[age_group_ptr[i]];
                         }
                     }
