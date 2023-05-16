@@ -62,6 +62,8 @@ void CaseData::InitFromFile (const std::string& fname)
         }
     }
 
+    amrex::ignore_unused(N_hubs);
+    amrex::ignore_unused(ntot);
     CopyDataToDevice();
     amrex::Gpu::streamSynchronize();
 }
