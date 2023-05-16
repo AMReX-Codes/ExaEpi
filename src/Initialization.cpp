@@ -84,7 +84,7 @@ namespace Initialization
             unsigned int number = (unsigned int) rint(((double) demo.Population[i]) / 2000.0);
             double scale = 1.02 * (2000.0 * number) / ((double) demo.Population[i]);
             for (int j = 0; j < demo.Nunit; j++) {
-                flow[i][j] = rint((double) flow[i][j] * scale);
+                flow[i][j] = (unsigned int) rint((double) flow[i][j] * scale);
             }
         }
     }
@@ -119,14 +119,15 @@ namespace Initialization
 
                 /* Randomly assign the eligible working-age population */
                 unsigned int number = (unsigned int) rint(((Real) demo.Population[from]) / 2000.0);
-                unsigned int nwork = 2000.0 * number * .586; /* 58.6% of population is working-age */
+                unsigned int nwork = (unsigned int) (2000.0 * number * .586); /* 58.6% of population is working-age */
                 if (nwork == 0) { return; }
 
                 int age_group = age_group_ptr[ip];
                 /* Check working-age population */
                 if ((age_group == 2) || (age_group == 3)) {
                     unsigned int irnd = amrex::Random_int(nwork, engine);
-                    int to, comm_to;
+                    int to = 0;
+                    int comm_to = 0;
                     if (irnd < flow[from][demo.Nunit-1]) {
                         /* Choose a random destination unit */
                         to = 0;
@@ -160,9 +161,9 @@ namespace Initialization
     }
 }
 
-    void setInitialCases (AgentContainer& pc, const amrex::iMultiFab& unit_mf,
-                          const amrex::iMultiFab& FIPS_mf, const amrex::iMultiFab& comm_mf,
-                          const CaseData& cases, const DemographicData& demo)
+    void setInitialCases (AgentContainer& /*pc*/, const amrex::iMultiFab& /*unit_mf*/,
+                          const amrex::iMultiFab& /*FIPS_mf*/, const amrex::iMultiFab& /*comm_mf*/,
+                          const CaseData& /*cases*/, const DemographicData& /*demo*/)
     {
         // ToDO
         // for (int ihub = 0; ihub < 57000; ++ihub) {
