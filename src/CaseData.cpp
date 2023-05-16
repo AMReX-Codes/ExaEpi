@@ -67,7 +67,7 @@ void CaseData::InitFromFile (const std::string& fname)
 }
 
 void CaseData::Print () const {
-    for (std::size_t i = 0; i < FIPS_hubs.size(); ++i) {
+    for (amrex::Long i = 0; i < FIPS_hubs.size(); ++i) {
         amrex::Print() << FIPS_hubs[i] << " " << num_cases[i] << " " << num_cases2date[i] << "\n";
     }
 }
