@@ -63,7 +63,7 @@ void writeFIPSData (const AgentContainer& agents, const iMultiFab& unit_mf,
                 auto bx = mfi.tilebox();
                 amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
                     {
-                        int unit = unit_arr(i, j, k);
+                        int unit = unit_arr(i, j, k);  // which FIPS
                         int num_infected = int(cell_data_arr(i, j, k, 2));
                         amrex::Gpu::Atomic::AddNoRet(&data_ptr[unit], (amrex::Real) num_infected);
                     });

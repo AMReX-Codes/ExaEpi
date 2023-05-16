@@ -451,7 +451,7 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,
                 auto& agent = aos[ip];
                 int il2 = amrex::Random_int(100, engine);
                 int nborhood = amrex::Random_int(4, engine);
-                int age_group;
+                int age_group = -1;
 
                 if (family_size == 1) {
                     if (il2 < 28) { age_group = 4; }      /* single adult age 65+   */
