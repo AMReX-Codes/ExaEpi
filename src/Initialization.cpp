@@ -112,13 +112,19 @@ namespace Initialization
         auto unit_arr = unit_mf[mfi].array();
         auto comm_arr = comm_mf[mfi].array();
 
+        auto Population = demo.Population_d.data();
+        auto Start = demo.Start_d.data();
+        auto Ndaywork = demo.Ndaywork_d.data();
+        auto Ncommunity = demo.Ncommunity;
+        auto Nunit = demo.Nunit;
+
         amrex::ParallelForRNG( np,
             [=] AMREX_GPU_DEVICE (int ip, RandomEngine const& engine) noexcept
             {
                 auto from = unit_arr(home_i_ptr[ip], home_j_ptr[ip], 0);
 
                 /* Randomly assign the eligible working-age population */
-                unsigned int number = (unsigned int) rint(((Real) demo.Population[from]) / 2000.0);
+                unsigned int number = (unsigned int) rint(((Real) Population[from]) / 2000.0);
                 unsigned int nwork = (unsigned int) (2000.0 * number * .586); /* 58.6% of population is working-age */
                 if (nwork == 0) { return; }
 
@@ -128,7 +134,7 @@ namespace Initialization
                     unsigned int irnd = amrex::Random_int(nwork, engine);
                     int to = 0;
                     int comm_to = 0;
-                    if (irnd < flow[from][demo.Nunit-1]) {
+                    if (irnd < flow[from][Nunit-1]) {
                         /* Choose a random destination unit */
                         to = 0;
                         while (irnd >= flow[from][to]) { to++; }
@@ -139,8 +145,8 @@ namespace Initialization
                         comm_to = comm_arr(home_i_ptr[ip], home_j_ptr[ip], 0);
                     } else {
                         /* Choose a random community within that destination unit */
-                        comm_to = demo.Start[to] + amrex::Random_int(demo.Start[to+1] - demo.Start[to]);
-                        AMREX_ALWAYS_ASSERT(comm_to < demo.Ncommunity);
+                        comm_to = Start[to] + amrex::Random_int(Start[to+1] - Start[to], engine);
+                        AMREX_ALWAYS_ASSERT(comm_to < Ncommunity);
                     }
 
                     IntVect comm_to_iv = domain.atOffset(comm_to);
@@ -148,8 +154,8 @@ namespace Initialization
                     work_j_ptr[ip] = comm_to_iv[1];
 
                     constexpr int WG_size = 20;
-                    number = (unsigned int) rint( ((Real) demo.Ndaywork[to]) /
-                             ((Real) WG_size * (demo.Start[to+1] - demo.Start[to])) );
+                    number = (unsigned int) rint( ((Real) Ndaywork[to]) /
+                             ((Real) WG_size * (Start[to+1] - Start[to])) );
 
                     work_nborhood_ptr[ip]=4*(amrex::Random_int(4, engine))+nborhood_ptr[ip];
 
