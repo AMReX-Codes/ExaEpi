@@ -164,27 +164,129 @@ namespace Initialization
                     }
                 }
             });
+        }
     }
-}
 
-    void setInitialCases (AgentContainer& /*pc*/, const amrex::iMultiFab& /*unit_mf*/,
-                          const amrex::iMultiFab& /*FIPS_mf*/, const amrex::iMultiFab& /*comm_mf*/,
-                          const CaseData& /*cases*/, const DemographicData& /*demo*/)
+    int infect_random_community (AgentContainer& pc, const amrex::iMultiFab& unit_mf,
+                                 const amrex::iMultiFab& FIPS_mf, const amrex::iMultiFab& comm_mf,
+                                 const CaseData& cases, const DemographicData& demo,
+                                 int unit, int ninfect) {
+        // chose random community in unit
+        int ncomms = demo.Start[unit+1] - demo.Start[unit];
+        int random_comm;
+        if (ParallelDescriptor::IOProcessor()) {
+            random_comm = amrex::Random_int(ncomms) + demo.Start[unit];
+        }
+        ParallelDescriptor::Bcast(&random_comm, 1);
+
+        const Geometry& geom = pc.Geom(0);
+        IntVect bin_size = {AMREX_D_DECL(1, 1, 1)};
+        const auto dxi = geom.InvCellSizeArray();
+        const auto plo = geom.ProbLoArray();
+        const auto domain = geom.Domain();
+
+        int num_infected = 0;
+        for (MFIter mfi(unit_mf, TilingIfNotGPU()); mfi.isValid(); ++mfi)
+        {
+            amrex::DenseBins<AgentContainer::ParticleType> bins;
+            auto& agents_tile = pc.GetParticles(0)[std::make_pair(mfi.index(),mfi.LocalTileIndex())];
+            auto& aos = agents_tile.GetArrayOfStructs();
+            auto& soa = agents_tile.GetStructOfArrays();
+            const size_t np = aos.numParticles();
+            if (np == 0) { continue; }
+            auto pstruct_ptr = aos().dataPtr();
+            const Box& box = mfi.validbox();
+
+            int ntiles = numTilesInBox(box, true, bin_size);
+
+            auto binner = GetParticleBin{plo, dxi, domain, bin_size, box};
+            bins.build(np, pstruct_ptr, ntiles, binner);
+            auto inds = bins.permutationPtr();
+            auto offsets = bins.offsetsPtr();
+
+            auto status_ptr = soa.GetIntData(IntIdx::age_group).data();
+            auto unit_arr = unit_mf[mfi].array();
+            auto comm_arr = comm_mf[mfi].array();
+            auto bx = mfi.tilebox();
+
+            Gpu::DeviceScalar<int> num_infected_d(num_infected);
+            int* num_infected_p = num_infected_d.dataPtr();
+            amrex::ParallelForRNG(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k, amrex::RandomEngine const& engine) noexcept
+            {
+                int community = comm_arr(i, j, k);
+                if (community != random_comm) { return; }
+
+                //int i_cell = community;  // I think this is true...
+                Box tbx;
+                int i_cell = getTileIndex({AMREX_D_DECL(i, j, k)}, box, true, bin_size, tbx);
+                //AMREX_ASSERT(tid == i_cell);
+                auto cell_start = offsets[i_cell];
+                auto cell_stop  = offsets[i_cell+1];
+                int num_this_community = cell_stop - cell_start;
+                AMREX_ASSERT(num_this_community > 0);
+                AMREX_ASSERT(cell_stop < np);
+
+                if (num_this_community == 0) { return;}
+
+                int ntry = 0;
+                int ni = 0;
+                int stop = std::min(cell_start + ninfect, cell_stop);
+                for (unsigned int ip = cell_start; ip < stop; ++ip) {
+                    int ind = cell_start + amrex::Random_int(num_this_community, engine);
+                    auto pindex = inds[ind];
+                    if (status_ptr[pindex] == Status::infected
+                        || status_ptr[pindex] == Status::immune) {
+                        if (++ntry < 100) {
+                            --ip;
+                        } else {
+                            ip += ninfect;
+                        }
+                    } else {
+                        status_ptr[pindex] = Status::infected;
+                        ++ni;
+                    }
+                }
+                amrex::Print() << "infected " << ni << " in " << ntry << " tries in comm " << community << "\n";
+                *num_infected_p = ni;
+            });
+
+            Gpu::Device::streamSynchronize();
+            num_infected += num_infected_d.dataValue();
+        }
+
+        ParallelDescriptor::ReduceIntSum(num_infected);
+        return num_infected;
+    }
+
+    void setInitialCases (AgentContainer& pc, const amrex::iMultiFab& unit_mf,
+                          const amrex::iMultiFab& FIPS_mf, const amrex::iMultiFab& comm_mf,
+                          const CaseData& cases, const DemographicData& demo)
     {
-        // ToDO
-        // for (int ihub = 0; ihub < 57000; ++ihub) {
-        //     if (cases.num_cases[ihub] > 0) {
-        //         int FIPS = cases.FIPS_hubs[ihub];
-        //         // pick a random community within that census tract
-        //         for (i = 0; i < n; i+=5) {
-        //             ntry = (int) (5.0*scale);
-        //             if (infect_myID(myID[unit], ntry) < ntry) {
-        //                 if (VERBOSE && !My_address) fprintf(stderr,"   trying again\n");
-        //                 i--;  // try again
-        //             } else ninf += ntry;
-        //         }
-        //     }
-        // }
+        amrex::Vector<int> FIPS_code_to_i(57000, -1);
+        for (int i = 0; i < demo.FIPS.size(); ++i) {
+            FIPS_code_to_i[demo.FIPS[i]] = i;
+        }
+
+        int ntry = 5;
+        int ninf = 0;
+        for (int ihub = 0; ihub < cases.N_hubs; ++ihub) {
+            if (cases.Size_hubs[ihub] > 0) {
+                int FIPS = cases.FIPS_hubs[ihub];
+                int unit = FIPS_code_to_i[FIPS];
+                if (unit > 0) {
+                    amrex::Print() << unit << " " << cases.Size_hubs[ihub] << "\n";
+                    for (int i = 0; i < cases.Size_hubs[ihub]; i+=5) {
+                        if (infect_random_community(pc, unit_mf, FIPS_mf, comm_mf,
+                                                    cases, demo, unit, ntry) < ntry) {
+                            i--;  // try again
+                        } else {
+                            ninf += ntry;
+                        }
+                    }
+                    return;
+                }
+            }
+        }
     }
 
 }

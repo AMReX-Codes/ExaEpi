@@ -236,7 +236,7 @@ void AgentContainer::initAgentsDemo (iMultiFab& /*num_residents*/,
             timer_ptr[i] = 0.0;
             strain_ptr[i] = 0;
 
-            if (amrex::Random(engine) < 2e-8) {
+            if (amrex::Random(engine) < 1e-6) {
                 status_ptr[i] = 1;
                 if (amrex::Random(engine) < 0.3) {
                     strain_ptr[i] = 1;
@@ -522,7 +522,7 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,
                 } else{
                     school_ptr[ip] = -1;
                 }
-                if (amrex::Random(engine) < 2e-8) {
+                if (amrex::Random(engine) < 1e-6) {
                     status_ptr[ip] = 1;
                     timer_ptr[ip] = 5.0*24;
                 }
@@ -760,11 +760,11 @@ void AgentContainer::interactAgents ()
                     auto pindex = inds[i];
                     if ( status_ptr[pindex] != Status::infected &&
                          status_ptr[pindex] != Status::immune) {
-                        if (amrex::Random(engine) < 0.001*num_infected[0]) {
+                        if (amrex::Random(engine) < 0.0001*num_infected[0]) {
                             strain_ptr[pindex] = 0;
                             status_ptr[pindex] = Status::infected;
                             timer_ptr[pindex] = 5.0*24; // 5 days in hours
-                        } else if (amrex::Random(engine) < 0.002*num_infected[1]) {
+                        } else if (amrex::Random(engine) < 0.0002*num_infected[1]) {
                             strain_ptr[pindex] = 1;
                             status_ptr[pindex] = Status::infected;
                             timer_ptr[pindex] = 5.0*24; // 5 days in hours

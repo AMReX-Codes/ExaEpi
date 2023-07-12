@@ -60,6 +60,7 @@ void runAgent ()
         }
 
         ExaEpi::Initialization::read_workerflow(demo, params, unit_mf, comm_mf, pc);
+        //ExaEpi::Initialization::setInitialCases(pc, unit_mf, FIPS_mf, comm_mf, cases, demo);
     }
 
     {

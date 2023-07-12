@@ -27,21 +27,22 @@ void CaseData::InitFromFile (const std::string& fname)
     std::istringstream is(fileCharPtrString, std::istringstream::in);
 
     FIPS_hubs.resize(0);
+    Size_hubs.resize(0);
     num_cases.resize(0);
     num_cases2date.resize(0);
 
-    FIPS_hubs.resize(57000, 0);
-    num_cases.resize(57000, 0);
-    num_cases2date.resize(57000, 0);
-
     FIPS_hubs_d.resize(0);
+    Size_hubs_d.resize(0);
     num_cases_d.resize(0);
     num_cases2date_d.resize(0);
+
+    num_cases.resize(57000, 0);
+    num_cases2date.resize(57000, 0);
 
     int fips = 1;
     int last_fips = -1;
     int i, j;
-    int N_hubs = 0;
+    N_hubs = 0;
     int ntot = 0;
     std::string line;
     while ( (is.good()) && (fips > 0)) {
@@ -62,7 +63,16 @@ void CaseData::InitFromFile (const std::string& fname)
         }
     }
 
-    amrex::ignore_unused(N_hubs);
+    FIPS_hubs.resize(N_hubs, 0);
+    Size_hubs.resize(N_hubs, 0);
+    j = 0;
+    for (int i = 0; i < 57000; i++) {
+        if (num_cases[i]) {
+            FIPS_hubs[j] = i;
+            Size_hubs[j++] = num_cases[i];
+        }
+    }
+
     amrex::ignore_unused(ntot);
     CopyDataToDevice();
     amrex::Gpu::streamSynchronize();
@@ -88,6 +98,7 @@ void CaseData::CopyToHostAsync (const amrex::Gpu::DeviceVector<int>& d_vec, amre
 
 void CaseData::CopyDataToDevice () {
     CopyToDeviceAsync(FIPS_hubs, FIPS_hubs_d);
+    CopyToDeviceAsync(Size_hubs, Size_hubs_d);
     CopyToDeviceAsync(num_cases, num_cases_d);
     CopyToDeviceAsync(num_cases2date, num_cases2date_d);
 }

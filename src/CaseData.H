@@ -22,14 +22,16 @@ struct CaseData
 
     void CopyDataToDevice ();
 
-    int Nhubs;                            /* number of disease hubs */
+    int N_hubs;                           /* number of disease hubs */
     amrex::Vector<int> FIPS_hubs;         /* FIPS code of each hub */
-    amrex::Vector<int> num_cases;         /* Cases in each hub */
-    amrex::Vector<int> num_cases2date;    /* Cumulative cases in each hub */
+    amrex::Vector<int> Size_hubs;         /* Num cases in each hub */
+    amrex::Vector<int> num_cases;         /* Cases in each FIPS code */
+    amrex::Vector<int> num_cases2date;    /* Cumulative cases in each FIPS code */
 
     amrex::Gpu::DeviceVector<int> FIPS_hubs_d;         /* FIPS code of each hub */
-    amrex::Gpu::DeviceVector<int> num_cases_d;         /* Cases in each hub */
-    amrex::Gpu::DeviceVector<int> num_cases2date_d;    /* Cumulative cases in each hub */
+    amrex::Gpu::DeviceVector<int> Size_hubs_d;         /* Num cases in each hub */
+    amrex::Gpu::DeviceVector<int> num_cases_d;         /* Cases in each FIPS */
+    amrex::Gpu::DeviceVector<int> num_cases2date_d;    /* Cumulative cases in each FIPS */
 };
 
 #endif
