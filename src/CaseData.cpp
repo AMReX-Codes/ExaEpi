@@ -66,7 +66,7 @@ void CaseData::InitFromFile (const std::string& fname)
     FIPS_hubs.resize(N_hubs, 0);
     Size_hubs.resize(N_hubs, 0);
     j = 0;
-    for (int i = 0; i < 57000; i++) {
+    for (i = 0; i < 57000; i++) {
         if (num_cases[i]) {
             FIPS_hubs[j] = i;
             Size_hubs[j++] = num_cases[i];
