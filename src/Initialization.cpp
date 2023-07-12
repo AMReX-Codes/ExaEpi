@@ -168,7 +168,7 @@ namespace Initialization
     }
 
     int infect_random_community (AgentContainer& pc, const amrex::iMultiFab& unit_mf,
-                                 const amrex::iMultiFab& FIPS_mf, const amrex::iMultiFab& comm_mf,
+                                 const amrex::iMultiFab& /*FIPS_mf*/, const amrex::iMultiFab& comm_mf,
                                  const CaseData& /*cases*/, const DemographicData& demo,
                                  int unit, int ninfect) {
         // chose random community in unit
