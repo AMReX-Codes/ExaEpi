@@ -173,7 +173,7 @@ namespace Initialization
                                  int unit, int ninfect) {
         // chose random community in unit
         int ncomms = demo.Start[unit+1] - demo.Start[unit];
-        int random_comm;
+        int random_comm = -1;
         if (ParallelDescriptor::IOProcessor()) {
             random_comm = amrex::Random_int(ncomms) + demo.Start[unit];
         }
@@ -287,6 +287,7 @@ namespace Initialization
                 }
             }
         }
+        amrex::ignore_unused(ninf);
     }
 
 }
