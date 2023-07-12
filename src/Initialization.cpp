@@ -246,7 +246,7 @@ namespace Initialization
                         ++ni;
                     }
                 }
-                amrex::Print() << "infected " << ni << " in " << ntry << " tries in comm " << community << "\n";
+                //amrex::Print() << "infected " << ni << " in " << ntry << " tries in comm " << community << "\n";
                 *num_infected_p = ni;
             });
 
