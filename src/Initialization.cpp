@@ -169,7 +169,7 @@ namespace Initialization
 
     int infect_random_community (AgentContainer& pc, const amrex::iMultiFab& unit_mf,
                                  const amrex::iMultiFab& FIPS_mf, const amrex::iMultiFab& comm_mf,
-                                 const CaseData& cases, const DemographicData& demo,
+                                 const CaseData& /*cases*/, const DemographicData& demo,
                                  int unit, int ninfect) {
         // chose random community in unit
         int ncomms = demo.Start[unit+1] - demo.Start[unit];
@@ -205,7 +205,7 @@ namespace Initialization
             auto offsets = bins.offsetsPtr();
 
             auto status_ptr = soa.GetIntData(IntIdx::age_group).data();
-            auto unit_arr = unit_mf[mfi].array();
+            //auto unit_arr = unit_mf[mfi].array();
             auto comm_arr = comm_mf[mfi].array();
             auto bx = mfi.tilebox();
 
@@ -230,7 +230,7 @@ namespace Initialization
 
                 int ntry = 0;
                 int ni = 0;
-                int stop = std::min(cell_start + ninfect, cell_stop);
+                unsigned int stop = std::min(cell_start + ninfect, cell_stop);
                 for (unsigned int ip = cell_start; ip < stop; ++ip) {
                     int ind = cell_start + amrex::Random_int(num_this_community, engine);
                     auto pindex = inds[ind];
