@@ -234,26 +234,26 @@ public:
 
         {
             amrex::ParmParse pp("contact");
-            pp.get("pSC", h_parm->pSC);
-            pp.get("pCO", h_parm->pCO);
-            pp.get("pNH", h_parm->pNH);
-            pp.get("pWO", h_parm->pWO);
-            pp.get("pFA", h_parm->pFA);
-            pp.get("pBAR", h_parm->pBAR);
+            pp.query("pSC", h_parm->pSC);
+            pp.query("pCO", h_parm->pCO);
+            pp.query("pNH", h_parm->pNH);
+            pp.query("pWO", h_parm->pWO);
+            pp.query("pFA", h_parm->pFA);
+            pp.query("pBAR", h_parm->pBAR);
         }
 
         {
             amrex::ParmParse pp("disease");
-            pp.get("nstrain", h_parm->nstrain);
-            pp.get("reinfect_prob", h_parm->reinfect_prob);
+            pp.query("nstrain", h_parm->nstrain);
+            pp.query("reinfect_prob", h_parm->reinfect_prob);
 
             amrex::Vector<amrex::Real> p_trans(h_parm->nstrain);
             amrex::Vector<amrex::Real> p_asymp(h_parm->nstrain);
             amrex::Vector<amrex::Real> reduced_inf(h_parm->nstrain);
 
-            pp.getarr("p_trans", p_trans, 0, h_parm->nstrain);
-            pp.getarr("p_asymp", p_asymp, 0, h_parm->nstrain);
-            pp.getarr("reduced_inf", reduced_inf, 0, h_parm->nstrain);
+            pp.queryarr("p_trans", p_trans, 0, h_parm->nstrain);
+            pp.queryarr("p_asymp", p_asymp, 0, h_parm->nstrain);
+            pp.queryarr("reduced_inf", reduced_inf, 0, h_parm->nstrain);
 
             for (int i = 0; i < h_parm->nstrain; ++i) {
                 h_parm->p_trans[i] = p_trans[i];
