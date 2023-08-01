@@ -57,10 +57,9 @@ void runAgent ()
             pc.initAgentsDemo(num_residents, unit_mf, FIPS_mf, comm_mf, demo);
         } else if (params.ic_type == ICType::Census) {
             pc.initAgentsCensus(num_residents, unit_mf, FIPS_mf, comm_mf, demo);
+            ExaEpi::Initialization::read_workerflow(demo, params, unit_mf, comm_mf, pc);
+            //ExaEpi::Initialization::setInitialCases(pc, unit_mf, FIPS_mf, comm_mf, cases, demo);
         }
-
-        ExaEpi::Initialization::read_workerflow(demo, params, unit_mf, comm_mf, pc);
-        //ExaEpi::Initialization::setInitialCases(pc, unit_mf, FIPS_mf, comm_mf, cases, demo);
     }
 
     {
