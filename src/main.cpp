@@ -15,9 +15,18 @@ using namespace ExaEpi;
 
 void runAgent();
 
+void override_amrex_defaults ()
+{
+    amrex::ParmParse pp("amrex");
+
+    // ExaEpi currently assumes we have mananaged memory in the Arena
+    bool the_arena_is_managed = true;
+    pp.queryAdd("the_arena_is_managed", the_arena_is_managed);
+}
+
 int main (int argc, char* argv[])
 {
-    amrex::Initialize(argc,argv);
+    amrex::Initialize(argc,argv,true,MPI_COMM_WORLD,override_amrex_defaults);
 
     runAgent();
 
