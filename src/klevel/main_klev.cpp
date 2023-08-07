@@ -63,9 +63,8 @@ class AgentBld
     :
     public amrex::LevelBld
 {
-    void variableSetUp (){printf("seting up AgentBld\n");
-    };
-    void variableCleanUp () {printf("Cleaning up AgentBld\n");};
+    void variableSetUp (){amrex::Print()<<"seting up AgentBld\n";};
+    void variableCleanUp () {amrex::Print()<<"Cleaning up AgentBld\n";};
     AmrLevel *operator() () {return new AgentLevel;};
     AmrLevel *operator() (Amr&            papa,
                           int             lev,

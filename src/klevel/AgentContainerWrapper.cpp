@@ -22,7 +22,7 @@ AgentLevel::AgentLevel (amrex::Amr&            papa,
     {
 	buildStateVars();
 	if(lev==0){
-	    printf("Setting up ExaEpi variables using Census data\n");
+	    amrex::Print()<<"Setting up ExaEpi variables using Census data\n";
 	    variableSetUp();
 	}
     };
@@ -90,10 +90,9 @@ void AgentContainerWrapper::copyAgentContainerToAMRGrids(amrex::MultiFab& status
             amrex::ParallelForRNG( np,
             [=] AMREX_GPU_DEVICE (int i, amrex::RandomEngine const& engine) noexcept
             {
-	        int i_idx=i-box.smallEnd()[0];
-	        s_ptr[i_idx]  = (Real)status_ptr[i];
-	        p_ptr[i_idx]  = prob_ptr[i];
-	        t_ptr[i_idx]  = timer_ptr[i];
+	        s_ptr[i]  = (Real)status_ptr[i];
+	        p_ptr[i]  = prob_ptr[i];
+	        t_ptr[i]  = timer_ptr[i];
             });
             idx+=np;
         }
@@ -137,37 +136,6 @@ void AgentContainerWrapper::copyAMRGridsToAgentContainer(amrex::MultiFab& status
     Real* prob_tmp= new Real[numTransferedAgents];
     Real* timer_tmp= new Real[numTransferedAgents];
     {
-        auto& plev  = GetParticles(0);
-        int idx=0;
-        for(MFIter mfi = MakeMFIter(0); mfi.isValid(); ++mfi)
-        {
-            const Box& box = mfi.validbox();
-            int gid = mfi.index();
-            int tid = mfi.LocalTileIndex();
-            auto& ptile = plev[std::make_pair(gid, tid)];
-            auto& soa   = ptile.GetStructOfArrays();
-            const auto np = ptile.numParticles();
-            if(idx+np>= numTransferedAgents) break;
-            auto status_ptr = soa.GetIntData(IntIdx::status).data();
-            auto prob_ptr = soa.GetRealData(RealIdx::prob).data();
-            auto timer_ptr = soa.GetRealData(RealIdx::timer).data();
-            Real* s_ptr=&status_tmp[idx];
-            Real* p_ptr=&prob_tmp[idx];
-            Real* t_ptr=&timer_tmp[idx];
-
-            amrex::ParallelForRNG( np,
-            [=] AMREX_GPU_DEVICE (int i, amrex::RandomEngine const& engine) noexcept
-            {
-                int i_idx=i-box.smallEnd()[0];
-		status_ptr[i]= s_ptr[i_idx];
-		prob_ptr[i]  = p_ptr[i_idx];
-		timer_ptr[i]  = t_ptr[i_idx];
-            });
-            idx+=np;
-        }
-    }
-
-    {
         int idx=0;
         for(MFIter mfi(statusMF); mfi.isValid(); ++mfi)
         {
@@ -191,6 +159,36 @@ void AgentContainerWrapper::copyAMRGridsToAgentContainer(amrex::MultiFab& status
             idx+= box.length(1)*box.length(0);
         }
     }
+    {
+        auto& plev  = GetParticles(0);
+        int idx=0;
+        for(MFIter mfi = MakeMFIter(0); mfi.isValid(); ++mfi)
+        {
+            const Box& box = mfi.validbox();
+            int gid = mfi.index();
+            int tid = mfi.LocalTileIndex();
+            auto& ptile = plev[std::make_pair(gid, tid)];
+            auto& soa   = ptile.GetStructOfArrays();
+            const auto np = ptile.numParticles();
+            if(idx+np>= numTransferedAgents) break;
+            auto status_ptr = soa.GetIntData(IntIdx::status).data();
+            auto prob_ptr = soa.GetRealData(RealIdx::prob).data();
+            auto timer_ptr = soa.GetRealData(RealIdx::timer).data();
+            Real* s_ptr=&status_tmp[idx];
+            Real* p_ptr=&prob_tmp[idx];
+            Real* t_ptr=&timer_tmp[idx];
+
+            amrex::ParallelForRNG( np,
+            [=] AMREX_GPU_DEVICE (int i, amrex::RandomEngine const& engine) noexcept
+            {
+		status_ptr[i]= s_ptr[i];
+		prob_ptr[i]  = p_ptr[i];
+		timer_ptr[i]  = t_ptr[i];
+            });
+            idx+=np;
+        }
+    }
+
     delete [] status_tmp;
     delete [] prob_tmp;
     delete [] timer_tmp;

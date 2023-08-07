@@ -61,7 +61,7 @@ public:
     AgentLevel& operator= (const AgentLevel&) = delete;
     AgentLevel& operator= (AgentLevel&&) = delete;
     void buildStateVars(){
-        printf("BUILDING VARS at level %d\n", level); 
+        amrex::Print()<<"BUILDING VARS at level "<< level<<"\n"; 
         S[State_Type].define(grids,dmap,1,NUM_GROW);
         S[Infect_Type].define(grids,dmap,1,NUM_GROW);
         S[Status_Type].define(grids,dmap,1,NUM_GROW);
@@ -83,12 +83,11 @@ public:
     }
 
     void init (amrex::AmrLevel& old) override{
-        printf("Init AgentLevel from another level %p\n", &old); 
 	//to be implemented (when needed)
     }
 
     void init (){
-        printf("Setting time at level %d\n", level); 
+        amrex::Print()<<"Setting time at level "<<level<<"\n";
 	amrex::Real dt = parent->dtLevel(level);
 	amrex::Real cur_time = getLevel(level - 1).state[State_Type].curTime();
 	amrex::Real prev_time = getLevel(level - 1).state[State_Type].prevTime();
@@ -106,12 +105,12 @@ public:
                          amrex::Real dt,
                          int  iteration,
                          int  ncycle) override{
-	printf("Advance with dt= %f\n", dt);
+	amrex::Print()<<"Advance with dt= "<< dt<<"\n";
 	if(level==0){
           pc->updateStatus();
           pc->interactAgents();
           pc->copyAgentContainerToAMRGrids(S[Status_Type], S[Infect_Type], S[Timer_Type]);
-	  std::cout<<"Copy data from Agent Container to the base level"<<std::endl;
+	  amrex::Print()<<"Copy data from Agent Container to the base level\n";
 	}else{
 	  if(iteration==1){
 	      std::cout<<"Transfer select agents from the base level to the finer level"<<std::endl;
@@ -295,7 +294,7 @@ public:
         for (int i = 1; i <= parent->maxLevel(); i++)
         {
             dt_level[i] = dt_level[i-1]/ref_ratio[i-1][0];
-            printf("Setting initial dt at level %d to %f \n", i,  dt_level[i]); 
+	    amrex::Print()<<"Setting initial dt at level "<<i<<" to "<<dt_level[i]<<"\n";
         }    
     }
 
@@ -312,22 +311,22 @@ public:
         for (int i = 1; i <= finest_level; i++)
         {   
             dt_level[i] = dt_level[i-1]/ref_ratio[i-1][0];
-            printf("Setting new dt at level %d to %f \n", i,  dt_level[i]); 
+	    amrex::Print()<<"Setting new dt at level "<<i<<" to "<<dt_level[i]<<"\n";
         }
     }
 
     void post_regrid (int lbase,
                       int new_finest) override{}
-    void post_restart () override{printf("Running post_restart()\n");}
+    void post_restart () override{amrex::Print()<<"Running post_restart()\n";}
     void post_init (amrex::Real stop_time) override{
-	printf("Running post_init()\n");
+	amrex::Print()<<"Running post_init()\n";
     }
     void post_timestep (int iteration) override{
-	printf("Running post_timestep()\n");
+	amrex::Print()<<"Running post_timestep()\n";
     }
     void postCoarseTimeStep (amrex::Real cumtime) override{
-	printf("Running postCoarseTimeStep()\n");
-	std::cout<<"Transfer data from the base level to the Agent Container"<<std::endl;
+	amrex::Print()<<"Running postCoarseTimeStep()\n";
+	amrex::Print()<<"Transfer data from the base level to the Agent Container";
         pc->copyAMRGridsToAgentContainer(S[Status_Type], S[Infect_Type], S[Timer_Type]);
     }
 
@@ -338,7 +337,7 @@ public:
                    int          n_error_buf = 0,
                    int          ngrow = 0) override{
         BL_PROFILE("AgentLevel::errorEst()");
-        printf("Error Estimate\n"); 
+        amrex::Print()<<"Error Estimate\n"; 
 
     	Real ltime = time;    
     	if (post_step_regrid) {
@@ -447,13 +446,13 @@ public:
 
     amrex::Real initialTimeStep (){
        Real init_dt  = 0.0;
-       printf("Initial time step\n"); 
+       amrex::Print()<<"Initial time step\n"; 
        return init_dt;	    	    
     };
 
     void read_params ()
     {
-        printf("read parameters\n"); 
+        amrex::Print()<<"read parameters\n"; 
 	//no extra parameter needed so far
     }
 
