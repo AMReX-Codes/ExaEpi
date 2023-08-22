@@ -19,9 +19,6 @@
 using namespace amrex;
 using namespace ExaEpi;
 
-void runAgent();
-
-
 void override_parameters ()
 {
     {
@@ -41,10 +38,9 @@ void override_parameters ()
     {
         TestParams params;
         ExaEpi::Utils::get_test_params(params, "agent");
+	//Agent model's preprocessor that parses Census data
         DemographicData demo;
         if (params.ic_type == ICType::Census) { demo.InitFromFile(params.census_filename); }
-        CaseData cases;
-        if (params.ic_type == ICType::Census) { cases.InitFromFile(params.case_filename); }
         {
             ParmParse pp("agent");
    	    int max_grid_size=-1;
@@ -59,12 +55,11 @@ void override_parameters ()
 }
 
 
-class AgentBld
-    :
-    public amrex::LevelBld
+//build the Agent model (i.e. AgentLevel) on an AMR level
+class buildAgentModel :public amrex::LevelBld
 {
-    void variableSetUp (){amrex::Print()<<"seting up AgentBld\n";};
-    void variableCleanUp () {amrex::Print()<<"Cleaning up AgentBld\n";};
+    void variableSetUp   () {/*amrex::Print()<<"seting up buildAgentModel\n";*/  };//variable setup will be done in AgentLevel
+    void variableCleanUp () {/*amrex::Print()<<"Cleaning up buildAgentModel\n";*/};//variable cleanup will be done in AgentLevel
     AmrLevel *operator() () {return new AgentLevel;};
     AmrLevel *operator() (Amr&            papa,
                           int             lev,
@@ -77,17 +72,14 @@ class AgentBld
 };
 
 
-AgentBld Agent_bld;
+buildAgentModel Agent_bld;
 
 int main (int argc, char* argv[])
 {
-    Real strt_time;
-    Real stop_time;
-    int  max_step=1000;
-    strt_time =  0.0;
-    stop_time = -1.0;    
+    Real strt_time =  0.0;
+    Real stop_time = -1.0;
+    int  max_step  = 1000;
     
-    //amrex::Initialize(argc,argv);
     amrex::Initialize(argc, argv, true, MPI_COMM_WORLD, override_parameters);    
     Amr* amrptr = new Amr(&Agent_bld);
     amrptr->init(strt_time,stop_time);    
