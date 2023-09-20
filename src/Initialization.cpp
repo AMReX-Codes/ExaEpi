@@ -169,6 +169,7 @@ namespace Initialization
 
     int infect_random_community (AgentContainer& pc, const amrex::iMultiFab& unit_mf,
                                  const amrex::iMultiFab& /*FIPS_mf*/, const amrex::iMultiFab& comm_mf,
+                                 std::map<std::pair<int, int>, amrex::DenseBins<AgentContainer::ParticleType> >& bin_map,
                                  const CaseData& /*cases*/, const DemographicData& demo,
                                  int unit, int ninfect) {
         // chose random community in unit
@@ -188,7 +189,7 @@ namespace Initialization
         int num_infected = 0;
         for (MFIter mfi(unit_mf, TilingIfNotGPU()); mfi.isValid(); ++mfi)
         {
-            amrex::DenseBins<AgentContainer::ParticleType> bins;
+            amrex::DenseBins<AgentContainer::ParticleType>& bins = bin_map[std::make_pair(mfi.index(), mfi.LocalTileIndex())];
             auto& agents_tile = pc.GetParticles(0)[std::make_pair(mfi.index(),mfi.LocalTileIndex())];
             auto& aos = agents_tile.GetArrayOfStructs();
             auto& soa = agents_tile.GetStructOfArrays();
@@ -200,7 +201,9 @@ namespace Initialization
             int ntiles = numTilesInBox(box, true, bin_size);
 
             auto binner = GetParticleBin{plo, dxi, domain, bin_size, box};
-            bins.build(np, pstruct_ptr, ntiles, binner);
+            if (bins.numBins() < 0) {
+                bins.build(np, pstruct_ptr, ntiles, binner);
+            }
             auto inds = bins.permutationPtr();
             auto offsets = bins.offsetsPtr();
 
@@ -262,10 +265,14 @@ namespace Initialization
                           const amrex::iMultiFab& FIPS_mf, const amrex::iMultiFab& comm_mf,
                           const CaseData& cases, const DemographicData& demo)
     {
+        BL_PROFILE("setInitialCases");
+
         amrex::Vector<int> FIPS_code_to_i(57000, -1);
         for (int i = 0; i < demo.FIPS.size(); ++i) {
             FIPS_code_to_i[demo.FIPS[i]] = i;
         }
+
+        std::map<std::pair<int, int>, amrex::DenseBins<AgentContainer::ParticleType> > bin_map;
 
         int ntry = 5;
         int ninf = 0;
@@ -274,16 +281,15 @@ namespace Initialization
                 int FIPS = cases.FIPS_hubs[ihub];
                 int unit = FIPS_code_to_i[FIPS];
                 if (unit > 0) {
-                    amrex::Print() << unit << " " << cases.Size_hubs[ihub] << "\n";
+                    amrex::Print() << "Infecting " << cases.Size_hubs[ihub] << " in unit " << unit << " \n";
                     for (int i = 0; i < cases.Size_hubs[ihub]; i+=5) {
-                        if (infect_random_community(pc, unit_mf, FIPS_mf, comm_mf,
+                        if (infect_random_community(pc, unit_mf, FIPS_mf, comm_mf, bin_map,
                                                     cases, demo, unit, ntry) < ntry) {
                             i--;  // try again
                         } else {
                             ninf += ntry;
                         }
                     }
-                    return;
                 }
             }
         }

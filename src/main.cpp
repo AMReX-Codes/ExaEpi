@@ -53,6 +53,9 @@ void runAgent ()
     ba.maxSize(params.max_grid_size);
     dm.define(ba);
 
+    amrex::Print() << "Setting domain to be " << geom.Domain() << "\n";
+    amrex::Print() << ba << "\n";
+
     iMultiFab num_residents(ba, dm, 6, 0);
     iMultiFab unit_mf(ba, dm, 1, 0);
     iMultiFab FIPS_mf(ba, dm, 2, 0);
@@ -67,7 +70,7 @@ void runAgent ()
         } else if (params.ic_type == ICType::Census) {
             pc.initAgentsCensus(num_residents, unit_mf, FIPS_mf, comm_mf, demo);
             ExaEpi::Initialization::read_workerflow(demo, params, unit_mf, comm_mf, pc);
-            //ExaEpi::Initialization::setInitialCases(pc, unit_mf, FIPS_mf, comm_mf, cases, demo);
+            ExaEpi::Initialization::setInitialCases(pc, unit_mf, FIPS_mf, comm_mf, cases, demo);
         }
     }
 
