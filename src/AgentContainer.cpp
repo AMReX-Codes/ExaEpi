@@ -522,10 +522,6 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,
                 } else{
                     school_ptr[ip] = -1;
                 }
-                if (amrex::Random(engine) < 1e-6) {
-                    status_ptr[ip] = 1;
-                    timer_ptr[ip] = 5.0*24;
-                }
             }
         });
     }

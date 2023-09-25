@@ -207,7 +207,8 @@ namespace Initialization
             auto inds = bins.permutationPtr();
             auto offsets = bins.offsetsPtr();
 
-            auto status_ptr = soa.GetIntData(IntIdx::age_group).data();
+            auto status_ptr = soa.GetIntData(IntIdx::status).data();
+            auto timer_ptr = soa.GetRealData(RealIdx::timer).data();
             //auto unit_arr = unit_mf[mfi].array();
             auto comm_arr = comm_mf[mfi].array();
             auto bx = mfi.tilebox();
@@ -219,10 +220,8 @@ namespace Initialization
                 int community = comm_arr(i, j, k);
                 if (community != random_comm) { return; }
 
-                //int i_cell = community;  // I think this is true...
                 Box tbx;
                 int i_cell = getTileIndex({AMREX_D_DECL(i, j, k)}, box, true, bin_size, tbx);
-                //AMREX_ASSERT(tid == i_cell);
                 auto cell_start = offsets[i_cell];
                 auto cell_stop  = offsets[i_cell+1];
                 int num_this_community = cell_stop - cell_start;
@@ -246,10 +245,10 @@ namespace Initialization
                         }
                     } else {
                         status_ptr[pindex] = Status::infected;
+                        timer_ptr[pindex] = 5.0*24;
                         ++ni;
                     }
                 }
-                //amrex::Print() << "infected " << ni << " in " << ntry << " tries in comm " << community << "\n";
                 *num_infected_p = ni;
             });
 
