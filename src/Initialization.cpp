@@ -208,7 +208,7 @@ namespace Initialization
             auto offsets = bins.offsetsPtr();
 
             auto status_ptr = soa.GetIntData(IntIdx::status).data();
-            auto timer_ptr = soa.GetRealData(RealIdx::timer).data();
+            auto counter_ptr = soa.GetRealData(RealIdx::disease_counter).data();
             //auto unit_arr = unit_mf[mfi].array();
             auto comm_arr = comm_mf[mfi].array();
             auto bx = mfi.tilebox();
@@ -245,7 +245,7 @@ namespace Initialization
                         }
                     } else {
                         status_ptr[pindex] = Status::infected;
-                        timer_ptr[pindex] = 5.0*24;
+                        counter_ptr[pindex] = 0;
                         ++ni;
                     }
                 }

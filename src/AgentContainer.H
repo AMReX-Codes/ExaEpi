@@ -161,10 +161,10 @@ struct RealIdx
 {
     enum {
         /*
-          The meaning of the timer depends on the status flag.
-          Agents are infected for 5 days, then immune for 6 months.
+          Disease counter starts after infection.
          */
-        timer = 0,
+        disease_counter = 0,
+        treatment_timer,
         prob,
         nattribs
     };
@@ -175,7 +175,7 @@ struct Status
     enum {
         never = 0,   // never infected
         infected,    // infected
-        immune,      // no longer infected, immune
+        immune,      // no longer infected, immune. lasts 6 months.
         susceptible  // no longer infected, no longer immnune
     };
 };
@@ -194,6 +194,7 @@ struct IntIdx
         school,
         workgroup,
         work_nborhood,
+        withdrawn,
         nattribs
     };
 };
