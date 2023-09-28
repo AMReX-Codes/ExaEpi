@@ -89,9 +89,16 @@ void runAgent ()
             }
 
             pc.updateStatus();
-            pc.interactAgents();
+            //pc.interactAgents();
+            //pc.moveAgentsRandomWalk();
 
-            pc.moveAgentsRandomWalk();
+            pc.interactAgentsHomeWork();
+            pc.moveAgentsToWork();
+            pc.interactAgentsHomeWork();
+            pc.moveAgentsToHome();
+
+            pc.infectAgents();
+
             if ((params.random_travel_int > 0) && (i % params.random_travel_int == 0)) {
                 pc.moveRandomTravel();
             }

@@ -562,6 +562,8 @@ void AgentContainer::moveAgentsToWork ()
 {
     BL_PROFILE("AgentContainer::moveAgentsToWork");
 
+    amrex::Print() << " moving agents to work. \n";
+
     for (int lev = 0; lev <= finestLevel(); ++lev)
     {
         const auto dx = Geom(lev).CellSizeArray();
@@ -594,6 +596,8 @@ void AgentContainer::moveAgentsToWork ()
 void AgentContainer::moveAgentsToHome ()
 {
     BL_PROFILE("AgentContainer::moveAgentsToHome");
+
+    amrex::Print() << " moving agents to home. \n";
 
     for (int lev = 0; lev <= finestLevel(); ++lev)
     {
@@ -885,7 +889,8 @@ void AgentContainer::interactAgentsHomeWork ()
 
             int ntiles = numTilesInBox(box, true, bin_size);
 
-            bins.build(np, pstruct_ptr, ntiles, GetParticleBin{plo, dxi, domain, bin_size, box});
+            auto binner = GetParticleBin{plo, dxi, domain, bin_size, box};
+            bins.build(np, pstruct_ptr, ntiles, binner);
             auto inds = bins.permutationPtr();
             auto offsets = bins.offsetsPtr();
 
@@ -897,24 +902,23 @@ void AgentContainer::interactAgentsHomeWork ()
             auto prob_ptr = soa.GetRealData(RealIdx::prob).data();
 
             auto* lparm = d_parm;
-            amrex::ParallelForRNG( bins.numBins(),
-                                   [=] AMREX_GPU_DEVICE (int i_cell, amrex::RandomEngine const& /*engine*/) noexcept
+            amrex::ParallelForRNG( bins.numItems(),
+                                   [=] AMREX_GPU_DEVICE (int ii, amrex::RandomEngine const& /*engine*/) noexcept
             {
+                int i_cell = binner(pstruct_ptr[ii]);
                 auto cell_start = offsets[i_cell];
                 auto cell_stop  = offsets[i_cell+1];
 
-                for (unsigned int ii = cell_start; ii < cell_stop-1; ++ii) {
-                    auto i = inds[ii];
-                    if (status_ptr[i] == Status::immune) { continue; }
-                    for (unsigned int jj = ii+1; jj < cell_stop; ++jj) {
-                        auto j = inds[jj];
-                        if (status_ptr[j] == Status::immune) {continue;}
-                        if (status_ptr[i] == Status::infected && status_ptr[j] != Status::infected) {
-                            // i can infect j
-                            prob_ptr[j] *= 1.0 - lparm->infect*lparm->xmit_comm[age_group_ptr[j]];
-                        } else if (status_ptr[j] == Status::infected && status_ptr[i] != Status::infected) {
-                            prob_ptr[i] *= 1.0 - lparm->infect*lparm->xmit_comm[age_group_ptr[i]];
-                        }
+                auto i = inds[ii];
+                if (status_ptr[i] == Status::immune) { return; }
+                for (unsigned int jj = cell_start; jj < cell_stop; ++jj) {
+                    auto j = inds[jj];
+                    if (status_ptr[j] == Status::immune) {continue;}
+                    if (status_ptr[i] == Status::infected && status_ptr[j] != Status::infected) {
+                        // i can infect j
+                        prob_ptr[j] *= 1.0 - lparm->infect*lparm->xmit_comm[age_group_ptr[j]];
+                    } else if (status_ptr[j] == Status::infected && status_ptr[i] != Status::infected) {
+                        prob_ptr[i] *= 1.0 - lparm->infect*lparm->xmit_comm[age_group_ptr[i]];
                     }
                 }
             });
