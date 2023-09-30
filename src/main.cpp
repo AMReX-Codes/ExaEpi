@@ -58,6 +58,8 @@ void runAgent ()
     iMultiFab FIPS_mf(ba, dm, 2, 0);
     iMultiFab comm_mf(ba, dm, 1, 0);
 
+    MultiFab disease_stats(ba, dm, 4, 0);
+
     AgentContainer pc(geom, dm, ba);
 
     {
@@ -85,10 +87,7 @@ void runAgent ()
                 ExaEpi::IO::writeFIPSData(pc, unit_mf, FIPS_mf, comm_mf, demo, params.aggregated_diag_prefix, i);
             }
 
-            pc.updateStatus();
-            //pc.interactAgents();
-            //pc.moveAgentsRandomWalk();
-
+            pc.updateStatus(disease_stats);
             pc.interactAgentsHomeWork();
             pc.moveAgentsToWork();
             pc.interactAgentsHomeWork();

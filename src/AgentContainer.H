@@ -291,7 +291,7 @@ public:
 
     void moveRandomTravel ();
 
-    void updateStatus ();
+    void updateStatus (amrex::MultiFab& ds);
 
     void interactAgents ();
 

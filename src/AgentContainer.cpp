@@ -659,7 +659,7 @@ void AgentContainer::moveRandomTravel ()
     }
 }
 
-void AgentContainer::updateStatus ()
+void AgentContainer::updateStatus (MultiFab& disease_stats)
 {
     BL_PROFILE("AgentContainer::updateStatus");
 
@@ -676,9 +676,24 @@ void AgentContainer::updateStatus ()
             const auto np = ptile.numParticles();
             auto status_ptr = soa.GetIntData(IntIdx::status).data();
             auto age_group_ptr = soa.GetIntData(IntIdx::age_group).data();
+            auto home_i_ptr = soa.GetIntData(IntIdx::home_i).data();
+            auto home_j_ptr = soa.GetIntData(IntIdx::home_j).data();
             auto counter_ptr = soa.GetRealData(RealIdx::disease_counter).data();
             auto timer_ptr = soa.GetRealData(RealIdx::treatment_timer).data();
             auto prob_ptr = soa.GetRealData(RealIdx::prob).data();
+            auto& aos   = ptile.GetArrayOfStructs();
+            auto pstruct_ptr = aos.data();
+            auto ds_arr = disease_stats[mfi].array();
+
+            struct DiseaseStats
+            {
+                enum {
+                    hospitalization = 0,
+                    ICU,
+                    ventilator,
+                    death
+                };
+            };
 
             // Track hospitalization, ICU, ventilator, and fatalities
             Real CHR[] = {.0104, .0104, .070, .28, 1.0};  // sick -> hospital probabilities
@@ -715,9 +730,18 @@ void AgentContainer::updateStatus ()
                             else {
                                 timer_ptr[i] = 8;  // Age 50-64 hospitalized for 7.8 days
                             }
+                            amrex::Gpu::Atomic::AddNoRet(
+                                &ds_arr(home_i_ptr[i], home_j_ptr[i], 0,
+                                        DiseaseStats::hospitalization), 1.0_rt);
                             if (amrex::Random(engine) < CIC[age_group_ptr[i]]) {
                                 timer_ptr[i] += 10;  // move to ICU
+                                amrex::Gpu::Atomic::AddNoRet(
+                                    &ds_arr(home_i_ptr[i], home_j_ptr[i], 0,
+                                            DiseaseStats::ICU), 1.0_rt);
                                 if (amrex::Random(engine) < CVE[age_group_ptr[i]]) {
+                                    amrex::Gpu::Atomic::AddNoRet(
+                                    &ds_arr(home_i_ptr[i], home_j_ptr[i], 0,
+                                            DiseaseStats::ventilator), 1.0_rt);
                                     timer_ptr[i] += 10;  // put on ventilator
                                 }
                             }
@@ -729,21 +753,39 @@ void AgentContainer::updateStatus ()
                             if (timer_ptr[i] == 0) {
                                 if (CVF[age_group_ptr[i]] > 2.0)
                                     if (amrex::Random(engine) < (CVF[age_group_ptr[i]] - 2.0)) {
-                                        // dead
+                                        amrex::Gpu::Atomic::AddNoRet(
+                                            &ds_arr(home_i_ptr[i], home_j_ptr[i], 0,
+                                                    DiseaseStats::death), 1.0_rt);
+                                        pstruct_ptr[i].id() = -pstruct_ptr[i].id();
                                     }
+                                amrex::Gpu::Atomic::AddNoRet(
+                                    &ds_arr(home_i_ptr[i], home_j_ptr[i], 0,
+                                            DiseaseStats::hospitalization), -1.0_rt);
                                 status_ptr[i] = Status::immune;  // If alive, hospitalized patient recovers
                             }
                             if (timer_ptr[i] == 10) {
                                 if (CVF[age_group_ptr[i]] > 1.0)
                                     if (amrex::Random(engine) < (CVF[age_group_ptr[i]] - 1.0)) {
-                                        // dead
+                                        amrex::Gpu::Atomic::AddNoRet(
+                                            &ds_arr(home_i_ptr[i], home_j_ptr[i], 0,
+                                                    DiseaseStats::death), 1.0_rt);
+                                        pstruct_ptr[i].id() = -pstruct_ptr[i].id();
                                     }
+                                amrex::Gpu::Atomic::AddNoRet(
+                                    &ds_arr(home_i_ptr[i], home_j_ptr[i], 0,
+                                            DiseaseStats::ICU), -1.0_rt);
                                 status_ptr[i] = Status::immune;  // If alive, ICU patient recovers
                             }
                             if (timer_ptr[i] == 20) {
                                 if (amrex::Random(engine) < CVF[age_group_ptr[i]]) {
-                                    // dead
+                                    amrex::Gpu::Atomic::AddNoRet(
+                                        &ds_arr(home_i_ptr[i], home_j_ptr[i], 0,
+                                                DiseaseStats::death), 1.0_rt);
+                                    pstruct_ptr[i].id() = -pstruct_ptr[i].id();
                                 }
+                                amrex::Gpu::Atomic::AddNoRet(
+                                    &ds_arr(home_i_ptr[i], home_j_ptr[i], 0,
+                                            DiseaseStats::ventilator), -1.0_rt);
                                 status_ptr[i] = Status::immune;  // If alive, ventilated patient recovers
                             }
                         }
