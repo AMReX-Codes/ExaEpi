@@ -53,9 +53,6 @@ void runAgent ()
     ba.maxSize(params.max_grid_size);
     dm.define(ba);
 
-    amrex::Print() << "Setting domain to be " << geom.Domain() << "\n";
-    amrex::Print() << ba << "\n";
-
     iMultiFab num_residents(ba, dm, 6, 0);
     iMultiFab unit_mf(ba, dm, 1, 0);
     iMultiFab FIPS_mf(ba, dm, 2, 0);
