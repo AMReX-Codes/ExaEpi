@@ -59,6 +59,8 @@ void runAgent ()
     iMultiFab comm_mf(ba, dm, 1, 0);
 
     MultiFab disease_stats(ba, dm, 4, 0);
+    MultiFab mask_behavior(ba, dm, 1, 0);
+    mask_behavior.setVal(1);
 
     AgentContainer pc(geom, dm, ba);
 
@@ -88,9 +90,9 @@ void runAgent ()
             }
 
             pc.updateStatus(disease_stats);
-            pc.interactAgentsHomeWork();
+            pc.interactAgentsHomeWork(mask_behavior, true);
             pc.moveAgentsToWork();
-            pc.interactAgentsHomeWork();
+            pc.interactAgentsHomeWork(mask_behavior, false);
             pc.moveAgentsToHome();
 
             pc.infectAgents();

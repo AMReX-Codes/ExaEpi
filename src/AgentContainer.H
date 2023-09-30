@@ -295,7 +295,7 @@ public:
 
     void interactAgents ();
 
-    void interactAgentsHomeWork ();
+    void interactAgentsHomeWork (amrex::MultiFab& mask, bool home);
 
     void infectAgents ();
 

@@ -907,7 +907,7 @@ void AgentContainer::infectAgents ()
     }
 }
 
-void AgentContainer::interactAgentsHomeWork ()
+void AgentContainer::interactAgentsHomeWork (MultiFab& mask_behavior, bool home)
 {
     BL_PROFILE("AgentContainer::interactAgentsHomeWork");
 
@@ -939,6 +939,17 @@ void AgentContainer::interactAgentsHomeWork ()
             auto& soa   = ptile.GetStructOfArrays();
             auto status_ptr = soa.GetIntData(IntIdx::status).data();
             auto age_group_ptr = soa.GetIntData(IntIdx::age_group).data();
+
+            auto home_i_ptr = soa.GetIntData(IntIdx::home_i).data();
+            auto home_j_ptr = soa.GetIntData(IntIdx::home_j).data();
+            auto work_i_ptr = soa.GetIntData(IntIdx::work_i).data();
+            auto work_j_ptr = soa.GetIntData(IntIdx::work_j).data();
+
+            auto i_ptr = home ? home_i_ptr : work_i_ptr;
+            auto j_ptr = home ? home_j_ptr : work_j_ptr;
+
+            auto mask_arr = mask_behavior[mfi].array();
+
             //auto strain_ptr = soa.GetIntData(IntIdx::strain).data();
             //auto timer_ptr = soa.GetRealData(RealIdx::timer).data();
             auto prob_ptr = soa.GetRealData(RealIdx::prob).data();
@@ -953,14 +964,16 @@ void AgentContainer::interactAgentsHomeWork ()
 
                 auto i = inds[ii];
                 if (status_ptr[i] == Status::immune) { return; }
+                amrex::Real i_mask = mask_arr(i_ptr[i], j_ptr[i], 0);
                 for (unsigned int jj = cell_start; jj < cell_stop; ++jj) {
                     auto j = inds[jj];
+                    amrex::Real j_mask = mask_arr(i_ptr[j], j_ptr[j], 0);
                     if (status_ptr[j] == Status::immune) {continue;}
                     if (status_ptr[i] == Status::infected && status_ptr[j] != Status::infected) {
                         // i can infect j
-                        prob_ptr[j] *= 1.0 - lparm->infect*lparm->xmit_comm[age_group_ptr[j]];
+                        prob_ptr[j] *= 1.0 - i_mask*j_mask*lparm->infect*lparm->xmit_comm[age_group_ptr[j]];
                     } else if (status_ptr[j] == Status::infected && status_ptr[i] != Status::infected) {
-                        prob_ptr[i] *= 1.0 - lparm->infect*lparm->xmit_comm[age_group_ptr[i]];
+                        prob_ptr[i] *= 1.0 -  j_mask*i_mask*lparm->infect*lparm->xmit_comm[age_group_ptr[i]];
                     }
                 }
             });
