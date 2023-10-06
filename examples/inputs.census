@@ -6,7 +6,7 @@ agent.census_filename = "../../data/CensusData/CA.dat"
 agent.workerflow_filename = "../../data/CensusData/CA-wf.bin"
 agent.case_filename = "../../data/CaseData/July4.cases"
 
-agent.nsteps = 0
+agent.nsteps = 10
 agent.plot_int = 168
 agent.random_travel_int = 24
 
