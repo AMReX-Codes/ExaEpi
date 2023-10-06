@@ -34,7 +34,7 @@ Running the code succesfully will create a number of "plt?????" files. You can v
 these using the script at etc/plot.py. This will require the "yt" package to be installed:
 
     https://yt-project.org/
-    
+
 ## Copyright Notice
 
 ExaEpi Copyright (c) 2022, The Regents of the University of California,
@@ -49,5 +49,5 @@ NOTICE.  This Software was developed under funding from the U.S. Department
 of Energy and the U.S. Government consequently retains certain rights.  As
 such, the U.S. Government has been granted for itself and others acting on
 its behalf a paid-up, nonexclusive, irrevocable, worldwide license in the
-Software to reproduce, distribute copies to the public, prepare derivative 
+Software to reproduce, distribute copies to the public, prepare derivative
 works, and perform publicly and display publicly, and to permit others to do so.
