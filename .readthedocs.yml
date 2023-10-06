@@ -6,11 +6,11 @@ build:
     python: "3.11"
 
 sphinx:
-   configuration: Docs/source/conf.py
+   configuration: docs/source/conf.py
 
 python:
    install:
-   - requirements: Docs/requirements.txt
+   - requirements: docs/requirements.txt
 
 formats:
   - htmlzip
