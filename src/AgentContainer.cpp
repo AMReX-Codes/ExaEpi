@@ -271,6 +271,7 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,
 
     iMultiFab num_families(num_residents.boxArray(), num_residents.DistributionMap(), 7, 0);
     iMultiFab fam_offsets (num_residents.boxArray(), num_residents.DistributionMap(), 7, 0);
+    iMultiFab fam_id (num_residents.boxArray(), num_residents.DistributionMap(), 7, 0);
     num_families.setVal(0);
 
 #ifdef AMREX_USE_OMP
@@ -381,10 +382,21 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,
                             },
                             [=] AMREX_GPU_DEVICE (int i, int const& x) { out[i] = x; },
                                                Scan::Type::exclusive, Scan::retSum);
-
+        }
+        {
+            BL_PROFILE("setFamily_id_prefixsum")
+            const int* in = num_families[mfi].dataPtr();
+            int* out = fam_id[mfi].dataPtr();
+            nagents = Scan::PrefixSum<int>(ncomp*ncell,
+                            [=] AMREX_GPU_DEVICE (int i) -> int {
+                                return in[i];
+                            },
+                            [=] AMREX_GPU_DEVICE (int i, int const& x) { out[i] = x; },
+                                               Scan::Type::exclusive, Scan::retSum);
         }
 
         auto offset_arr = fam_offsets[mfi].array();
+        auto fam_id_arr = fam_id[mfi].array();
         auto& agents_tile = GetParticles(0)[std::make_pair(mfi.index(),mfi.LocalTileIndex())];
         agents_tile.resize(nagents);
         auto aos = &agents_tile.GetArrayOfStructs()[0];
@@ -392,6 +404,7 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,
 
         auto status_ptr = soa.GetIntData(IntIdx::status).data();
         auto age_group_ptr = soa.GetIntData(IntIdx::age_group).data();
+        auto family_ptr = soa.GetIntData(IntIdx::family).data();
         auto home_i_ptr = soa.GetIntData(IntIdx::home_i).data();
         auto home_j_ptr = soa.GetIntData(IntIdx::home_j).data();
         auto work_i_ptr = soa.GetIntData(IntIdx::work_i).data();
@@ -424,6 +437,7 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,
 
             int unit = unit_arr(i, j, k);
             int community = comm_arr(i, j, k);
+            int family_id = Gpu::Atomic::Add(&fam_id_arr(i, j, k, n), 1);
             int family_size = n + 1;
             int num_to_add = family_size * nf;
 
@@ -506,6 +520,7 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,
                 status_ptr[ip] = 0;
                 counter_ptr[ip] = 0.0;
                 age_group_ptr[ip] = age_group;
+                family_ptr[ip] = family_id;
                 home_i_ptr[ip] = i;
                 home_j_ptr[ip] = j;
                 work_i_ptr[ip] = i;
@@ -952,7 +967,12 @@ void AgentContainer::interactAgentsHomeWork (MultiFab& mask_behavior, bool home)
 
             //auto strain_ptr = soa.GetIntData(IntIdx::strain).data();
             //auto timer_ptr = soa.GetRealData(RealIdx::timer).data();
+            auto family_ptr = soa.GetIntData(IntIdx::family).data();
+            auto nborhood_ptr = soa.GetIntData(IntIdx::nborhood).data();
+            auto school_ptr = soa.GetIntData(IntIdx::school).data();
+            auto workgroup_ptr = soa.GetIntData(IntIdx::workgroup).data();
             auto prob_ptr = soa.GetRealData(RealIdx::prob).data();
+            auto counter_ptr = soa.GetRealData(RealIdx::disease_counter).data();
 
             auto* lparm = d_parm;
             amrex::ParallelForRNG( bins.numItems(),
@@ -964,16 +984,115 @@ void AgentContainer::interactAgentsHomeWork (MultiFab& mask_behavior, bool home)
 
                 auto i = inds[ii];
                 if (status_ptr[i] == Status::immune) { return; }
+                if (counter_ptr[i] < 3) { return; }  // incubation stage
                 amrex::Real i_mask = mask_arr(i_ptr[i], j_ptr[i], 0);
                 for (unsigned int jj = cell_start; jj < cell_stop; ++jj) {
                     auto j = inds[jj];
                     amrex::Real j_mask = mask_arr(i_ptr[j], j_ptr[j], 0);
                     if (status_ptr[j] == Status::immune) {continue;}
+                    if (counter_ptr[j] < 3) { return; }  // incubation stage
+
                     if (status_ptr[i] == Status::infected && status_ptr[j] != Status::infected) {
                         // i can infect j
-                        prob_ptr[j] *= 1.0 - i_mask*j_mask*lparm->infect*lparm->xmit_comm[age_group_ptr[j]];
+                        amrex::Real infect = lparm->infect;
+                        infect *= lparm->vac_eff;
+                        infect *= i_mask;
+                        infect *= j_mask;
+
+                        // /* Determine what connections these individuals have */
+                        // if ((nborhood_ptr[i] == nborhood_ptr[j]) &&
+                        //     (pt1->family == pt2->family) &&   /* Same family */
+                        //     (! DAYTIME))   /* and night-time */
+                        //     if (!(pt1->status & 6)) {  /* Transmitter i is a child */
+                        //         if (pt1->school < 0)  // not attending school, use _SC contacts
+                        //             prob_ptr[j] *= 1.0 - infect * xmit_child_SC[pt2->status & 7];
+                        //         else
+                        //             prob_ptr[j] *= 1.0 - infect * xmit_child[pt2->status & 7];
+                        //     }
+                        //     else {
+                        //         if (pt1->school < 0)  // not attending school, use _SC contacts
+                        //             prob_ptr[j] *= 1.0 - infect * xmit_adult_SC[pt2->status & 7];
+                        //         else
+                        //             prob_ptr[j] *= 1.0 - infect * xmit_adult[pt2->status & 7];
+                        //     }
+                        // /* check for common neighborhood cluster: */
+                        // else if ((nborhood_ptr[i] == nborhood_ptr[j]) &&
+                        //          ((pt1->family>>2) == (pt2->family>>2)) &&
+                        //          (!(pt1->status & AT_HOME)) &&
+                        //          (!(pt2->status & AT_HOME)) &&
+                        //          (! DAYTIME)) {  /* and night-time */
+                        //     if (!(pt1->status & 6)) {  /* Transmitter i is a child */
+                        //         if (pt1->school < 0)  // not attending school, use _SC contacts
+                        //             prob_ptr[j] *= 1.0 - infect * xmit_nc_child_SC[pt2->status & 7] * cd->social_scale;
+                        //         else
+                        //             prob_ptr[j] *= 1.0 - infect * xmit_nc_child[pt2->status & 7] * cd->social_scale;
+                        //     }
+                        //     else {
+                        //         if (pt1->school < 0)  // not attending school, use _SC contacts
+                        //             prob_ptr[j] *= 1.0 - infect * xmit_nc_adult_SC[pt2->status & 7] * cd->social_scale;
+                        //         else
+                        //             prob_ptr[j] *= 1.0 - infect * xmit_nc_adult[pt2->status & 7] * cd->social_scale;
+                        //     }
+                        // }
+
+                        // /* Home isolation or household quarantine? */
+                        // if ( (!(pt1->status & AT_HOME)) && (!(pt2->status & AT_HOME)) ) {
+
+                        //     /* Should always be in the same community = same cell */
+                        //     if (pt1->school < 0)  // not attending school, use _SC contacts
+                        //         prob_ptr[j] *= 1.0 - infect * xmit_comm_SC[pt2->status & 7] * cd->social_scale;
+                        //     else
+                        //         prob_ptr[j] *= 1.0 - infect * xmit_comm[pt2->status & 7] * cd->social_scale;
+
+                        //     /* Workgroup transmission */
+                        //     if (DAYTIME && pt1->workgroup && (pt1->comm_work.i >= 0)) { // transmitter i at work
+                        //         if ((pt2->comm_work.i >= 0) && (pt1->workgroup == pt2->workgroup)) {  // coworker
+                        //             prob_ptr[j] *= 1.0 - infect * xmit_work * cd->work_scale;
+                        //         }
+                        //     }
+
+                        //     /* Neighborhood? */
+                        //     if (nborhood_ptr[i] == nborhood_ptr[j]) {
+                        //         if (pt1->school < 0)  // not attending school, use _SC contacts
+                        //             prob_ptr[j] *= 1.0 - infect * xmit_hood_SC[pt2->status & 7] * cd->social_scale;
+                        //         else
+                        //             prob_ptr[j] *= 1.0 - infect * xmit_hood[pt2->status & 7] * cd->social_scale;
+
+                        //         if ((pt1->school == pt2->school) && DAYTIME) {
+                        //             if (pt1->school > 5) {
+                        //                 /* Playgroup */
+                        //                 prob_ptr[j] *= 1.0 - infect * xmit_school[6] * cd->social_scale;
+                        //             } else if (pt1->school == 5) {
+                        //                 /* Day care */
+                        //                 prob_ptr[j] *= 1.0 - infect * xmit_school[5] * cd->social_scale;
+                        //             }
+                        //         }
+                        //     }  /* same neighborhood */
+
+                        //     /* Elementary/middle/high school in common */
+                        //     if ((pt1->school == pt2->school) && DAYTIME &&
+                        //         (pt1->school > 0) && (pt1->school < 5)) {
+                        //         if (!(pt1->status & 6)) {  /* Transmitter i is a child */
+                        //             if (!(pt2->status & 6)) {  /* Receiver j is a child */
+                        //                 prob_ptr[j] *= 1.0 - infect * xmit_school[pt1->school] * cd->social_scale;
+                        //             } else {  // Child student -> adult teacher/staff transmission
+                        //                 prob_ptr[j] *= 1.0 - infect * xmit_sch_c2a[pt1->school] * cd->social_scale;
+                        //             }
+                        //         } else if (!(pt2->status & 6)) {  // Adult teacher/staff -> child student
+                        //             prob_ptr[j] *= 1.0 - infect * xmit_sch_a2c[pt1->school] * cd->social_scale;
+                        //         }
+                        //     }
+                        // }  /* within society */
+
+                        prob_ptr[j] *= 1.0 - infect*lparm->xmit_comm[age_group_ptr[j]];
                     } else if (status_ptr[j] == Status::infected && status_ptr[i] != Status::infected) {
-                        prob_ptr[i] *= 1.0 -  j_mask*i_mask*lparm->infect*lparm->xmit_comm[age_group_ptr[i]];
+                        // j can infect i
+                        amrex::Real infect = lparm->infect;
+                        infect *= lparm->vac_eff;
+                        infect *= i_mask;
+                        infect *= j_mask;
+
+                        prob_ptr[i] *= 1.0 - infect*lparm->xmit_comm[age_group_ptr[i]];
                     }
                 }
             });

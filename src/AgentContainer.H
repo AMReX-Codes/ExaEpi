@@ -186,6 +186,7 @@ struct IntIdx
         status = 0,
         strain,
         age_group,
+        family,
         home_i,
         home_j,
         work_i,
@@ -255,6 +256,8 @@ public:
             pp.queryarr("p_trans", p_trans, 0, h_parm->nstrain);
             pp.queryarr("p_asymp", p_asymp, 0, h_parm->nstrain);
             pp.queryarr("reduced_inf", reduced_inf, 0, h_parm->nstrain);
+
+            pp.query("vac_eff", h_parm->vac_eff);
 
             for (int i = 0; i < h_parm->nstrain; ++i) {
                 h_parm->p_trans[i] = p_trans[i];
