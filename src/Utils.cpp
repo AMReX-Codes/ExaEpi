@@ -16,7 +16,7 @@
 using namespace amrex;
 using namespace ExaEpi;
 
-void ExaEpi::Utils::get_test_params(TestParams& params, const std::string& prefix)
+void ExaEpi::Utils::get_test_params (TestParams& params, const std::string& prefix)
 {
     ParmParse pp(prefix);
     pp.get("size", params.size);
