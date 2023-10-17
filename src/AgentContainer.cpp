@@ -967,10 +967,10 @@ void AgentContainer::interactAgentsHomeWork (MultiFab& mask_behavior, bool home)
 
             //auto strain_ptr = soa.GetIntData(IntIdx::strain).data();
             //auto timer_ptr = soa.GetRealData(RealIdx::timer).data();
-            auto family_ptr = soa.GetIntData(IntIdx::family).data();
-            auto nborhood_ptr = soa.GetIntData(IntIdx::nborhood).data();
-            auto school_ptr = soa.GetIntData(IntIdx::school).data();
-            auto workgroup_ptr = soa.GetIntData(IntIdx::workgroup).data();
+            //auto family_ptr = soa.GetIntData(IntIdx::family).data();
+            //auto nborhood_ptr = soa.GetIntData(IntIdx::nborhood).data();
+            //auto school_ptr = soa.GetIntData(IntIdx::school).data();
+            //auto workgroup_ptr = soa.GetIntData(IntIdx::workgroup).data();
             auto prob_ptr = soa.GetRealData(RealIdx::prob).data();
             auto counter_ptr = soa.GetRealData(RealIdx::disease_counter).data();
 
