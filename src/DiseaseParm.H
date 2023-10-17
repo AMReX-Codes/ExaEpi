@@ -26,6 +26,8 @@ struct DiseaseParm
 
     amrex::Real reinfect_prob = amrex::Real(0.0);
 
+    amrex::Real vac_eff = amrex::Real(1.0);
+
     void Initialize ();
 };
 #endif
