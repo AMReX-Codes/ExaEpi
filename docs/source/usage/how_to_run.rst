@@ -91,6 +91,8 @@ In addition to the ExaEpi inputs, there are also a number of runtime options tha
     one entry for each disease strain.
 * ``disease.reduced_inf`` (`float`, example: ``0.1``)
     The cross-strain reduction factor to the transmission probability.
+* ``disease.vac_eff`` (`float`, example: ``0.4``)
+    The vaccine efficacy - the probability of transmission will be multiplied by this factor
 
 In addition to the ExaEpi inputs, there are also a number of runtime options that can be configured for AMReX itself. Please see <https://amrex-codes.github.io/amrex/docs_html/GPU.html#inputs-parameters>`__ for more information on these options.
 
