@@ -387,12 +387,12 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,
             BL_PROFILE("setFamily_id_prefixsum")
             const int* in = num_families[mfi].dataPtr();
             int* out = fam_id[mfi].dataPtr();
-            nagents = Scan::PrefixSum<int>(ncomp*ncell,
-                            [=] AMREX_GPU_DEVICE (int i) -> int {
-                                return in[i];
-                            },
-                            [=] AMREX_GPU_DEVICE (int i, int const& x) { out[i] = x; },
-                                               Scan::Type::exclusive, Scan::retSum);
+            Scan::PrefixSum<int>(ncomp*ncell,
+                                 [=] AMREX_GPU_DEVICE (int i) -> int {
+                                     return in[i];
+                                 },
+                                 [=] AMREX_GPU_DEVICE (int i, int const& x) { out[i] = x; },
+                                 Scan::Type::exclusive, Scan::retSum);
         }
 
         auto offset_arr = fam_offsets[mfi].array();
@@ -437,7 +437,7 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,
 
             int unit = unit_arr(i, j, k);
             int community = comm_arr(i, j, k);
-            int family_id = Gpu::Atomic::Add(&fam_id_arr(i, j, k, n), 1);
+            int family_id = fam_id_arr(i, j, k, n);
             int family_size = n + 1;
             int num_to_add = family_size * nf;
 
@@ -520,7 +520,7 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,
                 status_ptr[ip] = 0;
                 counter_ptr[ip] = 0.0;
                 age_group_ptr[ip] = age_group;
-                family_ptr[ip] = family_id;
+                family_ptr[ip] = family_id++;
                 home_i_ptr[ip] = i;
                 home_j_ptr[ip] = j;
                 work_i_ptr[ip] = i;
