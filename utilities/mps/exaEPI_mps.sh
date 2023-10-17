@@ -19,7 +19,7 @@ echo "Colocating 3 identical jobs on the GPU"
 start=`date +%s`
 srun ./agent ../../examples/inputs >run1.log &
 srun ./agent ../../examples/inputs >run2.log &
-srun ./agent ../../examples/inputs >run3.log 
+srun ./agent ../../examples/inputs >run3.log
 end=`date +%s`
 runtime=$((end-start))
 echo "Runtime for all jobs: $((runtime)) seconds"

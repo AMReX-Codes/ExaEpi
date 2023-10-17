@@ -157,7 +157,7 @@ if True:
     parameters = parse_filename_nsight(metricfile)
     splt= pref.split(".")
     kernelName= splt[1]
-            
+
     #metrics
     #open subprocess and communicate
     metricdf = import_nsight_metric(metricfile, ncu=nsightcompute)
@@ -166,7 +166,7 @@ if True:
 
     #fuse read/write metrics together:
     unique_metrics = metricdf["Metric Name"].unique()
-        
+
     unique_metrics = set([x.replace(".sum","").replace(".per_second","").replace(".avg","").replace("_write","").replace("_read","").replace("_ld","").replace("_st","") for x in unique_metrics])
     unique_metrics = set([x.replace(".sum","").replace(".per_second","").replace(".avg","") for x in unique_metrics])
     unique_units = metricdf["Metric Unit"].unique()
@@ -180,15 +180,15 @@ if True:
     metricdf.loc[ metricdf[ "Metric Name" ].str.contains("_st"), "Metric Type" ] = "write"
     #rate
     metricdf.loc[ metricdf[ "Metric Name" ].str.contains(".per_second"), "Metric Type" ] = "rate"
-                
+
     for metric in unique_metrics:
         metricdf.loc[ metricdf[ "Metric Name"].str.startswith(metric), "Metric Name" ] = metric
-                
+
     #append to DF:
     df_metrics.append(metricdf)
-    
+
     metricdf = pd.concat(df_metrics)
-    
+
         #compute the profile
     parsedTime          = parse_time(metricdf)
     if parsedTime.size>0:
@@ -229,9 +229,9 @@ x = np.arange(0,12.535,0.01)
 x1 = np.arange(1,10000,0.1)
 x2 = np.arange(0,1,0.001)
 y1 = np.full(len(x1), 108*4*1.41*32*1e9)
-plt.plot(x, 1555*x*1e9, color='black',linestyle='-',linewidth=2.0)  
-plt.plot(x1, y1, color='black',linestyle='-',linewidth=2.0)  
-plt.plot(x2, 19492*x2*1e9, color='green',linestyle='-',linewidth=2.0)  
+plt.plot(x, 1555*x*1e9, color='black',linestyle='-',linewidth=2.0)
+plt.plot(x1, y1, color='black',linestyle='-',linewidth=2.0)
+plt.plot(x2, 19492*x2*1e9, color='green',linestyle='-',linewidth=2.0)
 plt.xlabel("Arithmetic Intensity (IntOps/Byte)")
 plt.ylabel("Op Rate (IntOps/s)")
 plt.yscale('log')
