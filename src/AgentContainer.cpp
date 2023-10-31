@@ -1006,7 +1006,7 @@ void AgentContainer::interactAgentsHomeWork (MultiFab& mask_behavior, bool home)
 
                         /* Determine what connections these individuals have */
                         if ((nborhood_ptr[i] == nborhood_ptr[j]) && (family_ptr[i] == family_ptr[2]) && (!DAYTIME)) {
-                            if (age_group_ptr[i] == 0) {  /* Transmitter i is a child */
+                            if (age_group_ptr[i] <= 1) {  /* Transmitter i is a child */
                                 if (school_ptr[i] < 0) { // not attending school, use _SC contacts
                                     prob_ptr[j] *= 1.0 - infect * lparm->xmit_child_SC[age_group_ptr[j]];
                                 } else {
@@ -1022,9 +1022,8 @@ void AgentContainer::interactAgentsHomeWork (MultiFab& mask_behavior, bool home)
                             }
                         }
                         /* check for common neighborhood cluster: */
-                        else if ((nborhood_ptr[i] == nborhood_ptr[j]) && (family_ptr[i] == family_ptr[j]) &&
-                                 (!withdrawn_ptr[i]) && (!withdrawn_ptr[j]) && (!DAYTIME)) {
-                            if (age_group_ptr[i] == 0) {  /* Transmitter i is a child */
+                        else if ((nborhood_ptr[i] == nborhood_ptr[j]) && (!withdrawn_ptr[i]) && (!withdrawn_ptr[j]) && (!DAYTIME)) {
+                            if (age_group_ptr[i] <= 1) {  /* Transmitter i is a child */
                                 if (school_ptr[i] < 0)  // not attending school, use _SC contacts
                                     prob_ptr[j] *= 1.0 - infect * lparm->xmit_nc_child_SC[age_group_ptr[j]] * social_scale;
                                 else
@@ -1075,13 +1074,13 @@ void AgentContainer::interactAgentsHomeWork (MultiFab& mask_behavior, bool home)
                             /* Elementary/middle/high school in common */
                             if ((school_ptr[i] == school_ptr[j]) && DAYTIME &&
                                 (school_ptr[i] > 0) && (school_ptr[i] < 5)) {
-                                if (age_group_ptr[i] == 1) {  /* Transmitter i is a child */
-                                    if (age_group_ptr[j] == 1) {  /* Receiver j is a child */
+                                if (age_group_ptr[i] <= 1) {  /* Transmitter i is a child */
+                                    if (age_group_ptr[j] <= 1) {  /* Receiver j is a child */
                                         prob_ptr[j] *= 1.0 - infect * lparm->xmit_school[school_ptr[i]] * social_scale;
                                     } else {  // Child student -> adult teacher/staff transmission
                                         prob_ptr[j] *= 1.0 - infect * lparm->xmit_sch_c2a[school_ptr[i]] * social_scale;
                                     }
-                                } else if (age_group_ptr[j] == 1) {  // Adult teacher/staff -> child student
+                                } else if (age_group_ptr[j] <= 1) {  // Adult teacher/staff -> child student
                                     prob_ptr[j] *= 1.0 - infect * lparm->xmit_sch_a2c[school_ptr[i]] * social_scale;
                                 }
                             }
@@ -1093,7 +1092,94 @@ void AgentContainer::interactAgentsHomeWork (MultiFab& mask_behavior, bool home)
                         infect *= i_mask;
                         infect *= j_mask;
 
-                        prob_ptr[i] *= 1.0 - infect*lparm->xmit_comm[age_group_ptr[i]];
+                        amrex::Real social_scale = 1.0;  // TODO this should vary based on cell
+                        amrex::Real work_scale = 1.0;  // TODO this should vary based on cell
+
+                        /* Determine what connections these individuals have */
+                        if ((nborhood_ptr[i] == nborhood_ptr[j]) && (family_ptr[i] == family_ptr[j]) && (! DAYTIME)) {
+                            if (age_group_ptr[j] <= 1) {  /* Transmitter j is a child */
+                                if (school_ptr[j] < 0) { // not attending school, use _SC contacts
+                                    prob_ptr[i] *= 1.0 - infect * lparm->xmit_child_SC[age_group_ptr[i]];
+                                } else {
+                                    prob_ptr[i] *= 1.0 - infect * lparm->xmit_child[age_group_ptr[i]];
+                                }
+                            } else {
+                                if (school_ptr[j] < 0) {  // not attending school, use _SC contacts
+                                    prob_ptr[i] *= 1.0 - infect * lparm->xmit_adult_SC[age_group_ptr[i]];
+                                } else {
+                                    prob_ptr[i] *= 1.0 - infect * lparm->xmit_adult[age_group_ptr[i]];
+                                }
+                            }
+                        }
+
+                        /* check for common neighborhood cluster: */  // ATM careful here...
+                        else if ((nborhood_ptr[i] == nborhood_ptr[j]) && (!withdrawn_ptr[i]) && (!withdrawn_ptr[j]) && (!DAYTIME)) {
+                            if (age_group_ptr[j] <= 1) {  /* Transmitter i is a child */
+                                if (school_ptr[j] < 0) { // not attending school, use _SC contacts
+                                    prob_ptr[i] *= 1.0 - infect * lparm->xmit_nc_child_SC[age_group_ptr[i]] * social_scale;
+                                } else {
+                                    prob_ptr[i] *= 1.0 - infect * lparm->xmit_nc_child[age_group_ptr[i]] * social_scale;
+                                }
+                            } else {
+                                if (school_ptr[j] < 0) {  // not attending school, use _SC contacts
+                                    prob_ptr[i] *= 1.0 - infect * lparm->xmit_nc_adult_SC[age_group_ptr[i]] * social_scale;
+                                } else {
+                                    prob_ptr[i] *= 1.0 - infect * lparm->xmit_nc_adult[age_group_ptr[i]] * social_scale;
+                                }
+                            }
+                        }
+
+                        /* Home isolation or household quarantine? */  // TODO - be careful about withdrawn versus at home...
+                        if ( (!withdrawn_ptr[i]) && (!withdrawn_ptr[j]) ) {
+
+                            // school < 0 means a child normally attends school, but not today
+                            /* Should always be in the same community = same cell */
+                            if (school_ptr[j] < 0) {  // not attending school, use _SC contacts
+                                prob_ptr[i] *= 1.0 - infect * lparm->xmit_comm_SC[age_group_ptr[i]] * social_scale;
+                            } else {
+                                prob_ptr[i] *= 1.0 - infect * lparm->xmit_comm[age_group_ptr[i]] * social_scale;
+                            }
+
+                            /* Workgroup transmission */
+                            if (DAYTIME && workgroup_ptr[j] && (work_i_ptr[j] >= 0)) { // transmitter j at work
+                                if ((work_i_ptr[i] >= 0) && (workgroup_ptr[i] == workgroup_ptr[j])) {  // coworker
+                                    prob_ptr[i] *= 1.0 - infect * lparm->xmit_work * work_scale;
+                                }
+                            }
+
+                            /* Neighborhood? */
+                            if (nborhood_ptr[i] == nborhood_ptr[j]) {
+                                if (school_ptr[j] < 0) { // not attending school, use _SC contacts
+                                    prob_ptr[i] *= 1.0 - infect * lparm->xmit_hood_SC[age_group_ptr[i]] * social_scale;
+                                } else {
+                                    prob_ptr[i] *= 1.0 - infect * lparm->xmit_hood[age_group_ptr[i]] * social_scale;
+                                }
+
+                                if ((school_ptr[i] == school_ptr[j]) && DAYTIME) {
+                                    if (school_ptr[i] > 5) {
+                                        /* Playgroup */
+                                        prob_ptr[i] *= 1.0 - infect * lparm->xmit_school[6] * social_scale;
+                                    } else if (school_ptr[i] == 5) {
+                                        /* Day care */
+                                        prob_ptr[i] *= 1.0 - infect * lparm->xmit_school[5] * social_scale;
+                                    }
+                                }
+                            }  /* same neighborhood */
+
+                            /* Elementary/middle/high school in common */
+                            if ((school_ptr[i] == school_ptr[j]) && DAYTIME &&
+                                (school_ptr[i] > 0) && (school_ptr[i] < 5)) {
+                                if (age_group_ptr[i] <= 1) {  /* Receiver i is a child */
+                                    if (age_group_ptr[j] <= 1) {  /* Transmitter j is a child */
+                                        prob_ptr[i] *= 1.0 - infect * lparm->xmit_school[school_ptr[i]] * social_scale;
+                                    } else {   // Adult teacher/staff -> child student transmission
+                                        prob_ptr[i] *= 1.0 - infect * lparm->xmit_sch_a2c[school_ptr[i]] * social_scale;
+                                    }
+                                } else if (age_group_ptr[j] <= 1) {  // Child student -> adult teacher/staff
+                                    prob_ptr[i] *= 1.0 - infect * lparm->xmit_sch_c2a[school_ptr[i]] * social_scale;
+                                }
+                            }
+                        }  /* within society */
                     }
                 }
             });
