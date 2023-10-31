@@ -306,8 +306,13 @@ public:
 
     void printTotals ();
 
+protected:
+
     DiseaseParm* h_parm;
     DiseaseParm* d_parm;
+
+    std::map<std::pair<int, int>, amrex::DenseBins<AgentContainer::ParticleType> > m_bins_home;
+    std::map<std::pair<int, int>, amrex::DenseBins<AgentContainer::ParticleType> > m_bins_work;
 };
 
 using AgentIterator = typename AgentContainer::ParIterType;

@@ -937,7 +937,10 @@ void AgentContainer::interactAgentsHomeWork (MultiFab& mask_behavior, bool home)
 
         for(MFIter mfi = MakeMFIter(lev); mfi.isValid(); ++mfi)
         {
-            amrex::DenseBins<ParticleType> bins;
+            amrex::DenseBins<AgentContainer::ParticleType>* bins_ptr = nullptr;
+            auto pair_ind = std::make_pair(mfi.index(), mfi.LocalTileIndex());
+            bins_ptr = home ? &m_bins_home[pair_ind] : &m_bins_work[pair_ind];
+
             auto& ptile = ParticlesAt(lev, mfi);
             auto& aos   = ptile.GetArrayOfStructs();
             const size_t np = aos.numParticles();
@@ -948,9 +951,11 @@ void AgentContainer::interactAgentsHomeWork (MultiFab& mask_behavior, bool home)
             int ntiles = numTilesInBox(box, true, bin_size);
 
             auto binner = GetParticleBin{plo, dxi, domain, bin_size, box};
-            bins.build(np, pstruct_ptr, ntiles, binner);
-            auto inds = bins.permutationPtr();
-            auto offsets = bins.offsetsPtr();
+            if (bins_ptr->numBins() < 0) {
+                bins_ptr->build(np, pstruct_ptr, ntiles, binner);
+            }
+            auto inds = bins_ptr->permutationPtr();
+            auto offsets = bins_ptr->offsetsPtr();
 
             auto& soa   = ptile.GetStructOfArrays();
             auto status_ptr = soa.GetIntData(IntIdx::status).data();
@@ -977,7 +982,7 @@ void AgentContainer::interactAgentsHomeWork (MultiFab& mask_behavior, bool home)
             auto counter_ptr = soa.GetRealData(RealIdx::disease_counter).data();
 
             auto* lparm = d_parm;
-            amrex::ParallelForRNG( bins.numItems(),
+            amrex::ParallelForRNG( bins_ptr->numItems(),
                                    [=] AMREX_GPU_DEVICE (int ii, amrex::RandomEngine const& /*engine*/) noexcept
             {
                 int i_cell = binner(pstruct_ptr[ii]);
