@@ -926,6 +926,7 @@ void AgentContainer::interactAgentsHomeWork (MultiFab& mask_behavior, bool home)
 {
     BL_PROFILE("AgentContainer::interactAgentsHomeWork");
 
+    const bool DAYTIME = home;
     IntVect bin_size = {AMREX_D_DECL(1, 1, 1)};
     for (int lev = 0; lev < numLevels(); ++lev)
     {
@@ -967,9 +968,10 @@ void AgentContainer::interactAgentsHomeWork (MultiFab& mask_behavior, bool home)
 
             //auto strain_ptr = soa.GetIntData(IntIdx::strain).data();
             //auto timer_ptr = soa.GetRealData(RealIdx::timer).data();
-            //auto family_ptr = soa.GetIntData(IntIdx::family).data();
-            //auto nborhood_ptr = soa.GetIntData(IntIdx::nborhood).data();
-            //auto school_ptr = soa.GetIntData(IntIdx::school).data();
+            auto family_ptr = soa.GetIntData(IntIdx::family).data();
+            auto nborhood_ptr = soa.GetIntData(IntIdx::nborhood).data();
+            auto school_ptr = soa.GetIntData(IntIdx::school).data();
+            auto withdrawn_ptr = soa.GetIntData(IntIdx::withdrawn).data();
             //auto workgroup_ptr = soa.GetIntData(IntIdx::workgroup).data();
             auto prob_ptr = soa.GetRealData(RealIdx::prob).data();
             auto counter_ptr = soa.GetRealData(RealIdx::disease_counter).data();
@@ -999,41 +1001,41 @@ void AgentContainer::interactAgentsHomeWork (MultiFab& mask_behavior, bool home)
                         infect *= i_mask;
                         infect *= j_mask;
 
-                        // /* Determine what connections these individuals have */
-                        // if ((nborhood_ptr[i] == nborhood_ptr[j]) &&
-                        //     (pt1->family == pt2->family) &&   /* Same family */
-                        //     (! DAYTIME))   /* and night-time */
-                        //     if (!(pt1->status & 6)) {  /* Transmitter i is a child */
-                        //         if (pt1->school < 0)  // not attending school, use _SC contacts
-                        //             prob_ptr[j] *= 1.0 - infect * xmit_child_SC[pt2->status & 7];
-                        //         else
-                        //             prob_ptr[j] *= 1.0 - infect * xmit_child[pt2->status & 7];
-                        //     }
-                        //     else {
-                        //         if (pt1->school < 0)  // not attending school, use _SC contacts
-                        //             prob_ptr[j] *= 1.0 - infect * xmit_adult_SC[pt2->status & 7];
-                        //         else
-                        //             prob_ptr[j] *= 1.0 - infect * xmit_adult[pt2->status & 7];
-                        //     }
-                        // /* check for common neighborhood cluster: */
-                        // else if ((nborhood_ptr[i] == nborhood_ptr[j]) &&
-                        //          ((pt1->family>>2) == (pt2->family>>2)) &&
-                        //          (!(pt1->status & AT_HOME)) &&
-                        //          (!(pt2->status & AT_HOME)) &&
-                        //          (! DAYTIME)) {  /* and night-time */
-                        //     if (!(pt1->status & 6)) {  /* Transmitter i is a child */
-                        //         if (pt1->school < 0)  // not attending school, use _SC contacts
-                        //             prob_ptr[j] *= 1.0 - infect * xmit_nc_child_SC[pt2->status & 7] * cd->social_scale;
-                        //         else
-                        //             prob_ptr[j] *= 1.0 - infect * xmit_nc_child[pt2->status & 7] * cd->social_scale;
-                        //     }
-                        //     else {
-                        //         if (pt1->school < 0)  // not attending school, use _SC contacts
-                        //             prob_ptr[j] *= 1.0 - infect * xmit_nc_adult_SC[pt2->status & 7] * cd->social_scale;
-                        //         else
-                        //             prob_ptr[j] *= 1.0 - infect * xmit_nc_adult[pt2->status & 7] * cd->social_scale;
-                        //     }
-                        // }
+                        amrex::Real social_scale = 1.0;  // TODO this should vary based on cell
+
+                        /* Determine what connections these individuals have */
+                        if ((nborhood_ptr[i] == nborhood_ptr[j]) && (family_ptr[i] == family_ptr[2]) && (!DAYTIME)) {
+                            if (age_group_ptr[i] == 0) {  /* Transmitter i is a child */
+                                if (school_ptr[i] < 0) { // not attending school, use _SC contacts
+                                    prob_ptr[j] *= 1.0 - infect * lparm->xmit_child_SC[age_group_ptr[j]];
+                                } else {
+                                    prob_ptr[j] *= 1.0 - infect * lparm->xmit_child[age_group_ptr[j]];
+                                }
+                            }
+                            else {
+                                if (school_ptr[i] < 0) { // not attending school, use _SC contacts
+                                    prob_ptr[j] *= 1.0 - infect * lparm->xmit_adult_SC[age_group_ptr[j]];
+                                } else {
+                                    prob_ptr[j] *= 1.0 - infect * lparm->xmit_adult[age_group_ptr[j]];
+                                }
+                            }
+                        }
+                        /* check for common neighborhood cluster: */
+                        else if ((nborhood_ptr[i] == nborhood_ptr[j]) && (family_ptr[i] == family_ptr[j]) &&
+                                 withdrawn_ptr[i] && withdrawn_ptr[j] && (!DAYTIME)) {
+                            if (age_group_ptr[i] == 0) {  /* Transmitter i is a child */
+                                if (school_ptr[i] < 0)  // not attending school, use _SC contacts
+                                    prob_ptr[j] *= 1.0 - infect * lparm->xmit_nc_child_SC[age_group_ptr[j]] * social_scale;
+                                else
+                                    prob_ptr[j] *= 1.0 - infect * lparm->xmit_nc_child[age_group_ptr[j]] * social_scale;
+                            }
+                            else {
+                                if (school_ptr[i] < 0)  // not attending school, use _SC contacts
+                                    prob_ptr[j] *= 1.0 - infect * lparm->xmit_nc_adult_SC[age_group_ptr[j]] * social_scale;
+                                else
+                                    prob_ptr[j] *= 1.0 - infect * lparm->xmit_nc_adult[age_group_ptr[j]] * social_scale;
+                            }
+                        }
 
                         // /* Home isolation or household quarantine? */
                         // if ( (!(pt1->status & AT_HOME)) && (!(pt2->status & AT_HOME)) ) {
