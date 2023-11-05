@@ -1202,7 +1202,7 @@ void AgentContainer::interactAgentsHomeWork (MultiFab& mask_behavior, bool home)
                                 /* Travel group in common */
                                 if ((travel_group_ptr[j] == travel_group_ptr[i]) && DAYTIME &&
                                     (age_group_ptr[j] > 1) && (age_group_ptr[i] > 1)) {
-                                    prob_ptr[i] *= 1.0 - infect * lparm->xmit_travel[age_group_ptr[j]] * social_scale;
+                                    prob_ptr[i] *= 1.0 - infect * lparm->xmit_travel[age_group_ptr[i]] * social_scale;
                                 }
                             }
                         }  /* within society */
