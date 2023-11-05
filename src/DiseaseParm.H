@@ -18,6 +18,7 @@ struct DiseaseParm
     amrex::Real pHCC0 = amrex::Real(0.5);
     amrex::Real pHCC1 = amrex::Real(0.5);
     amrex::Real pFA =  amrex::Real(1.0);   // family
+    amrex::Real pTR = amrex::Real(0.2);    // travel group
     amrex::Real pBAR = amrex::Real(-1.0);  // bar or other large social gatherings (<0 turns this off)
 
     int nstrain = 2;
@@ -39,6 +40,8 @@ struct DiseaseParm
 
     amrex::Real xmit_child_SC[5], xmit_adult_SC[5], xmit_nc_child_SC[5], xmit_nc_adult_SC[5];
     amrex::Real xmit_comm_SC[5], xmit_hood_SC[5], xmit_sch_c2a[5], xmit_sch_a2c[5];
+
+    amrex::Real xmit_travel[5] = {amrex::Real(.0000125*pTR), amrex::Real(.0000375*pTR), amrex::Real(.00010*pTR), amrex::Real(.00010*pTR), amrex::Real(.00015*pTR)};
 
     amrex::Real infect = amrex::Real(1.0);
 

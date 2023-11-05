@@ -32,6 +32,7 @@ struct DemographicData
     amrex::Vector<int> Ndaywork;      /* Number of daytime workers */
     amrex::Vector<int> myIDtoUnit; /* Given myID #, what Unit # is it? */
     amrex::Vector<int> Unit_on_proc; /* Is any part of this unit on this processor? */
+    amrex::Vector<amrex::Real> public_transport; /* percent taking public transport*/
 
     amrex::Gpu::DeviceVector<int> myID_d, FIPS_d, Tract_d;    /* ID arrays */
     amrex::Gpu::DeviceVector<int> Start_d;         /* Starting community number for each unit */

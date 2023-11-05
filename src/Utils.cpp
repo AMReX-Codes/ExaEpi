@@ -47,6 +47,9 @@ void ExaEpi::Utils::get_test_params (TestParams& params, const std::string& pref
     if (params.aggregated_diag_int >= 0) {
         pp.get("aggregated_diag_prefix", params.aggregated_diag_prefix);
     }
+
+    params.transport_filename = "";
+    pp.query("transport_filename", params.transport_filename);
 }
 
 /* Determine number of cells in each direction required */

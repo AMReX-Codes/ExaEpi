@@ -256,6 +256,7 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,
                                        iMultiFab& unit_mf,
                                        iMultiFab& FIPS_mf,
                                        iMultiFab& comm_mf,
+                                       const Gpu::DeviceVector<Real>& public_transport,
                                        DemographicData& demo)
 {
     BL_PROFILE("initAgentsCensus");
@@ -430,6 +431,8 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,
             static_cast<Long>(pid + nagents) < LastParticleID,
             "Error: overflow on agent id numbers!");
 
+        auto public_transport_ptr = public_transport.data();
+        auto travel_group_ptr = soa.GetIntData(IntIdx::travel_group).data();
         amrex::ParallelForRNG(bx, ncomp, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n, amrex::RandomEngine const& engine) noexcept
         {
             int nf = nf_arr(i, j, k, n);
@@ -512,6 +515,11 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,
                     }
                 }
 
+                if (amrex::Random() < public_transport_ptr[unit]) {
+                    travel_group_ptr[i] = amrex::Random_int(49, engine) + 1;;
+                } else {
+                    travel_group_ptr[ip] = 0;
+                }
                 agent.pos(0) = (i + 0.5)*dx[0];
                 agent.pos(1) = (j + 0.5)*dx[1];
                 agent.id()  = pid+ip;
@@ -978,6 +986,7 @@ void AgentContainer::interactAgentsHomeWork (MultiFab& mask_behavior, bool home)
             auto school_ptr = soa.GetIntData(IntIdx::school).data();
             auto withdrawn_ptr = soa.GetIntData(IntIdx::withdrawn).data();
             auto workgroup_ptr = soa.GetIntData(IntIdx::workgroup).data();
+            auto travel_group_ptr = soa.GetIntData(IntIdx::travel_group).data();
             auto prob_ptr = soa.GetRealData(RealIdx::prob).data();
             auto counter_ptr = soa.GetRealData(RealIdx::disease_counter).data();
 
@@ -1089,6 +1098,12 @@ void AgentContainer::interactAgentsHomeWork (MultiFab& mask_behavior, bool home)
                                     prob_ptr[j] *= 1.0 - infect * lparm->xmit_sch_a2c[school_ptr[i]] * social_scale;
                                 }
                             }
+
+                            /* Travel group in common */
+                            if ((travel_group_ptr[i] == travel_group_ptr[j]) && DAYTIME &&
+                                (age_group_ptr[j] > 1) && (age_group_ptr[i] > 1)) {
+                                prob_ptr[j] *= 1.0 - infect * lparm->xmit_travel[age_group_ptr[j]] * social_scale;
+                            }
                         }  /* within society */
                     } else if (status_ptr[j] == Status::infected && status_ptr[i] != Status::infected) {
                         // j can infect i
@@ -1182,6 +1197,12 @@ void AgentContainer::interactAgentsHomeWork (MultiFab& mask_behavior, bool home)
                                     }
                                 } else if (age_group_ptr[j] <= 1) {  // Child student -> adult teacher/staff
                                     prob_ptr[i] *= 1.0 - infect * lparm->xmit_sch_c2a[school_ptr[i]] * social_scale;
+                                }
+
+                                /* Travel group in common */
+                                if ((travel_group_ptr[j] == travel_group_ptr[i]) && DAYTIME &&
+                                    (age_group_ptr[j] > 1) && (age_group_ptr[i] > 1)) {
+                                    prob_ptr[i] *= 1.0 - infect * lparm->xmit_travel[age_group_ptr[j]] * social_scale;
                                 }
                             }
                         }  /* within society */

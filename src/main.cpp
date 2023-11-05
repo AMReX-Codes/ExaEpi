@@ -62,6 +62,9 @@ void runAgent ()
     MultiFab mask_behavior(ba, dm, 1, 0);
     mask_behavior.setVal(1);
 
+    Gpu::DeviceVector<Real> public_transport = ExaEpi::Initialization::get_transport_vector
+        (demo, params.transport_filename);
+
     AgentContainer pc(geom, dm, ba);
 
     {
@@ -69,7 +72,7 @@ void runAgent ()
         if (params.ic_type == ICType::Demo) {
             pc.initAgentsDemo(num_residents, unit_mf, FIPS_mf, comm_mf, demo);
         } else if (params.ic_type == ICType::Census) {
-            pc.initAgentsCensus(num_residents, unit_mf, FIPS_mf, comm_mf, demo);
+            pc.initAgentsCensus(num_residents, unit_mf, FIPS_mf, comm_mf, public_transport, demo);
             ExaEpi::Initialization::read_workerflow(demo, params, unit_mf, comm_mf, pc);
             ExaEpi::Initialization::setInitialCases(pc, unit_mf, FIPS_mf, comm_mf, cases, demo);
         }

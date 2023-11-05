@@ -167,6 +167,21 @@ namespace Initialization
         }
     }
 
+    Gpu::DeviceVector<Real>
+        get_transport_vector (const DemographicData& demo,
+                              const std::string& transport_filename)
+    {
+        Gpu::DeviceVector<Real> public_transport;
+        if (transport_filename == "") {
+            public_transport.resize(0);
+            public_transport.resize(demo.Nunit, 0.1);
+        } else {
+            amrex::Abort("Not implemented");
+        }
+
+        return public_transport;
+    }
+
     int infect_random_community (AgentContainer& pc, const amrex::iMultiFab& unit_mf,
                                  const amrex::iMultiFab& /*FIPS_mf*/, const amrex::iMultiFab& comm_mf,
                                  std::map<std::pair<int, int>, amrex::DenseBins<AgentContainer::ParticleType> >& bin_map,

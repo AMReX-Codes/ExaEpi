@@ -22,6 +22,7 @@ struct TestParams
     std::string census_filename;
     std::string workerflow_filename;
     std::string case_filename;
+    std::string transport_filename;
 
     int aggregated_diag_int;
     std::string aggregated_diag_prefix;

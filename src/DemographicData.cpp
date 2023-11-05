@@ -55,6 +55,8 @@ void DemographicData::InitFromFile (const std::string& fname)
     myIDtoUnit.resize(65334);
     Unit_on_proc.resize(Nunit);
 
+    public_transport.resize(Nunit, 0.1);
+
     Ncommunity = 0;
     for (int i = 0; i < Nunit; ++i) {
         Start[i] = Ncommunity;

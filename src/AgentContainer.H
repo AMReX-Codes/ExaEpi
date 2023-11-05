@@ -196,6 +196,7 @@ struct IntIdx
         workgroup,
         work_nborhood,
         withdrawn,
+        travel_group,
         nattribs
     };
 };
@@ -284,6 +285,7 @@ public:
                            amrex::iMultiFab& unit_mf,
                            amrex::iMultiFab& FIPS_mf,
                            amrex::iMultiFab& comm_mf,
+                           const amrex::Gpu::DeviceVector<amrex::Real>& public_transport,
                            DemographicData& demo);
 
     void moveAgentsRandomWalk ();

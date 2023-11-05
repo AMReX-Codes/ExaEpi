@@ -7,6 +7,7 @@
 #include "Utils.H"
 
 #include <AMReX_iMultiFab.H>
+#include <AMReX_GpuContainers.H>
 
 namespace ExaEpi
 {
@@ -17,6 +18,10 @@ namespace Initialization
                           const amrex::iMultiFab& unit_mf,
                           const amrex::iMultiFab& comm_mf,
                           AgentContainer& pc);
+
+    amrex::Gpu::DeviceVector<amrex::Real>
+        get_transport_vector (const DemographicData& demo,
+                              const std::string& transport_filename);
 
     void setInitialCases (AgentContainer& pc, const amrex::iMultiFab& unit_mf,
                           const amrex::iMultiFab& FIPS_mf, const amrex::iMultiFab& comm_mf,
