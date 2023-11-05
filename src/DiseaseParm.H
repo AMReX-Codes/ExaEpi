@@ -27,15 +27,15 @@ struct DiseaseParm
 
     // these are computed from the above
     amrex::Real xmit_comm[5] = {amrex::Real(.0000125*pCO), amrex::Real(.0000375*pCO), amrex::Real(.00010*pCO), amrex::Real(.00010*pCO), amrex::Real(.00015*pCO)};
-    amrex::Real xmit_hood[5] = {.00005*pNH, .00015*pNH, .00040*pNH, .00040*pNH, .00060*pNH};;
-    amrex::Real xmit_nc_adult[5] = {.08*pHC,  .08*pHC, .1*pHC, .1*pHC, .1*pHC};
-    amrex::Real xmit_nc_child[5] = {.15*pHCC0, .15*pHCC1, .08*pHC, .08*pHC, .08*pHC};
+    amrex::Real xmit_hood[5] = {amrex::Real(.00005*pNH), amrex::Real(.00015*pNH), amrex::Real(.00040*pNH), amrex::Real(.00040*pNH), amrex::Real(.00060*pNH)};
+    amrex::Real xmit_nc_adult[5] = {amrex::Real(.08*pHC),  amrex::Real(.08*pHC), amrex::Real(.1*pHC), amrex::Real(.1*pHC), amrex::Real(.1*pHC)};
+    amrex::Real xmit_nc_child[5] = {amrex::Real(.15*pHCC0), amrex::Real(.15*pHCC1), amrex::Real(.08*pHC), amrex::Real(.08*pHC), amrex::Real(.08*pHC)};
     amrex::Real xmit_work = amrex::Real(0.115*pWO);
-    amrex::Real xmit_school[7] = {0., .105*pHSC, .125*pMSC, .145*pESC, .145*pESC, .15, .35};
+    amrex::Real xmit_school[7] = {amrex::Real(0.), amrex::Real(.105*pHSC), amrex::Real(.125*pMSC), amrex::Real(.145*pESC), amrex::Real(.145*pESC), amrex::Real(.15), amrex::Real(.35)};
 
     /* Within family, from child or adult, for 5 age groups (here Thai paper, US:0.6->0.8)*/
-    amrex::Real xmit_adult[5] = {.3*pFA, .3*pFA, .4*pFA, .4*pFA, .4*pFA};
-    amrex::Real xmit_child[5] = {.6*pFA, .6*pFA, .3*pFA, .3*pFA, .3*pFA};
+    amrex::Real xmit_adult[5] = {amrex::Real(.3*pFA), amrex::Real(.3*pFA), amrex::Real(.4*pFA), amrex::Real(.4*pFA), amrex::Real(.4*pFA)};
+    amrex::Real xmit_child[5] = {amrex::Real(.6*pFA), amrex::Real(.6*pFA), amrex::Real(.3*pFA), amrex::Real(.3*pFA), amrex::Real(.3*pFA)};
 
     amrex::Real xmit_child_SC[5], xmit_adult_SC[5], xmit_nc_child_SC[5], xmit_nc_adult_SC[5];
     amrex::Real xmit_comm_SC[5], xmit_hood_SC[5], xmit_sch_c2a[5], xmit_sch_a2c[5];
