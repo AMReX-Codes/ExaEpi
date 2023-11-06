@@ -171,15 +171,38 @@ namespace Initialization
         get_transport_vector (const DemographicData& demo,
                               const std::string& transport_filename)
     {
-        Gpu::DeviceVector<Real> public_transport;
-        if (transport_filename == "") {
-            public_transport.resize(0);
-            public_transport.resize(demo.Nunit, 0.1);
-        } else {
-            amrex::Abort("Not implemented");
+        Vector<Real> public_transport_h;
+        public_transport_h.resize(0);
+        public_transport_h.resize(demo.Nunit, 0.1);
+
+        if (transport_filename != "") {
+            Vector<char> fileCharPtr;
+            ParallelDescriptor::ReadAndBcastFile(transport_filename, fileCharPtr);
+            std::string fileCharPtrString(fileCharPtr.dataPtr());
+            std::istringstream is(fileCharPtrString, std::istringstream::in);
+
+            Vector<Real> public_transport_host;
+            std::string line, word;
+            while ( is.good() ) {
+                int tract, workers, drive, carpool, transport;
+                std::getline(is, line);
+                std::istringstream lis(line);
+                lis >> tract >> workers >> drive >> carpool >> transport;
+                //amrex::Print() << workers << "\n";
+                public_transport_h[tract] = ((Real) transport) / workers;
+            }
+
+            // for (auto percent : public_transport_host) {
+            //     amrex::Print() << percent << " ";
+            // }
+            // amrex::Print() << "\n";
         }
 
-        return public_transport;
+        Gpu::DeviceVector<Real> public_transport_d(demo.Nunit);
+        Gpu::copyAsync(Gpu::hostToDevice, public_transport_h.begin(),
+                       public_transport_h.end(), public_transport_d.begin());
+
+        return public_transport_d;
     }
 
     int infect_random_community (AgentContainer& pc, const amrex::iMultiFab& unit_mf,
