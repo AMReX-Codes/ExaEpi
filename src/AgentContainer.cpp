@@ -991,13 +991,13 @@ void AgentContainer::interactAgentsHomeWork (MultiFab& mask_behavior, bool home)
                 auto cell_start = offsets[i_cell];
                 auto cell_stop  = offsets[i_cell+1];
 
-                AMREX_ALWAYS_ASSERT(i < np);
+                AMREX_ALWAYS_ASSERT( (Long) i < np);
                 if (status_ptr[i] == Status::immune) { return; }
                 if (status_ptr[i] == Status::infected && counter_ptr[i] < 3) { return; }  // incubation stage
                 //amrex::Real i_mask = mask_arr(home_i_ptr[i], home_j_ptr[i], 0);
                 for (unsigned int jj = cell_start; jj < cell_stop; ++jj) {
                     auto j = inds[jj];
-                    AMREX_ALWAYS_ASSERT(j < np);
+                    AMREX_ALWAYS_ASSERT( (Long) j < np);
                     //amrex::Real j_mask = mask_arr(home_i_ptr[j], home_j_ptr[j], 0);
                     if (status_ptr[j] == Status::immune) {continue;}
                     if (status_ptr[i] == Status::infected && counter_ptr[j] < 3) { continue; }  // incubation stage
