@@ -696,7 +696,7 @@ void AgentContainer::updateStatus (MultiFab& disease_stats)
             auto counter_ptr = soa.GetRealData(RealIdx::disease_counter).data();
             auto timer_ptr = soa.GetRealData(RealIdx::treatment_timer).data();
             auto prob_ptr = soa.GetRealData(RealIdx::prob).data();
-            auto& aos   = ptile.GetArrayOfStructs();
+            //auto& aos   = ptile.GetArrayOfStructs();
             //auto pstruct_ptr = aos.data();
             auto ds_arr = disease_stats[mfi].array();
 
@@ -925,7 +925,7 @@ void AgentContainer::infectAgents ()
     }
 }
 
-void AgentContainer::interactAgentsHomeWork (MultiFab& mask_behavior, bool home)
+void AgentContainer::interactAgentsHomeWork (MultiFab& /*mask_behavior*/, bool home)
 {
     BL_PROFILE("AgentContainer::interactAgentsHomeWork");
 
