@@ -107,7 +107,7 @@ void runAgent ()
         }
     }
 
-    if ((params.plot_int > 0) && (params.nsteps % params.plot_int == 0)) {
+    if (params.plot_int > 0) {
         ExaEpi::IO::writePlotFile(pc, num_residents, unit_mf, FIPS_mf, comm_mf, params.nsteps);
     }
 
