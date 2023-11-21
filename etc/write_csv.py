@@ -2,8 +2,11 @@ import numpy as np
 import yt
 from yt.frontends.boxlib.data_structures import AMReXDataset
 from collections import defaultdict
+import sys
 
-ds = AMReXDataset("plt00000")
+fn = sys.argv[1]
+
+ds = AMReXDataset(fn)
 ad = ds.all_data()
 
 inf = ad['infected'].d
