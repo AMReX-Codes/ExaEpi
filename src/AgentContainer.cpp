@@ -697,7 +697,7 @@ void AgentContainer::updateStatus (MultiFab& disease_stats)
             auto timer_ptr = soa.GetRealData(RealIdx::treatment_timer).data();
             auto prob_ptr = soa.GetRealData(RealIdx::prob).data();
             auto& aos   = ptile.GetArrayOfStructs();
-            auto pstruct_ptr = aos.data();
+            //auto pstruct_ptr = aos.data();
             auto ds_arr = disease_stats[mfi].array();
 
             struct DiseaseStats
@@ -946,7 +946,7 @@ void AgentContainer::interactAgentsHomeWork (MultiFab& mask_behavior, bool home)
 
             auto& ptile = ParticlesAt(lev, mfi);
             auto& aos   = ptile.GetArrayOfStructs();
-            const size_t np = aos.numParticles();
+            const auto np = aos.numParticles();
             auto pstruct_ptr = aos().dataPtr();
 
             const Box& box = mfi.validbox();
@@ -964,12 +964,12 @@ void AgentContainer::interactAgentsHomeWork (MultiFab& mask_behavior, bool home)
             auto status_ptr = soa.GetIntData(IntIdx::status).data();
             auto age_group_ptr = soa.GetIntData(IntIdx::age_group).data();
 
-            auto home_i_ptr = soa.GetIntData(IntIdx::home_i).data();
-            auto home_j_ptr = soa.GetIntData(IntIdx::home_j).data();
+            //auto home_i_ptr = soa.GetIntData(IntIdx::home_i).data();
+            //auto home_j_ptr = soa.GetIntData(IntIdx::home_j).data();
             auto work_i_ptr = soa.GetIntData(IntIdx::work_i).data();
-            auto work_j_ptr = soa.GetIntData(IntIdx::work_j).data();
+            //auto work_j_ptr = soa.GetIntData(IntIdx::work_j).data();
 
-            auto mask_arr = mask_behavior[mfi].array();
+            //auto mask_arr = mask_behavior[mfi].array();
 
             //auto strain_ptr = soa.GetIntData(IntIdx::strain).data();
             //auto timer_ptr = soa.GetRealData(RealIdx::timer).data();
