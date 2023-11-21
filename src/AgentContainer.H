@@ -176,7 +176,8 @@ struct Status
         never = 0,   // never infected
         infected,    // infected
         immune,      // no longer infected, immune. lasts 6 months.
-        susceptible  // no longer infected, no longer immnune
+        susceptible, // no longer infected, no longer immnune
+        dead
     };
 };
 

@@ -226,7 +226,7 @@ namespace Initialization
                 auto cell_stop  = offsets[i_cell+1];
                 int num_this_community = cell_stop - cell_start;
                 AMREX_ASSERT(num_this_community > 0);
-                AMREX_ASSERT(cell_stop < np);
+                //AMREX_ASSERT(cell_stop < np);
 
                 if (num_this_community == 0) { return;}
 

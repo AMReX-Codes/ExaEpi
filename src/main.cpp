@@ -97,9 +97,9 @@ void runAgent ()
 
             pc.infectAgents();
 
-            if ((params.random_travel_int > 0) && (i % params.random_travel_int == 0)) {
-                pc.moveRandomTravel();
-            }
+            //            if ((params.random_travel_int > 0) && (i % params.random_travel_int == 0)) {
+            //                pc.moveRandomTravel();
+            //            }
 
             pc.Redistribute();
 

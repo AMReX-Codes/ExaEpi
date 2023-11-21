@@ -771,7 +771,8 @@ void AgentContainer::updateStatus (MultiFab& disease_stats)
                                         amrex::Gpu::Atomic::AddNoRet(
                                             &ds_arr(home_i_ptr[i], home_j_ptr[i], 0,
                                                     DiseaseStats::death), 1.0_rt);
-                                        pstruct_ptr[i].id() = -pstruct_ptr[i].id();
+                                        status_ptr[i] = Status::dead;
+                                        //pstruct_ptr[i].id() = -pstruct_ptr[i].id();
                                     }
                                 amrex::Gpu::Atomic::AddNoRet(
                                     &ds_arr(home_i_ptr[i], home_j_ptr[i], 0,
@@ -784,7 +785,8 @@ void AgentContainer::updateStatus (MultiFab& disease_stats)
                                         amrex::Gpu::Atomic::AddNoRet(
                                             &ds_arr(home_i_ptr[i], home_j_ptr[i], 0,
                                                     DiseaseStats::death), 1.0_rt);
-                                        pstruct_ptr[i].id() = -pstruct_ptr[i].id();
+                                        status_ptr[i] = Status::dead;
+                                        //pstruct_ptr[i].id() = -pstruct_ptr[i].id();
                                     }
                                 amrex::Gpu::Atomic::AddNoRet(
                                     &ds_arr(home_i_ptr[i], home_j_ptr[i], 0,
@@ -796,7 +798,8 @@ void AgentContainer::updateStatus (MultiFab& disease_stats)
                                     amrex::Gpu::Atomic::AddNoRet(
                                         &ds_arr(home_i_ptr[i], home_j_ptr[i], 0,
                                                 DiseaseStats::death), 1.0_rt);
-                                    pstruct_ptr[i].id() = -pstruct_ptr[i].id();
+                                    status_ptr[i] = Status::dead;
+                                    //pstruct_ptr[i].id() = -pstruct_ptr[i].id();
                                 }
                                 amrex::Gpu::Atomic::AddNoRet(
                                     &ds_arr(home_i_ptr[i], home_j_ptr[i], 0,
@@ -966,9 +969,6 @@ void AgentContainer::interactAgentsHomeWork (MultiFab& mask_behavior, bool home)
             auto work_i_ptr = soa.GetIntData(IntIdx::work_i).data();
             auto work_j_ptr = soa.GetIntData(IntIdx::work_j).data();
 
-            auto i_ptr = home ? home_i_ptr : work_i_ptr;
-            auto j_ptr = home ? home_j_ptr : work_j_ptr;
-
             auto mask_arr = mask_behavior[mfi].array();
 
             //auto strain_ptr = soa.GetIntData(IntIdx::strain).data();
@@ -981,21 +981,24 @@ void AgentContainer::interactAgentsHomeWork (MultiFab& mask_behavior, bool home)
             auto prob_ptr = soa.GetRealData(RealIdx::prob).data();
             auto counter_ptr = soa.GetRealData(RealIdx::disease_counter).data();
 
+            AMREX_ALWAYS_ASSERT(np == bins_ptr->numItems());
             auto* lparm = d_parm;
             amrex::ParallelForRNG( bins_ptr->numItems(),
                                    [=] AMREX_GPU_DEVICE (int ii, amrex::RandomEngine const& /*engine*/) noexcept
             {
-                int i_cell = binner(pstruct_ptr[ii]);
+                auto i = inds[ii];
+                int i_cell = binner(pstruct_ptr[i]);
                 auto cell_start = offsets[i_cell];
                 auto cell_stop  = offsets[i_cell+1];
 
-                auto i = inds[ii];
+                AMREX_ALWAYS_ASSERT(i < np);
                 if (status_ptr[i] == Status::immune) { return; }
                 if (status_ptr[i] == Status::infected && counter_ptr[i] < 3) { return; }  // incubation stage
-                amrex::Real i_mask = mask_arr(i_ptr[i], j_ptr[i], 0);
+                //amrex::Real i_mask = mask_arr(home_i_ptr[i], home_j_ptr[i], 0);
                 for (unsigned int jj = cell_start; jj < cell_stop; ++jj) {
                     auto j = inds[jj];
-                    amrex::Real j_mask = mask_arr(i_ptr[j], j_ptr[j], 0);
+                    AMREX_ALWAYS_ASSERT(j < np);
+                    //amrex::Real j_mask = mask_arr(home_i_ptr[j], home_j_ptr[j], 0);
                     if (status_ptr[j] == Status::immune) {continue;}
                     if (status_ptr[i] == Status::infected && counter_ptr[j] < 3) { continue; }  // incubation stage
 
@@ -1003,8 +1006,8 @@ void AgentContainer::interactAgentsHomeWork (MultiFab& mask_behavior, bool home)
                         // i can infect j
                         amrex::Real infect = lparm->infect;
                         infect *= lparm->vac_eff;
-                        infect *= i_mask;
-                        infect *= j_mask;
+                        //infect *= i_mask;
+                        //infect *= j_mask;
 
                         amrex::Real social_scale = 1.0;  // TODO this should vary based on cell
                         amrex::Real work_scale = 1.0;  // TODO this should vary based on cell
@@ -1094,8 +1097,8 @@ void AgentContainer::interactAgentsHomeWork (MultiFab& mask_behavior, bool home)
                         // j can infect i
                         amrex::Real infect = lparm->infect;
                         infect *= lparm->vac_eff;
-                        infect *= i_mask;
-                        infect *= j_mask;
+                        //infect *= i_mask;
+                        //infect *= j_mask;
 
                         amrex::Real social_scale = 1.0;  // TODO this should vary based on cell
                         amrex::Real work_scale = 1.0;  // TODO this should vary based on cell
@@ -1236,6 +1239,8 @@ void AgentContainer::printTotals () {
                   -> amrex::GpuTuple<int,int,int,int>
               {
                   int s[4] = {0, 0, 0, 0};
+                  AMREX_ALWAYS_ASSERT(p.idata(IntIdx::status) >= 0);
+                  AMREX_ALWAYS_ASSERT(p.idata(IntIdx::status) <= 3);
                   s[p.idata(IntIdx::status)] = 1;
                   return {s[0], s[1], s[2], s[3]};
               }, reduce_ops);
