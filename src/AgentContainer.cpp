@@ -773,11 +773,12 @@ void AgentContainer::updateStatus (MultiFab& disease_stats)
                                                     DiseaseStats::death), 1.0_rt);
                                         status_ptr[i] = Status::dead;
                                         //pstruct_ptr[i].id() = -pstruct_ptr[i].id();
+                                    } else {
+                                        amrex::Gpu::Atomic::AddNoRet(
+                                                                     &ds_arr(home_i_ptr[i], home_j_ptr[i], 0,
+                                                                             DiseaseStats::hospitalization), -1.0_rt);
+                                        status_ptr[i] = Status::immune;  // If alive, hospitalized patient recovers
                                     }
-                                amrex::Gpu::Atomic::AddNoRet(
-                                    &ds_arr(home_i_ptr[i], home_j_ptr[i], 0,
-                                            DiseaseStats::hospitalization), -1.0_rt);
-                                status_ptr[i] = Status::immune;  // If alive, hospitalized patient recovers
                             }
                             if (timer_ptr[i] == 10) {
                                 if (CVF[age_group_ptr[i]] > 1.0)
@@ -787,11 +788,12 @@ void AgentContainer::updateStatus (MultiFab& disease_stats)
                                                     DiseaseStats::death), 1.0_rt);
                                         status_ptr[i] = Status::dead;
                                         //pstruct_ptr[i].id() = -pstruct_ptr[i].id();
+                                    } else {
+                                        amrex::Gpu::Atomic::AddNoRet(
+                                                                     &ds_arr(home_i_ptr[i], home_j_ptr[i], 0,
+                                                                             DiseaseStats::ICU), -1.0_rt);
+                                        status_ptr[i] = Status::immune;  // If alive, ICU patient recovers
                                     }
-                                amrex::Gpu::Atomic::AddNoRet(
-                                    &ds_arr(home_i_ptr[i], home_j_ptr[i], 0,
-                                            DiseaseStats::ICU), -1.0_rt);
-                                status_ptr[i] = Status::immune;  // If alive, ICU patient recovers
                             }
                             if (timer_ptr[i] == 20) {
                                 if (amrex::Random(engine) < CVF[age_group_ptr[i]]) {
@@ -800,11 +802,12 @@ void AgentContainer::updateStatus (MultiFab& disease_stats)
                                                 DiseaseStats::death), 1.0_rt);
                                     status_ptr[i] = Status::dead;
                                     //pstruct_ptr[i].id() = -pstruct_ptr[i].id();
+                                } else {
+                                    amrex::Gpu::Atomic::AddNoRet(
+                                                                 &ds_arr(home_i_ptr[i], home_j_ptr[i], 0,
+                                                                         DiseaseStats::ventilator), -1.0_rt);
+                                    status_ptr[i] = Status::immune;  // If alive, ventilated patient recovers
                                 }
-                                amrex::Gpu::Atomic::AddNoRet(
-                                    &ds_arr(home_i_ptr[i], home_j_ptr[i], 0,
-                                            DiseaseStats::ventilator), -1.0_rt);
-                                status_ptr[i] = Status::immune;  // If alive, ventilated patient recovers
                             }
                         }
                         else { // not hospitalized, recover on day 9
@@ -1231,24 +1234,27 @@ void AgentContainer::generateCellData (MultiFab& mf) const
         }, false);
 }
 
-void AgentContainer::printTotals () {
+std::array<Long, 5> AgentContainer::printTotals () {
     BL_PROFILE("printTotals");
-    amrex::ReduceOps<ReduceOpSum, ReduceOpSum, ReduceOpSum, ReduceOpSum> reduce_ops;
-    auto r = amrex::ParticleReduce<ReduceData<int,int,int,int>> (
+    amrex::ReduceOps<ReduceOpSum, ReduceOpSum, ReduceOpSum, ReduceOpSum, ReduceOpSum> reduce_ops;
+    auto r = amrex::ParticleReduce<ReduceData<int,int,int,int,int>> (
                   *this, [=] AMREX_GPU_DEVICE (const SuperParticleType& p) noexcept
-                  -> amrex::GpuTuple<int,int,int,int>
+                  -> amrex::GpuTuple<int,int,int,int,int>
               {
-                  int s[4] = {0, 0, 0, 0};
+                  int s[5] = {0, 0, 0, 0, 0};
                   AMREX_ALWAYS_ASSERT(p.idata(IntIdx::status) >= 0);
-                  AMREX_ALWAYS_ASSERT(p.idata(IntIdx::status) <= 3);
+                  AMREX_ALWAYS_ASSERT(p.idata(IntIdx::status) <= 4);
                   s[p.idata(IntIdx::status)] = 1;
-                  return {s[0], s[1], s[2], s[3]};
+                  return {s[0], s[1], s[2], s[3], s[4]};
               }, reduce_ops);
 
-    Long counts[4] = {amrex::get<0>(r), amrex::get<1>(r), amrex::get<2>(r), amrex::get<3>(r)};
-    ParallelDescriptor::ReduceLongSum(&counts[0], 4, ParallelDescriptor::IOProcessorNumber());
-    amrex::Print() << "Never infected: " << counts[0] << "\n";
-    amrex::Print() << "Infected: " << counts[1] << "\n";
-    amrex::Print() << "Immune: " << counts[2] << "\n";
-    amrex::Print() << "Previously infected: " << counts[3] << "\n";
+    std::array<Long, 5> counts = {amrex::get<0>(r), amrex::get<1>(r), amrex::get<2>(r), amrex::get<3>(r),
+                                  amrex::get<4>(r)};
+    ParallelDescriptor::ReduceLongSum(&counts[0], 5, ParallelDescriptor::IOProcessorNumber());
+    // amrex::Print() << "Never infected: " << counts[0] << "\n";
+    // amrex::Print() << "Infected: " << counts[1] << "\n";
+    // amrex::Print() << "Immune: " << counts[2] << "\n";
+    // amrex::Print() << "Previously infected: " << counts[3] << "\n";
+    // amrex::Print() << "Deaths: " << counts[4] << "\n";
+    return counts;
 }

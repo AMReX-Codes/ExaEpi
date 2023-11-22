@@ -75,6 +75,10 @@ void runAgent ()
         }
     }
 
+    int  step_of_peak = 0;
+    Long num_infected_peak = 0;
+    Long cumulative_deaths = 0;
+
     {
         BL_PROFILE_REGION("Evolution");
         for (int i = 0; i < params.nsteps; ++i)
@@ -103,9 +107,20 @@ void runAgent ()
 
             pc.Redistribute();
 
-            pc.printTotals();
+            auto counts = pc.printTotals();
+            if (counts[1] > num_infected_peak) {
+                num_infected_peak = counts[1];
+                step_of_peak = i;
+            }
+            cumulative_deaths = counts[4];
         }
     }
+
+    amrex::Print() << "\n \n";
+    amrex::Print() << "Peak number of infected: " << num_infected_peak << "\n";
+    amrex::Print() << "Day of peak: " << step_of_peak / 2 << "\n";
+    amrex::Print() << "Cumulative deaths: " << cumulative_deaths << "\n";
+    amrex::Print() << "\n \n";
 
     if (params.plot_int > 0) {
         ExaEpi::IO::writePlotFile(pc, num_residents, unit_mf, FIPS_mf, comm_mf, params.nsteps);

@@ -50,5 +50,29 @@ void DiseaseParm::Initialize ()
         xmit_hood_SC[i] = xmit_hood[i];
     }
 
+    // Multiply contact rates by transmission probability given contact
+    xmit_work *= p_trans[0];
+
+    for (int i = 0; i < 5; i++) {
+        xmit_comm[i] *= p_trans[0];
+        xmit_hood[i] *= p_trans[0];
+        xmit_nc_adult[i] *= p_trans[0];
+        xmit_nc_child[i] *= p_trans[0];
+        xmit_adult[i] *= p_trans[0];
+        xmit_child[i] *= p_trans[0];
+    }
+
+    for (int i = 1; i < 7; i++) xmit_school[i] *= p_trans[0];
+    for (int i = 1; i < 5; i++) {
+        xmit_child_SC[i] *= p_trans[0];
+        xmit_adult_SC[i] *= p_trans[0];
+        xmit_nc_child_SC[i] *= p_trans[0];
+        xmit_nc_adult_SC[i] *= p_trans[0];
+        xmit_comm_SC[i] *= p_trans[0];
+        xmit_hood_SC[i] *= p_trans[0];
+        xmit_sch_c2a[i] *= p_trans[0];
+        xmit_sch_a2c[i] *= p_trans[0];
+    }
+
     infect = 1.0;
 }

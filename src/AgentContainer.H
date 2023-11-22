@@ -1,6 +1,8 @@
 #ifndef AGENT_CONTAINER_H_
 #define AGENT_CONTAINER_H_
 
+#include <array>
+
 #include <AMReX_BoxArray.H>
 #include <AMReX_DistributionMapping.H>
 #include <AMReX_Geometry.H>
@@ -305,7 +307,7 @@ public:
 
     void generateCellData (amrex::MultiFab& mf) const;
 
-    void printTotals ();
+    std::array<amrex::Long, 5> printTotals ();
 
 protected:
 
