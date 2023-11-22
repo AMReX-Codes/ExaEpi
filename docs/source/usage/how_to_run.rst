@@ -91,8 +91,6 @@ In addition to the ExaEpi inputs, there are also a number of runtime options tha
 * ``disease.reduced_inf`` (`list of float`, example: ``0.75 0.75``)
     The relative infectiousness of asymptomatic individuals. There must be
     one entry for each disease strain.
-* ``disease.reduced_inf`` (`float`, example: ``0.1``)
-    The cross-strain reduction factor to the transmission probability.
 * ``disease.vac_eff`` (`float`, example: ``0.4``)
     The vaccine efficacy - the probability of transmission will be multiplied by this factor
 
