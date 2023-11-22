@@ -766,7 +766,7 @@ void AgentContainer::updateStatus (MultiFab& disease_stats)
                             // do hospital things
                             timer_ptr[i] -= 1.0;
                             if (timer_ptr[i] == 0) {
-                                if (CVF[age_group_ptr[i]] > 2.0)
+                                if (CVF[age_group_ptr[i]] > 2.0) {
                                     if (amrex::Random(engine) < (CVF[age_group_ptr[i]] - 2.0)) {
                                         amrex::Gpu::Atomic::AddNoRet(
                                             &ds_arr(home_i_ptr[i], home_j_ptr[i], 0,
@@ -779,9 +779,10 @@ void AgentContainer::updateStatus (MultiFab& disease_stats)
                                                                              DiseaseStats::hospitalization), -1.0_rt);
                                         status_ptr[i] = Status::immune;  // If alive, hospitalized patient recovers
                                     }
+                                }
                             }
                             if (timer_ptr[i] == 10) {
-                                if (CVF[age_group_ptr[i]] > 1.0)
+                                if (CVF[age_group_ptr[i]] > 1.0) {
                                     if (amrex::Random(engine) < (CVF[age_group_ptr[i]] - 1.0)) {
                                         amrex::Gpu::Atomic::AddNoRet(
                                             &ds_arr(home_i_ptr[i], home_j_ptr[i], 0,
@@ -794,6 +795,7 @@ void AgentContainer::updateStatus (MultiFab& disease_stats)
                                                                              DiseaseStats::ICU), -1.0_rt);
                                         status_ptr[i] = Status::immune;  // If alive, ICU patient recovers
                                     }
+                                }
                             }
                             if (timer_ptr[i] == 20) {
                                 if (amrex::Random(engine) < CVF[age_group_ptr[i]]) {
