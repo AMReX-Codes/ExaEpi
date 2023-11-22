@@ -65,6 +65,8 @@ In addition to the ExaEpi inputs, there are also a number of runtime options tha
 * ``agent.aggregated_diag_prefix`` (`string`)
     Prefix to use when writing aggregated data. For example, if this is set to `cases`, the
     aggregated data files will be named `cases000010`, etc.
+* ``agent.seed`` (`long integer`)
+    Use this to specify the random seed to use for the run.
 * ``contact.pSC`` (`float`, default: 0.2)
     This is contact matrix scaling factor for schools.
 * ``contact.pCO`` (`float`, default: 1.45)
