@@ -1,8 +1,9 @@
 import yt
 from yt.frontends.boxlib.data_structures import AMReXDataset
 import pylab as plt
+import sys
 
-fn = "plt00168"
+fn = sys.argv[1]
 
 ds = AMReXDataset(fn)
 
