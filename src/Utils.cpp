@@ -47,6 +47,14 @@ void ExaEpi::Utils::get_test_params (TestParams& params, const std::string& pref
     if (params.aggregated_diag_int >= 0) {
         pp.get("aggregated_diag_prefix", params.aggregated_diag_prefix);
     }
+
+    Long seed = 0;
+    bool reset_seed = pp.query("seed", seed);
+    if (reset_seed) {
+        ULong gpu_seed = (ULong) seed;
+        ULong cpu_seed = (ULong) seed;
+        amrex::ResetRandomSeed(cpu_seed, gpu_seed);
+    }
 }
 
 /* Determine number of cells in each direction required */
