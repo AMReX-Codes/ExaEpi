@@ -93,6 +93,12 @@ In addition to the ExaEpi inputs, there are also a number of runtime options tha
     one entry for each disease strain.
 * ``disease.vac_eff`` (`float`, example: ``0.4``)
     The vaccine efficacy - the probability of transmission will be multiplied by this factor
+* ``disease.incubation_length`` (`int`, default: ``3``)
+    Length of the incubation period in days. Before this, agents have no symptoms and are not infectious.
+* ``disease.infectious_length`` (`int`, default: ``6``)
+    Length of the infectious period in days. This counter starts once the incubation phase is over. Before tihs, agents are symptomatic and can spread the disease.
+* ``disease.symptomatic_length`` (`int`, default: ``5``)
+    Length of the symptomatic-but-not-infectious stage in days. This counter starts once the infectious phase is complete. During this time agents are symptomatic and may self-withdraw, but they cannot spread the illness.
 
 In addition to the ExaEpi inputs, there are also a number of runtime options that can be configured for AMReX itself. Please see <https://amrex-codes.github.io/amrex/docs_html/GPU.html#inputs-parameters>`__ for more information on these options.
 

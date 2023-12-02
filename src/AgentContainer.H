@@ -267,6 +267,10 @@ public:
                 h_parm->p_asymp[i] = p_asymp[i];
                 h_parm->reduced_inf[i] = reduced_inf[i];
             }
+
+            pp.query("incubation_length", h_parm->incubation_length);
+            pp.query("infectious_length", h_parm->infectious_length);
+            pp.query("symptomatic_length", h_parm->symptomatic_length);
         }
 
         h_parm->Initialize();

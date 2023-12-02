@@ -710,6 +710,8 @@ void AgentContainer::updateStatus (MultiFab& disease_stats)
                 };
             };
 
+            auto* lparm = d_parm;
+
             // Track hospitalization, ICU, ventilator, and fatalities
             Real CHR[] = {.0104, .0104, .070, .28, 1.0};  // sick -> hospital probabilities
             Real CIC[] = {.24, .24, .24, .36, .35};      // hospital -> ICU probabilities
@@ -725,7 +727,7 @@ void AgentContainer::updateStatus (MultiFab& disease_stats)
                 }
                 else if (status_ptr[i] == Status::infected) {
                     counter_ptr[i] += 1;
-                    if (counter_ptr[i] < 3) {
+                    if (counter_ptr[i] < lparm->incubation_length) {
                         // incubation phase
                         return;
                     }
@@ -812,8 +814,8 @@ void AgentContainer::updateStatus (MultiFab& disease_stats)
                                 }
                             }
                         }
-                        else { // not hospitalized, recover on day 9
-                            if (counter_ptr[i] == 9.0) {
+                        else { // not hospitalized, recover once not infectious
+                            if (counter_ptr[i] == lparm->incubation_length + lparm->infectious_length) {
                                 status_ptr[i] = Status::immune;
                             }
                         }
@@ -998,14 +1000,14 @@ void AgentContainer::interactAgentsHomeWork (MultiFab& /*mask_behavior*/, bool h
 
                 AMREX_ALWAYS_ASSERT( (Long) i < np);
                 if (status_ptr[i] == Status::immune) { return; }
-                if (status_ptr[i] == Status::infected && counter_ptr[i] < 3) { return; }  // incubation stage
+                if (status_ptr[i] == Status::infected && counter_ptr[i] < lparm->incubation_length) { return; }  // incubation stage
                 //amrex::Real i_mask = mask_arr(home_i_ptr[i], home_j_ptr[i], 0);
                 for (unsigned int jj = cell_start; jj < cell_stop; ++jj) {
                     auto j = inds[jj];
                     AMREX_ALWAYS_ASSERT( (Long) j < np);
                     //amrex::Real j_mask = mask_arr(home_i_ptr[j], home_j_ptr[j], 0);
                     if (status_ptr[j] == Status::immune) {continue;}
-                    if (status_ptr[i] == Status::infected && counter_ptr[j] < 3) { continue; }  // incubation stage
+                    if (status_ptr[i] == Status::infected && counter_ptr[j] < lparm->incubation_length) { continue; }  // incubation stage
 
                     if (status_ptr[i] == Status::infected && status_ptr[j] != Status::infected) {
                         // i can infect j

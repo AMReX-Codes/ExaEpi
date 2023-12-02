@@ -48,6 +48,10 @@ struct DiseaseParm
 
     amrex::Real Child_compliance, Child_HH_closure;
 
+    int incubation_length  = 3;
+    int infectious_length  = 6;
+    int symptomatic_length = 5; // note, this does not affect the model yet
+
     void Initialize ();
 };
 #endif
