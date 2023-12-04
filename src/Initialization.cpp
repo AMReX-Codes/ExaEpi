@@ -232,8 +232,8 @@ namespace Initialization
 
                 int ntry = 0;
                 int ni = 0;
-                unsigned int stop = std::min(cell_start + ninfect, cell_stop);
-                for (unsigned int ip = cell_start; ip < stop; ++ip) {
+                /*unsigned*/ int stop = std::min(cell_start + ninfect, cell_stop);
+                for (/*unsigned*/ int ip = cell_start; ip < stop; ++ip) {
                     int ind = cell_start + amrex::Random_int(num_this_community, engine);
                     auto pindex = inds[ind];
                     if (status_ptr[pindex] == Status::infected
@@ -254,6 +254,9 @@ namespace Initialization
 
             Gpu::Device::streamSynchronize();
             num_infected += num_infected_d.dataValue();
+	    if(num_infected>=ninfect) { 
+		    break;
+	    }
         }
 
         ParallelDescriptor::ReduceIntSum(num_infected);
@@ -265,12 +268,13 @@ namespace Initialization
                           const CaseData& cases, const DemographicData& demo)
     {
         BL_PROFILE("setInitialCases");
-
+/*
         amrex::Vector<int> FIPS_code_to_i(57000, -1);
         for (int i = 0; i < demo.FIPS.size(); ++i) {
             FIPS_code_to_i[demo.FIPS[i]] = i;
+	                            printf("Unit %d has FIPS %d and num Comm %d and population %d\n", i, demo.FIPS[i], demo.Start[i+1]-demo.Start[i], demo.Population[i]);
         }
-
+*/
         std::map<std::pair<int, int>, amrex::DenseBins<AgentContainer::ParticleType> > bin_map;
 
         int ntry = 5;
@@ -278,17 +282,21 @@ namespace Initialization
         for (int ihub = 0; ihub < cases.N_hubs; ++ihub) {
             if (cases.Size_hubs[ihub] > 0) {
                 int FIPS = cases.FIPS_hubs[ihub];
-                int unit = FIPS_code_to_i[FIPS];
-                if (unit > 0) {
-                    amrex::Print() << "Infecting " << cases.Size_hubs[ihub] << " in unit " << unit << " \n";
-                    for (int i = 0; i < cases.Size_hubs[ihub]; i+=5) {
-                        if (infect_random_community(pc, unit_mf, FIPS_mf, comm_mf, bin_map,
-                                                    cases, demo, unit, ntry) < ntry) {
-                            i--;  // try again
-                        } else {
-                            ninf += ntry;
-                        }
+		std::vector<int> units;
+		units.resize(0);
+	        for (int i = 0; i < demo.Nunit; ++i) if(demo.FIPS[i]==FIPS)units.push_back(i);		
+                //int unit = FIPS_code_to_i[FIPS];
+                if (units.size() > 0) {
+		    printf("Infecting %d people in FIPS %d\n", cases.Size_hubs[ihub], FIPS);
+		    int u=0;
+		    int i=0;
+                    while(i < cases.Size_hubs[ihub]) {
+			int nSuccesses= infect_random_community(pc, unit_mf, FIPS_mf, comm_mf, bin_map, cases, demo, units[u], ntry);
+                        ninf += nSuccesses;
+			i+= nSuccesses;
+			u=(u+1)%units.size(); //sometimes we infect fewer than ntry, but switch to next unit anyway
                     }
+                    amrex::Print() << "Infected " << i<< "total " << ninf << " after processing FIPS " << FIPS<< " \n";
                 }
             }
         }
