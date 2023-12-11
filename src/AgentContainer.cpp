@@ -1020,7 +1020,7 @@ void AgentContainer::interactAgentsHomeWork (MultiFab& /*mask_behavior*/, bool h
                         amrex::Real work_scale = 1.0;  // TODO this should vary based on cell
 
                         /* Determine what connections these individuals have */
-                        if ((nborhood_ptr[i] == nborhood_ptr[j]) && (family_ptr[i] == family_ptr[2]) && (!DAYTIME)) {
+                        if ((nborhood_ptr[i] == nborhood_ptr[j]) && (family_ptr[i] == family_ptr[j]) && (!DAYTIME)) {
                             if (age_group_ptr[i] <= 1) {  /* Transmitter i is a child */
                                 if (school_ptr[i] < 0) { // not attending school, use _SC contacts
                                     prob_ptr[j] *= 1.0 - infect * lparm->xmit_child_SC[age_group_ptr[j]];
@@ -1101,6 +1101,7 @@ void AgentContainer::interactAgentsHomeWork (MultiFab& /*mask_behavior*/, bool h
                             }
                         }  /* within society */
                     } else if (status_ptr[j] == Status::infected && status_ptr[i] != Status::infected) {
+                        if (counter_ptr[j] < lparm->incubation_length) { continue; }
                         // j can infect i
                         amrex::Real infect = lparm->infect;
                         infect *= lparm->vac_eff;
