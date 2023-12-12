@@ -936,7 +936,7 @@ void AgentContainer::interactAgentsHomeWork (MultiFab& /*mask_behavior*/, bool h
 {
     BL_PROFILE("AgentContainer::interactAgentsHomeWork");
 
-    const bool DAYTIME = home;
+    const bool DAYTIME = !home;
     IntVect bin_size = {AMREX_D_DECL(1, 1, 1)};
     for (int lev = 0; lev < numLevels(); ++lev)
     {

@@ -94,18 +94,16 @@ void runAgent ()
             }
 
             pc.updateStatus(disease_stats);
-            pc.interactAgentsHomeWork(mask_behavior, true);
             pc.moveAgentsToWork();
             pc.interactAgentsHomeWork(mask_behavior, false);
             pc.moveAgentsToHome();
-
+            pc.interactAgentsHomeWork(mask_behavior, true);
             pc.infectAgents();
 
             //            if ((params.random_travel_int > 0) && (i % params.random_travel_int == 0)) {
             //                pc.moveRandomTravel();
             //            }
-
-            pc.Redistribute();
+            //            pc.Redistribute();
 
             auto counts = pc.printTotals();
             if (counts[1] > num_infected_peak) {
