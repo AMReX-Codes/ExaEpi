@@ -1,18 +1,26 @@
+/*! @file AgentContainer.cpp
+    \brief Function implementations for #AgentContainer class
+*/
+
 #include "AgentContainer.H"
 
 using namespace amrex;
 
 namespace {
 
-    void randomShuffle (std::vector<int>& vec)
+    /*! \brief Shuffle the elements of a given vector */
+    void randomShuffle (std::vector<int>& vec /*!< Vector to be shuffled */)
     {
         std::random_device rd;
         std::mt19937 g(rd());
         std::shuffle(vec.begin(), vec.end(), g);
     }
 
-    void compute_initial_distribution (amrex::Vector<int>& cell_pops,
-                                       amrex::Vector<int>& cell_indices, int ncell)
+    /*! \brief
+    */
+    void compute_initial_distribution (amrex::Vector<int>& cell_pops, /*!< */
+                                       amrex::Vector<int>& cell_indices, /*!< */
+                                       int ncell /*!< */)
     {
         BL_PROFILE("compute_initial_distribution");
 
@@ -150,6 +158,7 @@ namespace {
     }
 }
 
+/*! \brief Initialize agents for ExaEpi::ICType::Demo */
 void AgentContainer::initAgentsDemo (iMultiFab& /*num_residents*/,
                                      iMultiFab& /*unit_mf*/,
                                      iMultiFab& /*FIPS_mf*/,
@@ -252,11 +261,62 @@ void AgentContainer::initAgentsDemo (iMultiFab& /*num_residents*/,
     amrex::Print() << "... finished initialization\n";
 }
 
-void AgentContainer::initAgentsCensus (iMultiFab& num_residents,
-                                       iMultiFab& unit_mf,
-                                       iMultiFab& FIPS_mf,
-                                       iMultiFab& comm_mf,
-                                       DemographicData& demo)
+/*! \brief Initialize agents for ExaEpi::ICType::Census
+
+ *  + Define and allocate the following integer MultiFabs:
+ *    + num_families: number of families; has 7 components, each component is the
+ *      number of families of size (component+1)
+ *    + fam_offsets: offset array for each family (i.e., each component of each grid cell), where the
+ *      offset is the total number of people before this family while iterating over the grid.
+ *      (QDG: ??)
+ *    + fam_id: ID array for each family ()i.e., each component of each grid cell, where the ID is the
+ *      total number of families before this family while iterating over the grid.
+ *      (QDG: ??)
+ *  + At each grid cell in each box/tile on each processor:
+ *    + Set community number.
+ *    + Find unit number for this community; specify that a part of this unit is on this processor;
+ *      set unit number, FIPS code, and census tract number at this grid cell (community).
+ *    + Set community size: 2000 people, unless this is the last community of a unit, in which case
+ *      the remaining people if > 1000 (else 0).
+ *    + Compute cumulative distribution (on a scale of 0-1000) of household size ranging from 1 to 7:
+ *      initialize with default distributions, then compute from census data if available.
+ *    + For each person in this community, generate a random integer between 0 and 1000; based on its
+ *      value, assign this person to a household of a certain size (1-7) based on the cumulative
+ *      distributions above.
+ *  + Compute total number of agents (people), family offsets and IDs over the box/tile.
+ *  + Allocate particle container AoS and SoA arrays for the computed number of agents.
+ *  + At each grid cell in each box/tile on each processor, and for each component (where component
+ *    corresponds to family size):
+ *    + Compute percentage of school age kids (kids of age 5-17 as a fraction of total kids - under 5
+ *      plus 5-17), if available in census data or set to default (76%).
+ *    + For each agent at this grid cell and family size (component):
+ *      + Find age group by generating a random integer (0-100) and using default age distributions.
+ *        Look at code to see the algorithm for family size > 1.
+ *      + Set agent position at the center of this grid cell.
+ *      + Initialize status and day counters.
+ *      + Set age group and family ID.
+ *      + Set home location to current grid cell.
+ *      + Initialize work location to current grid cell. Actual work location is set in
+ *        ExaEpi::read_workerflow().
+ *      + Set neighborhood and work neighborhood values. Actual work neighborhood is set
+ *        in ExaEpi::read_workerflow().
+ *      + Initialize workgroup to 0. It is set in ExaEpi::read_workerflow().
+ *      + If age group is 5-17, assign a school based on neighborhood (#assign_school).
+ *  + Copy everything to GPU device.
+*/
+void AgentContainer::initAgentsCensus (iMultiFab& num_residents,    /*!< Number of residents in each community (grid cell);
+                                                                         component 0: age under 5,
+                                                                         component 1: age group 5-17,
+                                                                         component 2: age group 18-29,
+                                                                         component 3: age group 30-64,
+                                                                         component 4: age group 65+,
+                                                                         component 4: total. */
+                                       iMultiFab& unit_mf,          /*!< Unit number of each community */
+                                       iMultiFab& FIPS_mf,          /*!< FIPS code (component 0) and
+                                                                         census tract number (component 1)
+                                                                         of each community */
+                                       iMultiFab& comm_mf,          /*!< Community number */
+                                       DemographicData& demo        /*!< Demographic data */ )
 {
     BL_PROFILE("initAgentsCensus");
 
@@ -544,6 +604,10 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,
     amrex::Gpu::streamSynchronize();
 }
 
+/*! \brief Send agents on a random walk around the neighborhood
+
+    For each agent, set its position to a random one near its current position
+*/
 void AgentContainer::moveAgentsRandomWalk ()
 {
     BL_PROFILE("AgentContainer::moveAgentsRandomWalk");
@@ -576,6 +640,10 @@ void AgentContainer::moveAgentsRandomWalk ()
     }
 }
 
+/*! \brief Move agents to work
+
+    For each agent, set its position to the work community (IntIdx::work_i, IntIdx::work_j)
+*/
 void AgentContainer::moveAgentsToWork ()
 {
     BL_PROFILE("AgentContainer::moveAgentsToWork");
@@ -614,6 +682,10 @@ void AgentContainer::moveAgentsToWork ()
     }
 }
 
+/*! \brief Move agents to home
+
+    For each agent, set its position to the home community (IntIdx::home_i, IntIdx::home_j)
+*/
 void AgentContainer::moveAgentsToHome ()
 {
     BL_PROFILE("AgentContainer::moveAgentsToHome");
@@ -652,6 +724,10 @@ void AgentContainer::moveAgentsToHome ()
     }
 }
 
+/*! \brief Move agents randomly
+
+    For each agent, set its position to a random location with a probabilty of 0.01%
+*/
 void AgentContainer::moveRandomTravel ()
 {
     BL_PROFILE("AgentContainer::moveRandomTravel");
@@ -686,7 +762,30 @@ void AgentContainer::moveRandomTravel ()
     }
 }
 
-void AgentContainer::updateStatus (MultiFab& disease_stats)
+/*! \brief Updates disease status of each agent at a given step and also updates a MultiFab
+    that tracks disease statistics (hospitalization, ICU, ventilator, and death) in a community.
+
+    At a given step, update the disease status of each agent based on the following overall logic:
+    + If agent status is #Status::never or #Status::susceptible, do nothing
+    + If agent status is #Status::infected, then
+      + Increment its counter by 1 day
+      + If counter is within incubation period (#DiseaseParm::incubation_length days), do nothing more
+      + Else on day #DiseaseParm::incubation_length, use hospitalization probabilities (by age group)
+        to decide if agent is hospitalized. If yes, use age group to set hospital timer. Also, use
+        age-group-wise probabilities to move agent to ICU and then to ventilator. Adjust timer
+        accordingly.
+      + Update the community-wise disease stats tracker MultiFab according to hospitalization/ICU/vent
+        status (using the agent's home community)
+      + Else (beyond 3 days), count down hospital timer if agent is hospitalized. At end of hospital
+        stay, determine if agent is #Status dead or #Status::immune. For non-hospitalized agents,
+        set them to #Status::immune after #DiseaseParm::incubation_length +
+        #DiseaseParm::infectious_length days.
+
+    The input argument is a MultiFab with 4 components corresponding to "hospitalizations", "ICU",
+    "ventilator", and "death". It contains the cumulative totals of these quantities for each
+    community as the simulation progresses.
+*/
+void AgentContainer::updateStatus (MultiFab& disease_stats /*!< Community-wise disease stats tracker */)
 {
     BL_PROFILE("AgentContainer::updateStatus");
 
@@ -746,7 +845,7 @@ void AgentContainer::updateStatus (MultiFab& disease_stats)
                         // incubation phase
                         return;
                     }
-                    if (counter_ptr[i] == 3) {
+                    if (counter_ptr[i] == 3) { //QDG: use DiseaseParm::incubation_length instead of 3?
                         // decide if hospitalized
                         Real p_hosp = CHR[age_group_ptr[i]];
                         if (amrex::Random(engine) < p_hosp) {
@@ -841,6 +940,25 @@ void AgentContainer::updateStatus (MultiFab& disease_stats)
     }
 }
 
+/*! \brief Interaction between agents
+
+    Simulate the interactions between agents and compute the infection probability
+    for each agent based on the number of infected agents at the same location:
+
+    + Create bins of agents (see #amrex::GetParticleBin, #amrex::DenseBins) with
+      their current locations:
+      + The bin size is 1 cell (QDG)
+      + #amrex::GetParticleBin maps a particle to its bin index
+      + amrex::DenseBins::build() creates the bin-sorted array of particle indices and
+        the offset array for each bin (where the offset of a bin is its starting location
+        in the bin-sorted array of particle indices).
+
+    + For each bin:
+      + Compute the total number of infected agents for each of the two strains.
+      + For each agent in the bin, if they are not already infected or immune, infect them
+        with a probability of 0.00001 and 0.00002 times the number of infections for each
+        strain respectively.
+*/
 void AgentContainer::interactAgents ()
 {
     BL_PROFILE("AgentContainer::interactAgents");
@@ -914,6 +1032,10 @@ void AgentContainer::interactAgents ()
     }
 }
 
+/*! \brief Infect agents based on their current status and the computed probability of infection.
+    The infection probability is computed in AgentContainer::interactAgentsHomeWork() or
+    AgentContainer::interactAgents()
+*/
 void AgentContainer::infectAgents ()
 {
     BL_PROFILE("AgentContainer::infectAgents");
@@ -953,7 +1075,58 @@ void AgentContainer::infectAgents ()
     }
 }
 
-void AgentContainer::interactAgentsHomeWork (MultiFab& /*mask_behavior*/, bool home)
+/*! \brief Interaction between agents at home and workplace
+
+    Simulate the interactions between agents at home and workplace and compute
+    the infection probability for each agent:
+
+    + For home and workplace, create bins of agents if not already created (see
+      #amrex::GetParticleBin, #amrex::DenseBins):
+      + The bin size is 1 cell (QDG)
+      + #amrex::GetParticleBin maps a particle to its bin index
+      + amrex::DenseBins::build() creates the bin-sorted array of particle indices and
+        the offset array for each bin (where the offset of a bin is its starting location
+        in the bin-sorted array of particle indices).
+
+    + For each agent *i* in the bin-sorted array of agents:
+      + Find its bin and the range of indices in the bin-sorted array for agents in its bin
+      + If the agent is #Status::immune, do nothing.
+      + If the agent is #Status::infected with the number of days infected (RealIdx::disease_counter)
+        less than the #DiseaseParm::incubation_length, do nothing.
+      + Else, for each agent *j* in the same bin:
+        + If the agent is #Status::immune, do nothing.
+        + If the agent is #Status::infected with the number of days infected (RealIdx::disease_counter)
+          less than the #DiseaseParm::incubation_length, do nothing.
+        + If *i* is infected and *j* is not infected, compute probability of *j* getting infected from i
+          (see below).
+        + Else if *i* is not infected and *j* is infected, compute probability of *i* getting infected
+          from *j* (see below).
+
+    Summary of how the probability of agent A getting infected from agent B is computed:
+    + Compute infection probability reduction factor from vaccine efficacy (#DiseaseParm::vac_eff)
+    + Within family - if their IntIdx::nborhood and IntIdx::family indices are same,
+      and the agents are at home:
+      + If B is a child, use the appropriate transmission probability (#DiseaseParm::xmit_child_SC or
+        #DiseaseParm::xmit_child) depending on whether B goes to school or not (#IntIdx::school)
+      + If B is an adult, use the appropriate transmission probability (#DiseaseParm::xmit_adult_SC or
+        #DiseaseParm::xmit_adult) depending on whether B works at a school or not (#IntIdx::school)
+    + Within neighborhood - if their IntIdx::nborhood are same, the agents are not under
+      quarrantine (#IntIdx::withdrawn), and the agents are not at work:
+      + If B is a child, use the appropriate transmission probability (#DiseaseParm::xmit_nc_child_SC or
+        #DiseaseParm::xmit_nc_child) depending on whether B goes to school or not (#IntIdx::school)
+      + If B is an adult, use the appropriate transmission probability (#DiseaseParm::xmit_nc_adult_SC or
+        #DiseaseParm::xmit_nc_adult) depending on whether B works at a school or not (#IntIdx::school)
+    + At workplace - if agents are at work, and B has a workgroup and work location assigned: If A
+      and B have the same workgroup and work location, use the workplace transmission
+      probability (#DiseaseParm::xmit_work).
+    + At school - if A and B are in the same school (#IntIdx::school) in the same neighborhood,
+      and they are at school:
+      + If both A and B are children: use #DiseaseParm::xmit_school
+      + If B is a child, and A is an adult, use #DiseaseParm::xmit_sch_c2a
+      + If A is a child, and B is an adult, use #DiseaseParm::xmit_sch_a2c
+*/
+void AgentContainer::interactAgentsHomeWork ( MultiFab& /*mask_behavior*/ /*!< Masking behavior */,
+                                              bool home /*!< At home (true) or at work (false) */ )
 {
     BL_PROFILE("AgentContainer::interactAgentsHomeWork");
 
@@ -1228,7 +1401,19 @@ void AgentContainer::interactAgentsHomeWork (MultiFab& /*mask_behavior*/, bool h
     }
 }
 
-void AgentContainer::generateCellData (MultiFab& mf) const
+/*! \brief Computes the number of agents with various #Status in each grid cell of the
+    computational domain.
+
+    Given a MultiFab with at least 5 components that is defined with the same box array and
+    distribution mapping as this #AgentContainer, the MultiFab will contain (at the end of
+    this function) the following *in each cell*:
+    + component 0: total number of agents in this grid cell.
+    + component 1: number of agents that have never been infected (#Status::never)
+    + component 2: number of agents that are infected (#Status::infected)
+    + component 3: number of agents that are immune (#Status::immune)
+    + component 4: number of agents that are susceptible infected (#Status::susceptible)
+*/
+void AgentContainer::generateCellData (MultiFab& mf /*!< MultiFab with at least 5 components */) const
 {
     BL_PROFILE("AgentContainer::generateCellData");
 
@@ -1263,6 +1448,11 @@ void AgentContainer::generateCellData (MultiFab& mf) const
         }, false);
 }
 
+/*! \brief Computes the total number of agents with each #Status
+
+    Returns a vector with 5 components corresponding to each value of #Status; each element is
+    the total number of agents at a step with the corresponding #Status (in that order).
+*/
 std::array<Long, 5> AgentContainer::printTotals () {
     BL_PROFILE("printTotals");
     amrex::ReduceOps<ReduceOpSum, ReduceOpSum, ReduceOpSum, ReduceOpSum, ReduceOpSum> reduce_ops;

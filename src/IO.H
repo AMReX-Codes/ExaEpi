@@ -1,3 +1,7 @@
+/*! @file IO.H
+    \brief Defines the #ExaEpi::IO namespace
+*/
+
 #ifndef IO_H_
 #define IO_H_
 
@@ -10,6 +14,9 @@
 
 namespace ExaEpi
 {
+
+/*! \brief Namespace for IO functions; note that this namespace contains that write
+           plotfiles and diagnostics data */
 namespace IO
 {
 

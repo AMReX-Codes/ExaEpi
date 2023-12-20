@@ -1,3 +1,7 @@
+/*! @file IO.cpp
+    \brief Contains IO functions in #ExaEpi::IO namespace
+*/
+
 #include <AMReX_GpuContainers.H>
 #include <AMReX_PlotFileUtil.H>
 #include <AMReX_REAL.H>
@@ -14,8 +18,33 @@ namespace ExaEpi
 namespace IO
 {
 
-void writePlotFile (const AgentContainer& pc, const iMultiFab& /*num_residents*/, const iMultiFab& unit_mf,
-                    const iMultiFab& FIPS_mf, const iMultiFab& comm_mf, const int step) {
+/*! \brief Write plotfile of computational domain with disease spread and census data at a given step.
+
+    Writes the current disease spread information and census data (unit, FIPS code, census tract ID,
+    and community number) to a plotfile:
+    + Create an output MultiFab (with the same domain and distribution map as the particle container)
+      with 9 components:
+      + component 0: total
+      + component 1: never infected (#Status::never)
+      + component 2: infected (#Status::infected)
+      + component 3: immune (#Status::immune)
+      + component 4: previously infected (#Status::susceptible QDG??)
+      + component 5: unit number
+      + component 6: FIPS ID
+      + component 7: census tract number
+      + component 8: community number
+    + Get disease spread data (first 5 components) from AgentContainer::generateCellData().
+    + Copy unit number, FIPS code, census tract ID, and community number from the input MultiFabs to
+      the remaining components.
+    + Write the output MultiFab to file.
+    + Write agents to file - see AgentContainer::WritePlotFile().
+*/
+void writePlotFile (const AgentContainer& pc,   /*!< Agent (particle) container */
+                    const iMultiFab& /*num_residents*/,
+                    const iMultiFab& unit_mf,   /*!< MultiFab with unit number of each community */
+                    const iMultiFab& FIPS_mf,   /*!< MultiFab with FIPS code and census tract ID */
+                    const iMultiFab& comm_mf,   /*!< MultiFab of community number */
+                    const int step              /*!< Current step */) {
     amrex::Print() << "Writing plotfile \n";
 
     MultiFab output_mf(pc.ParticleBoxArray(0),
@@ -35,9 +64,24 @@ void writePlotFile (const AgentContainer& pc, const iMultiFab& /*num_residents*/
     pc.WritePlotFile(amrex::Concatenate("plt", step, 5), "agents");
 }
 
-void writeFIPSData (const AgentContainer& agents, const iMultiFab& unit_mf,
-                    const iMultiFab& /*FIPS_mf*/, const iMultiFab& /*comm_mf*/,
-                    const DemographicData& demo, const std::string& prefix, const int step) {
+/*! \brief Writes diagnostic data by FIPS code
+
+    Writes a file with the total number of infected agents for each unit;
+    it writes out the number of infected agents in the same order as the units in the
+    census data file.
+    + Creates a output vector of size #DemographicData::Nunit (total number of units).
+    + Gets the disease status in agents from AgentContainer::generateCellData().
+    + On each processor, sets the unit-th element of the output vector to the number of
+      infected agents in the communities on this processor belonging to that unit.
+    + Sum across all processors and write to file.
+*/
+void writeFIPSData (const AgentContainer& agents, /*!< Agents (particle) container */
+                    const iMultiFab& unit_mf,     /*!< MultiFab with unit number of each community */
+                    const iMultiFab& /*FIPS_mf*/,
+                    const iMultiFab& /*comm_mf*/,
+                    const DemographicData& demo,  /*!< Demographic data */
+                    const std::string& prefix,    /*!< Filename prefix */
+                    const int step                /*!< Current step */) {
     amrex::Print() << "Generating diagnostic data by FIPS code \n";
 
     std::vector<amrex::Real> data(demo.Nunit, 0.0);

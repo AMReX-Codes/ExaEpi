@@ -1,3 +1,7 @@
+/*! @file Initialization.H
+    \brief Defines #ExaEpi::Initialization namespace
+*/
+
 #ifndef INITIALIZATION_H_
 #define INITIALIZATION_H_
 
@@ -10,6 +14,7 @@
 
 namespace ExaEpi
 {
+/*! \brief Namespace with initialization-related functions. */
 namespace Initialization
 {
     void read_workerflow (const DemographicData& demo,

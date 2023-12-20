@@ -1,3 +1,7 @@
+/*! @file CaseData.cpp
+    \brief Function implementations for #CaseData class
+*/
+
 #include "CaseData.H"
 
 #include <AMReX_BLassert.H>
@@ -12,12 +16,41 @@
 
 using namespace amrex;
 
-CaseData::CaseData (const::std::string& fname)
+/*! \brief Constructor that initializes by reading in data from given file
+
+    See CaseData::InitFromFile()
+*/
+CaseData::CaseData (const::std::string& fname /*!< Filename to read case data from */)
 {
     InitFromFile(fname);
 }
 
-void CaseData::InitFromFile (const std::string& fname)
+/*! \brief Read case data from a given file
+
+    The case data file is an ASCII text file with three columns of numbers:
+    FIPS code, current number of cases, and cumulative number of cases till date.
+    (QDG: But data/CaseData/July4.cases has 2 columns!)
+
+    + Initialize the member data (and their GPU versions) to empty vectors:
+      + #CaseData::FIPS_hubs
+      + #CaseData::Size_hubs
+      + #CaseData::num_cases
+      + #CaseData::num_cases2date
+    + Initialize #CaseData::num_cases and #CaseData::num_cases2date as arrays of size
+      57,000 with 0 values (56999 is the largest FIPS code)
+    + Initialize #CaseData::N_hubs to 0.
+    + Read the file: till reaching end-of-file, read each line that contains the FIPS code,
+      current number of cases, and cumulative number of cases till date.
+      + Set the #CaseData::num_cases and #CaseData::num_cases2date values for this FIPS code
+      + Increment #CaseData::N_hubs
+    + Resize #CaseData::FIPS_hubs and #CaseData::Size_hubs to #CaseData::N_hubs.
+    + For each FIPS code value (0 to 56999), if the number of cases for that FIPS code is
+      greater than zero,
+      + Add the FIPS code to the #CaseData::FIPS_hubs array.
+      + Add the number of cases to the #CaseData::Size_hubs array.
+    + Copy the arrays to device
+*/
+void CaseData::InitFromFile (const std::string& fname /*!< Filename to read case data from */)
 {
     BL_PROFILE("CaseData::InitFromFile");
 
@@ -80,24 +113,34 @@ void CaseData::InitFromFile (const std::string& fname)
     amrex::Gpu::streamSynchronize();
 }
 
+/*! \brief Prints case data to screen
+
+    For each disease hub (#CaseData::N_hubs), print the FIPS code, current number of cases,
+    and cumulative number of cases till date.
+*/
 void CaseData::Print () const {
     for (amrex::Long i = 0; i < FIPS_hubs.size(); ++i) {
         amrex::Print() << FIPS_hubs[i] << " " << num_cases[i] << " " << num_cases2date[i] << "\n";
     }
 }
 
-void CaseData::CopyToDeviceAsync (const amrex::Vector<int>& h_vec, amrex::Gpu::DeviceVector<int>& d_vec) {
+/*! \brief Copy a vector from host to device */
+void CaseData::CopyToDeviceAsync( const amrex::Vector<int>& h_vec,  /*!< Host vector */
+                                  amrex::Gpu::DeviceVector<int>& d_vec  /*!< Device vector */) {
     d_vec.resize(0);
     d_vec.resize(h_vec.size());
     Gpu::copyAsync(Gpu::hostToDevice, h_vec.begin(), h_vec.end(), d_vec.begin());
 }
 
-void CaseData::CopyToHostAsync (const amrex::Gpu::DeviceVector<int>& d_vec, amrex::Vector<int>& h_vec) {
+/*! \brief Copy a vector from device to host */
+void CaseData::CopyToHostAsync( const amrex::Gpu::DeviceVector<int>& d_vec, /*!< Device vector */
+                                amrex::Vector<int>& h_vec /*!< Host vector */) {
     h_vec.resize(0);
     h_vec.resize(d_vec.size());
     Gpu::copyAsync(Gpu::deviceToHost, d_vec.begin(), d_vec.end(), h_vec.begin());
 }
 
+/*! \brief Copy all member data from host to device */
 void CaseData::CopyDataToDevice () {
     CopyToDeviceAsync(FIPS_hubs, FIPS_hubs_d);
     CopyToDeviceAsync(Size_hubs, Size_hubs_d);
