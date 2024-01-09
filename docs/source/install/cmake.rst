@@ -57,4 +57,4 @@ or by adding arguments with ``-D<OPTION>=<VALUE>`` to the first CMake call, e.g.
 
 .. code-block:: bash
 
-   cmake -S . -B build -DAMReX_COMPUTE=CUDA
+   cmake -S . -B build -DAMReX_GPU_BACKEND=CUDA
