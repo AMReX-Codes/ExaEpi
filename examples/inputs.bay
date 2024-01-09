@@ -1,7 +1,7 @@
 agent.ic_type = "census"
-agent.census_filename = "BayArea.dat"
-agent.workerflow_filename = "BayArea-wf.bin"
-agent.case_filename = "July4.cases"
+agent.census_filename = "../../Data/CensusData/BayArea.dat"
+agent.workerflow_filename = "../../Data/CensusData/BayArea-wf.bin"
+agent.case_filename = "../../data/CaseData/July4.cases"
 
 agent.nsteps = 10
 agent.plot_int = -1
