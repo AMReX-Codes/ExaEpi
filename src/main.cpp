@@ -55,7 +55,7 @@ void runAgent ()
 
     amrex::Print() << "Base domain is: " << geom.Domain() << "\n";
     amrex::Print() << "Max grid size is: " << params.max_grid_size << "\n";
-    amrex::Print() << "Number of boxes is: " << ba.size() << "\n";
+    amrex::Print() << "Number of boxes is: " << ba.size() << " over " << ParallelDescriptor::NProcs() << " ranks. \n";
 
     iMultiFab num_residents(ba, dm, 6, 0);
     iMultiFab unit_mf(ba, dm, 1, 0);
