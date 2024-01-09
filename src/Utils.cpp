@@ -19,8 +19,12 @@ using namespace ExaEpi;
 void ExaEpi::Utils::get_test_params (TestParams& params, const std::string& prefix)
 {
     ParmParse pp(prefix);
-    pp.get("size", params.size);
-    pp.get("max_grid_size", params.max_grid_size);
+    params.size = {1, 1};
+    pp.query("size", params.size);
+
+    params.max_grid_size = 16;
+    pp.query("max_grid_size", params.max_grid_size);
+
     pp.get("nsteps", params.nsteps);
 
     params.plot_int = -1;

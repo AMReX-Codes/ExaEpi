@@ -28,14 +28,6 @@ the runtime parameters than can be set in the inputs file.
 
 In addition to the ExaEpi inputs, there are also a number of runtime options that can be configured for AMReX itself. Please see XXX for more information on these options.
 
-* ``agents.size`` (`tuple of 2 integers`: e.g. ``(1, 1)``)
-    This option is deprecated and will removed in a future version of ExaEpi. It controls
-    the number of cells in the domain when running in `demo` mode. During actual usage,
-    this number will be overridden and is irrelevant.
-* ``agent.max_grid_size`` (`integer`)
-    This option sets the maximum grid size used for MPI domain decomposition. If set to
-    ``16``, for example, the domain will be broken up into grids of `16^2` communities, and
-    these grids will be assigned to different MPI ranks / GPUs.
 * ``agent.ic_type`` (`string`: either ``"census"`` or ``"demo"``)
     If ``"census"``, initial conditions will be read from the provided census data file.
     If ``"demo"``, agents will be initialized according to a power law distribution.
@@ -99,6 +91,15 @@ In addition to the ExaEpi inputs, there are also a number of runtime options tha
     Length of the infectious period in days. This counter starts once the incubation phase is over. Before tihs, agents are symptomatic and can spread the disease.
 * ``disease.symptomatic_length`` (`int`, default: ``5``)
     Length of the symptomatic-but-not-infectious stage in days. This counter starts once the infectious phase is complete. During this time agents are symptomatic and may self-withdraw, but they cannot spread the illness.
+* ``agents.size`` (`tuple of 2 integers`: e.g. ``(1, 1)``, default: ``(1, 1)``)
+    This option is deprecated and will removed in a future version of ExaEpi. It controls
+    the number of cells in the domain when running in `demo` mode. During actual usage,
+    this number will be overridden and is irrelevant.
+* ``agent.max_grid_size`` (`integer`, default: ``16``)
+    This option sets the maximum grid size used for MPI domain decomposition. If set to
+    ``16``, for example, the domain will be broken up into grids of `16^2` communities, and
+    these grids will be assigned to different MPI ranks / GPUs.
+
 
 In addition to the ExaEpi inputs, there are also a number of runtime options that can be configured for AMReX itself. Please see <https://amrex-codes.github.io/amrex/docs_html/GPU.html#inputs-parameters>`__ for more information on these options.
 
