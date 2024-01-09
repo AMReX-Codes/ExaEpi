@@ -82,6 +82,14 @@ void runAgent ()
     int  step_of_peak = 0;
     Long num_infected_peak = 0;
     Long cumulative_deaths = 0;
+    {
+        auto counts = pc.printTotals();
+        if (counts[1] > num_infected_peak) {
+            num_infected_peak = counts[1];
+            step_of_peak = 0;
+        }
+        cumulative_deaths = counts[4];
+    }
 
     {
         BL_PROFILE_REGION("Evolution");
