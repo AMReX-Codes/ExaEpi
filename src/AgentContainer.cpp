@@ -553,7 +553,10 @@ void AgentContainer::moveAgentsRandomWalk ()
         const auto dx = Geom(lev).CellSizeArray();
         auto& plev  = GetParticles(lev);
 
-        for(MFIter mfi = MakeMFIter(lev); mfi.isValid(); ++mfi)
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (Gpu::notInLaunchRegion())
+#endif
+        for(MFIter mfi = MakeMFIter(lev, TilingIfNotGPU()); mfi.isValid(); ++mfi)
         {
             int gid = mfi.index();
             int tid = mfi.LocalTileIndex();
@@ -584,7 +587,10 @@ void AgentContainer::moveAgentsToWork ()
         const auto dx = Geom(lev).CellSizeArray();
         auto& plev  = GetParticles(lev);
 
-        for(MFIter mfi = MakeMFIter(lev); mfi.isValid(); ++mfi)
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (Gpu::notInLaunchRegion())
+#endif
+        for(MFIter mfi = MakeMFIter(lev, TilingIfNotGPU()); mfi.isValid(); ++mfi)
         {
             int gid = mfi.index();
             int tid = mfi.LocalTileIndex();
@@ -619,7 +625,10 @@ void AgentContainer::moveAgentsToHome ()
         const auto dx = Geom(lev).CellSizeArray();
         auto& plev  = GetParticles(lev);
 
-        for(MFIter mfi = MakeMFIter(lev); mfi.isValid(); ++mfi)
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (Gpu::notInLaunchRegion())
+#endif
+        for(MFIter mfi = MakeMFIter(lev, TilingIfNotGPU()); mfi.isValid(); ++mfi)
         {
             int gid = mfi.index();
             int tid = mfi.LocalTileIndex();
@@ -651,7 +660,10 @@ void AgentContainer::moveRandomTravel ()
     {
         auto& plev  = GetParticles(lev);
 
-        for(MFIter mfi = MakeMFIter(lev); mfi.isValid(); ++mfi)
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (Gpu::notInLaunchRegion())
+#endif
+        for(MFIter mfi = MakeMFIter(lev, TilingIfNotGPU()); mfi.isValid(); ++mfi)
         {
             int gid = mfi.index();
             int tid = mfi.LocalTileIndex();
@@ -682,7 +694,10 @@ void AgentContainer::updateStatus (MultiFab& disease_stats)
     {
         auto& plev  = GetParticles(lev);
 
-        for(MFIter mfi = MakeMFIter(lev); mfi.isValid(); ++mfi)
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (Gpu::notInLaunchRegion())
+#endif
+        for(MFIter mfi = MakeMFIter(lev, TilingIfNotGPU()); mfi.isValid(); ++mfi)
         {
             int gid = mfi.index();
             int tid = mfi.LocalTileIndex();
@@ -838,7 +853,10 @@ void AgentContainer::interactAgents ()
         const auto plo = geom.ProbLoArray();
         const auto domain = geom.Domain();
 
-        for(MFIter mfi = MakeMFIter(lev); mfi.isValid(); ++mfi)
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (Gpu::notInLaunchRegion())
+#endif
+        for(MFIter mfi = MakeMFIter(lev, TilingIfNotGPU()); mfi.isValid(); ++mfi)
         {
             amrex::DenseBins<ParticleType> bins;
             auto& ptile = ParticlesAt(lev, mfi);
@@ -904,7 +922,10 @@ void AgentContainer::infectAgents ()
     {
         auto& plev  = GetParticles(lev);
 
-        for(MFIter mfi = MakeMFIter(lev); mfi.isValid(); ++mfi)
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (Gpu::notInLaunchRegion())
+#endif
+        for(MFIter mfi = MakeMFIter(lev, TilingIfNotGPU()); mfi.isValid(); ++mfi)
         {
             int gid = mfi.index();
             int tid = mfi.LocalTileIndex();
@@ -945,7 +966,10 @@ void AgentContainer::interactAgentsHomeWork (MultiFab& /*mask_behavior*/, bool h
         const auto plo = geom.ProbLoArray();
         const auto domain = geom.Domain();
 
-        for(MFIter mfi = MakeMFIter(lev); mfi.isValid(); ++mfi)
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (Gpu::notInLaunchRegion())
+#endif
+        for(MFIter mfi = MakeMFIter(lev, TilingIfNotGPU()); mfi.isValid(); ++mfi)
         {
             amrex::DenseBins<AgentContainer::ParticleType>* bins_ptr = nullptr;
             auto pair_ind = std::make_pair(mfi.index(), mfi.LocalTileIndex());
