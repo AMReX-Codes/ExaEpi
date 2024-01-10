@@ -1,5 +1,14 @@
+/*! @file DiseaseParm.cpp
+    \brief Function implementations for #DiseaseParm class
+*/
+
 #include "DiseaseParm.H"
 
+/*! \brief Initialize disease parameters
+
+    Compute transmission probabilities for various situations based on disease
+    attributes.
+*/
 void DiseaseParm::Initialize ()
 {
     xmit_comm[0] = .0000125*pCO;

@@ -1,3 +1,7 @@
+/*! @file Initialization.cpp
+    \brief Contains initialization functions in #ExaEpi::Initialization namespace
+*/
+
 #include "Initialization.H"
 
 #include "DemographicData.H"
@@ -18,13 +22,48 @@ namespace ExaEpi
 {
 namespace Initialization
 {
-    void read_workerflow (const DemographicData& demo,
-                          const TestParams& params,
-                          const iMultiFab& unit_mf,
-                          const iMultiFab& comm_mf,
-                          AgentContainer& pc) {
 
-  /* Allocate worker-flow matrix, only from units with nighttime
+    /*! \brief Read worker flow data from file and set work location for agents
+
+     *  Read in worker flow (home and work) data from a given binary file:
+     *  + Initialize and allocate space for the worker-flow matrix with #DemographicData::Nunit rows
+     *    and columns; note that only those rows are allocated where part of the unit resides on this
+     *    processor.
+     *  + Read worker flow data from #ExaEpi::TestParams::workerflow_filename: it is a binary file that
+     *    contains 3 x (number of work patthers) unsigned integer data. The 3 integers are: from, to,
+     *    and the number of workers with this from and to. The from and to are the IDs from the
+     *    first column of the census data file (#DemographicData::myID).
+     *  + For each work pattern: Read in the from, to, and number. If both the from and to ID values
+     *    correspond to units that are on this processor, say, i and j, then set the worker-flow
+     *    matrix element at [i][j] to the number. Note that DemographicData::myIDtoUnit() maps from
+     *    ID value to unit number (from -> i, to -> j).
+     *  + Comvert values in each row to row-wise cumulative values.
+     *  + Scale these values to account for ~2% of people of vacation/sick leave.
+     *  + For each agent (particle) in each box/tile on each processor:
+     *    + Get the home (from) unit of the agent from its home cell index (i,j) and the input argument
+     *      unit_mf.
+     *    + Compute the number of workers in the "from" unit as 58.6% of the total population. If this
+     *      number if greater than zero, continue with the following steps.
+     *    + Find age group of this agent, and if it is either 18-29 or 30-64, continue with the
+     *      following steps.
+     *    + Assign a random work destination unit by picking a random number and placing it in the
+     *      row-wise cumulative numbers in the "from" row of the worker flow matrix.
+     *    + If the "to" unit is same as the "from" unit, then set the work community number same as
+     *      the home community number witn 25% probability and some other random community number in
+     *      the same unit with 75% probability.
+     *    + Set the work location indices (i,j) for the agent to the values corresponding to this
+     *      computed work community.
+     *    + Find the number of workgroups in the work location unit, where one workgroup consists of
+     *      20 workers; then assign a random workgroup to this agent.
+    */
+    void read_workerflow (const DemographicData& demo,  /*!< Demographic data */
+                          const TestParams& params,     /*!< Test parameters */
+                          const iMultiFab& unit_mf,     /*!< MultiFab with unit number at each grid cell */
+                          const iMultiFab& comm_mf,     /*!< MultiFab with community number at each grid cell */
+                          AgentContainer& pc            /*!< Agent container (particle container) */ )
+    {
+
+    /* Allocate worker-flow matrix, only from units with nighttime
      communities on this processor (Unit_on_proc[] flag) */
     unsigned int** flow = (unsigned int **) amrex::The_Arena()->alloc(demo.Nunit*sizeof(unsigned int *));
     for (int i = 0; i < demo.Nunit; i++) {
@@ -167,11 +206,34 @@ namespace Initialization
         }
     }
 
-    int infect_random_community (AgentContainer& pc, const amrex::iMultiFab& unit_mf,
-                                 const amrex::iMultiFab& /*FIPS_mf*/, const amrex::iMultiFab& comm_mf,
-                                 std::map<std::pair<int, int>, amrex::DenseBins<AgentContainer::ParticleType> >& bin_map,
-                                 const CaseData& /*cases*/, const DemographicData& demo,
-                                 int unit, int ninfect) {
+    /*! \brief Infect agents in a random community in a given unit and return the total
+        number of agents infected
+
+        + Choose a random community in the given unit.
+        + For each box on each processor:
+          + Create bins of agents if not already created (see #amrex::GetParticleBin, #amrex::DenseBins):
+            + The bin size is 1 cell.
+            + #amrex::GetParticleBin maps a particle to its bin index.
+            + amrex::DenseBins::build() creates the bin-sorted array of particle indices and
+              the offset array for each bin (where the offset of a bin is its starting location.
+          + For each grid cell: if the community at this cell is the randomly chosen community,
+            + Get bin index and the agent (particle) indices in this bin.
+            + Choose a random agent in the bin; if the agent is already infected, move on, else
+              infect the agent. Increment the counter variables for number of infections.
+              (See the code for nuances in this step.)
+        + Sum up number of infected agents over all processors and return that value.
+    */
+    int infect_random_community ( AgentContainer& pc, /*!< Agent container (particle container)*/
+                                  const amrex::iMultiFab& unit_mf, /*!< MultiFab with unit number at each grid cell */
+                                  const amrex::iMultiFab& /*FIPS_mf*/, /*!< FIPS code (component 0) and
+                                                                            census tract number (component 1) */
+                                  const amrex::iMultiFab& comm_mf, /*!< MultiFab with community number at each grid cell */
+                                  std::map<std::pair<int, int>,
+                                  amrex::DenseBins<AgentContainer::ParticleType> >& bin_map, /*!< Map of dense bins with agents */
+                                  const CaseData& /*cases*/, /*!< Case data */
+                                  const DemographicData& demo, /*!< Demographic data */
+                                  int unit, /*!< Unit number to infect */
+                                  int ninfect /*!< Target number of agents to infect */ ) {
         // chose random community in unit
         int ncomms = demo.Start[unit+1] - demo.Start[unit];
         int random_comm = -1;
@@ -263,9 +325,25 @@ namespace Initialization
         return num_infected;
     }
 
-    void setInitialCases (AgentContainer& pc, const amrex::iMultiFab& unit_mf,
-                          const amrex::iMultiFab& FIPS_mf, const amrex::iMultiFab& comm_mf,
-                          const CaseData& cases, const DemographicData& demo)
+    /*! \brief Set initial cases for the simulation
+
+        Set the initial cases of infection for the simulation based on the #CaseData:
+        For each infection hub (where #CaseData::N_hubs is the number of hubs):
+        + Get the FIPS code of that hub (#CaseData::FIPS_hubs)
+        + Create a vector of unit numbers corresponding to that FIPS code
+        + Get the number of cases for that FIPS code (#CaseData::Size_hubs)
+        + Randomly infect that many agents in the units corresponding to the FIPS code, i.e.,
+          cycle through units and infect agents in random communities in that unit till the
+          number of infected agents is equal or greater than the number of infections for this
+          FIPS code. See #ExaEpi::Initialization::infect_random_community().
+    */
+    void setInitialCases( AgentContainer&         pc,       /*!< Agent container (particle container) */
+                          const amrex::iMultiFab& unit_mf,  /*!< MultiFab with unit number at each grid cell */
+                          const amrex::iMultiFab& FIPS_mf,  /*!< FIPS code (component 0) and
+                                                                 census tract number (component 1) */
+                          const amrex::iMultiFab& comm_mf,  /*!< MultiFab with community number at each grid cell */
+                          const CaseData&         cases,    /*!< Case data */
+                          const DemographicData& demo       /*!< demographic data */ )
     {
         BL_PROFILE("setInitialCases");
 
