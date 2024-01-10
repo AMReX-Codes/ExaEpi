@@ -46,7 +46,9 @@ int main (int argc, /*!< Number of command line arguments */
     + Read test parameters (#ExaEpi::TestParams) from command line input file
     + If initialization type (#ExaEpi::TestParams::ic_type) is ExaEpi::ICType::Census,
       + Read #DemographicData from #ExaEpi::TestParams::census_filename
+        (see DemographicData::InitFromFile)
       + Read #CaseData from #ExaEpi::TestParams::case_filename
+        (see CaseData::InitFromFile)
     + Get computational domain from ExaEpi::Utils::get_geometry. Each grid cell corresponds to
       a community.
     + Create box arrays and distribution mapping based on #ExaEpi::TestParams::max_grid_size.

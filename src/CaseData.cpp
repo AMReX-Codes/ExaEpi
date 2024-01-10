@@ -48,6 +48,9 @@ CaseData::CaseData (const::std::string& fname /*!< Filename to read case data fr
       + Add the FIPS code to the #CaseData::FIPS_hubs array.
       + Add the number of cases to the #CaseData::Size_hubs array.
     + Copy the arrays to device
+
+    \b Note: The code runs even if the case data file lacks the 3rd column. In this case, the
+    #CaseData::num_cases2date will contain junk values (or maybe zero).
 */
 void CaseData::InitFromFile (const std::string& fname /*!< Filename to read case data from */)
 {

@@ -28,10 +28,35 @@ struct TestParams
     int random_travel_int;              /*!< steps between random travel events
                                              (see AgentContainer::moveRandomTravel) */
     short ic_type;                      /*!< initialization type (see ExaEpi::ICType) */
-    std::string census_filename;        /*!< census data filename (DemographicData::InitFromFile) */
-    std::string workerflow_filename;    /*!< worker flow filename
-                                             (ExaEpi::Initialization::read_workerflow) */
-    std::string case_filename;          /*!< initial cases filename (CaseData::InitFromFile) */
+
+    /*! Census data filename (DemographicData::InitFromFile)
+
+        The file contents are:
+        + The first line of the file contains the number of units.
+        + The following lines have the following data:
+          + ID (US-wide census tract ID)
+          + Population
+          + Number of day workers
+          + FIPS code
+          + Census tract number
+          + Numbers of people in age groups: under 5, 5-17, 18-29, 30-64, and 65+
+          + Number of households with: 1, 2, 3, 4, 5, 6, and 7 member(s)
+    */
+    std::string census_filename;
+
+    /*! Worker flow filename (ExaEpi::Initialization::read_workerflow):
+        It is a binary file that contains 3 x (number of work patthers) unsigned integer
+        data. The 3 integers are: from, to, and the number of workers with this from and to.
+        The from and to are the IDs from the first column of the census data file
+        (#DemographicData::myID).
+    */
+    std::string workerflow_filename;
+
+    /*! Initial cases filename (CaseData::InitFromFile):
+        The case data file is an ASCII text file with three columns of numbers:
+        FIPS code, current number of cases, and cumulative number of cases till date.
+    */
+    std::string case_filename;
 
     int aggregated_diag_int;            /*!< interval for writing aggregated diagnostic data
                                              (see: ExaEpi::IO::writeFIPSData) */
