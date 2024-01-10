@@ -29,7 +29,6 @@ CaseData::CaseData (const::std::string& fname /*!< Filename to read case data fr
 
     The case data file is an ASCII text file with three columns of numbers:
     FIPS code, current number of cases, and cumulative number of cases till date.
-    (QDG: But data/CaseData/July4.cases has 2 columns!)
 
     + Initialize the member data (and their GPU versions) to empty vectors:
       + #CaseData::FIPS_hubs

@@ -268,10 +268,8 @@ void AgentContainer::initAgentsDemo (iMultiFab& /*num_residents*/,
  *      number of families of size (component+1)
  *    + fam_offsets: offset array for each family (i.e., each component of each grid cell), where the
  *      offset is the total number of people before this family while iterating over the grid.
- *      (QDG: ??)
  *    + fam_id: ID array for each family ()i.e., each component of each grid cell, where the ID is the
  *      total number of families before this family while iterating over the grid.
- *      (QDG: ??)
  *  + At each grid cell in each box/tile on each processor:
  *    + Set community number.
  *    + Find unit number for this community; specify that a part of this unit is on this processor;
@@ -845,7 +843,7 @@ void AgentContainer::updateStatus (MultiFab& disease_stats /*!< Community-wise d
                         // incubation phase
                         return;
                     }
-                    if (counter_ptr[i] == 3) { //QDG: use DiseaseParm::incubation_length instead of 3?
+                    if (counter_ptr[i] == lparm->incubation_length) {
                         // decide if hospitalized
                         Real p_hosp = CHR[age_group_ptr[i]];
                         if (amrex::Random(engine) < p_hosp) {
@@ -947,7 +945,7 @@ void AgentContainer::updateStatus (MultiFab& disease_stats /*!< Community-wise d
 
     + Create bins of agents (see #amrex::GetParticleBin, #amrex::DenseBins) with
       their current locations:
-      + The bin size is 1 cell (QDG)
+      + The bin size is 1 cell
       + #amrex::GetParticleBin maps a particle to its bin index
       + amrex::DenseBins::build() creates the bin-sorted array of particle indices and
         the offset array for each bin (where the offset of a bin is its starting location
@@ -1082,7 +1080,7 @@ void AgentContainer::infectAgents ()
 
     + For home and workplace, create bins of agents if not already created (see
       #amrex::GetParticleBin, #amrex::DenseBins):
-      + The bin size is 1 cell (QDG)
+      + The bin size is 1 cell
       + #amrex::GetParticleBin maps a particle to its bin index
       + amrex::DenseBins::build() creates the bin-sorted array of particle indices and
         the offset array for each bin (where the offset of a bin is its starting location

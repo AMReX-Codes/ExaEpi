@@ -196,7 +196,6 @@ namespace Initialization
                     number = (unsigned int) rint( ((Real) Ndaywork[to]) /
                              ((Real) WG_size * (Start[to+1] - Start[to])) );
 
-                    /* QDG ?? */
                     work_nborhood_ptr[ip]=4*(amrex::Random_int(4, engine))+nborhood_ptr[ip];
 
                     if (number) {

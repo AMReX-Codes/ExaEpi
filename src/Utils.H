@@ -20,7 +20,7 @@ namespace ExaEpi
 */
 struct TestParams
 {
-    amrex::IntVect size;                /*!< domain size; (QDG: used only for ic_type = demo?)
+    amrex::IntVect size;                /*!< domain size; (used only for ic_type = demo)
                                              (see ExaEpi::Utils::get_geometry) */
     int max_grid_size;                  /*!< box size */
     int nsteps;                         /*!< number of simulation steps */

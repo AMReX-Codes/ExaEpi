@@ -28,7 +28,7 @@ namespace IO
       + component 1: never infected (#Status::never)
       + component 2: infected (#Status::infected)
       + component 3: immune (#Status::immune)
-      + component 4: previously infected (#Status::susceptible QDG??)
+      + component 4: susceptible (#Status::susceptible)
       + component 5: unit number
       + component 6: FIPS ID
       + component 7: census tract number
@@ -57,7 +57,7 @@ void writePlotFile (const AgentContainer& pc,   /*!< Agent (particle) container 
     amrex::Copy(output_mf, comm_mf, 0, 8, 1, 0);
 
     WriteSingleLevelPlotfile(amrex::Concatenate("plt", step, 5), output_mf,
-                             {"total", "never_infected", "infected", "immune", "previously_infected", "unit", "FIPS", "Tract", "comm"},
+                             {"total", "never_infected", "infected", "immune", "susceptible", "unit", "FIPS", "Tract", "comm"},
                              pc.ParticleGeom(0), 0.0, 0);
 
     // uncomment this to write all the particles

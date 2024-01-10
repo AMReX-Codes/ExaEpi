@@ -57,7 +57,7 @@ int main (int argc, /*!< Number of command line arguments */
       + FIPS code of the community at each grid cell (2 components - FIPS code, census tract ID).
       + Community number of the community at each grid cell.
       + Disease statistics with 4 components (hospitalization, ICU, ventilator, deaths)
-      + Masking behavior (QDG ??)
+      + Masking behavior
     + Initialize agents (AgentContainer::initAgentsDemo or AgentContainer::initAgentsCensus).
       If ExaEpi::TestParams::ic_type is ExaEpi::ICType::Census, then
       + Read worker flow (ExaEpi::Initialization::read_workerflow)

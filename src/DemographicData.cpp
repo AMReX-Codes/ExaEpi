@@ -27,7 +27,7 @@ DemographicData::DemographicData (const::std::string& fname /*!< Name of file co
  *
  *  + The first line of the file contains the number of units.
  *  + The following lines have the following data:
- *    + ID (QDG: what is this ID?)
+ *    + ID (US-wide census tract ID)
  *    + Population
  *    + Number of day workers
  *    + FIPS code
@@ -152,7 +152,7 @@ void DemographicData::InitFromFile (const std::string& fname /*!< Name of file c
 /*! \brief Prints demographic data to screen:
 
  *  For each unit, print
- *  + ID (QDG: what is this ID?)
+ *  + ID (US-wide census tract ID)
  *  + Population
  *  + Number of day workers
  *  + FIPS code
