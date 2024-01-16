@@ -1157,7 +1157,7 @@ void AgentContainer::interactAgentsHomeWork ( MultiFab& /*mask_behavior*/ /*!< M
 
             auto binner = GetParticleBin{plo, dxi, domain, bin_size, box};
             if (bins_ptr->numBins() < 0) {
-                bins_ptr->build(np, pstruct_ptr, ntiles, binner);
+                bins_ptr->build(BinPolicy::Serial, np, pstruct_ptr, ntiles, binner);
             }
             auto inds = bins_ptr->permutationPtr();
             auto offsets = bins_ptr->offsetsPtr();
