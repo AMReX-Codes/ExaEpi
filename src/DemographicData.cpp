@@ -1,3 +1,7 @@
+/*! @file DemographicData.cpp
+    \brief Function implementations of #DemographicData class
+*/
+
 #include "DemographicData.H"
 
 #include <AMReX_BLassert.H>
@@ -12,12 +16,37 @@
 
 using namespace amrex;
 
-DemographicData::DemographicData (const::std::string& fname)
+/*! Initializes by reading in demographic data from a given
+    filename. Calls DemographicData::InitFromFile(). */
+DemographicData::DemographicData (const::std::string& fname /*!< Name of file containing demographic data */)
 {
     InitFromFile(fname);
 }
 
-void DemographicData::InitFromFile (const std::string& fname)
+/*! \brief Read in demographic data from given file.
+ *
+ *  + The first line of the file contains the number of units.
+ *  + The following lines have the following data:
+ *    + ID (US-wide census tract ID)
+ *    + Population
+ *    + Number of day workers
+ *    + FIPS code
+ *    + Census tract number
+ *    + Numbers of people in age groups: under 5, 5-17, 18-29, 30-64, and 65+
+ *    + Number of households with: 1, 2, 3, 4, 5, 6, and 7 member(s)
+ *
+ *  This function reads the number of units and allocates the data arrays. Then, for each unit:
+ *  + Read in the above data.
+ *  + Compute the number of communities, where a community comprises 2000 people.
+ *    + If there are no residential communities but a significant daytime worker population (> 20),
+ *      a community is defined for these workers.
+ *    + If the number of daytime workers exceed 1000, then compute the number of 1000-worker communities.
+ *  + Save the starting community number of each unit
+ *  + Set up the mapping: given by ID, what is the unit number?
+ *  + Compute total population and number of daytime workers.
+ *  + Copy data to GPU device memory.
+ */
+void DemographicData::InitFromFile (const std::string& fname /*!< Name of file containing demographic data */)
 {
     BL_PROFILE("DemographicData::InitFromFile");
 
@@ -120,6 +149,17 @@ void DemographicData::InitFromFile (const std::string& fname)
     amrex::Gpu::streamSynchronize();
 }
 
+/*! \brief Prints demographic data to screen:
+
+ *  For each unit, print
+ *  + ID (US-wide census tract ID)
+ *  + Population
+ *  + Number of day workers
+ *  + FIPS code
+ *  + Census tract number
+ *  + Numbers of people in age groups: under 5, 5-17, 18-29, 30-64, and 65+
+ *  + Number of households with: 1, 2, 3, 4, 5, 6, and 7 member(s)
+*/
 void DemographicData::Print () const {
     amrex::Print() << Nunit << "\n";
     for (int i = 0; i < Nunit; ++i) {
@@ -129,18 +169,23 @@ void DemographicData::Print () const {
     }
 }
 
-void DemographicData::CopyToDeviceAsync (const amrex::Vector<int>& h_vec, amrex::Gpu::DeviceVector<int>& d_vec) {
+/*! \brief Copy array from host to device */
+void DemographicData::CopyToDeviceAsync (const amrex::Vector<int>& h_vec, /*!< host vector */
+                                         amrex::Gpu::DeviceVector<int>& d_vec /*!< device vector */) {
     d_vec.resize(0);
     d_vec.resize(h_vec.size());
     Gpu::copyAsync(Gpu::hostToDevice, h_vec.begin(), h_vec.end(), d_vec.begin());
 }
 
-void DemographicData::CopyToHostAsync (const amrex::Gpu::DeviceVector<int>& d_vec, amrex::Vector<int>& h_vec) {
+/*! \brief Copy array from device to host */
+void DemographicData::CopyToHostAsync (const amrex::Gpu::DeviceVector<int>& d_vec, /*!< device vector */
+                                       amrex::Vector<int>& h_vec /*!< host vector */) {
     h_vec.resize(0);
     h_vec.resize(d_vec.size());
     Gpu::copyAsync(Gpu::deviceToHost, d_vec.begin(), d_vec.end(), h_vec.begin());
 }
 
+/*! \brief Copies member arrays of #DemographicData from host to device */
 void DemographicData::CopyDataToDevice () {
     CopyToDeviceAsync(myID, myID_d);
     CopyToDeviceAsync(FIPS, FIPS_d);

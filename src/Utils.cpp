@@ -1,3 +1,7 @@
+/*! @file Utils.cpp
+    \brief Contains function implementations for the #ExaEpi::Utils namespace
+*/
+
 #include <AMReX.H>
 #include <AMReX_Box.H>
 #include <AMReX_CoordSys.H>
@@ -16,11 +20,17 @@
 using namespace amrex;
 using namespace ExaEpi;
 
-void ExaEpi::Utils::get_test_params (TestParams& params, const std::string& prefix)
+/*! \brief Read in test parameters in #ExaEpi::TestParams from input file */
+void ExaEpi::Utils::get_test_params (   TestParams& params,         /*!< Test parameters */
+                                        const std::string& prefix   /*!< ParmParse prefix */ )
 {
     ParmParse pp(prefix);
-    pp.get("size", params.size);
-    pp.get("max_grid_size", params.max_grid_size);
+    params.size = {1, 1};
+    pp.query("size", params.size);
+
+    params.max_grid_size = 16;
+    pp.query("max_grid_size", params.max_grid_size);
+
     pp.get("nsteps", params.nsteps);
 
     params.plot_int = -1;
@@ -57,9 +67,18 @@ void ExaEpi::Utils::get_test_params (TestParams& params, const std::string& pref
     }
 }
 
-/* Determine number of cells in each direction required */
-Geometry ExaEpi::Utils::get_geometry (const DemographicData& demo,
-                                      const TestParams& params) {
+/*! \brief Set computational domain, i.e., number of cells in each direction, from the
+    demographic data (number of communities).
+ *
+ *  If the initialization type (ExaEpi::TestParams::ic_type) is ExaEpi::ICType::Census, then
+ *  + The domain is a 2D square, where the total number of cells is the lowest square of an
+ *    integer that is greater than #DemographicData::Ncommunity
+ *  + The physical size is 1.0 in each dimension.
+ *
+ *  A periodic Cartesian grid is defined.
+*/
+Geometry ExaEpi::Utils::get_geometry (const DemographicData&    demo,   /*!< demographic data */
+                                      const TestParams&         params  /*!< test parameters */ ) {
     int is_per[BL_SPACEDIM];
     for (int i = 0; i < BL_SPACEDIM; i++) {
         is_per[i] = true;

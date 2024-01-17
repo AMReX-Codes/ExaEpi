@@ -1,17 +1,13 @@
-agent.size = (1, 1)
-agent.max_grid_size = 16
-
 agent.ic_type = "census"
-agent.census_filename = "../../data/CensusData/CA.dat"
-agent.workerflow_filename = "../../data/CensusData/CA-wf.bin"
+agent.census_filename = "../../data/CensusData/BayArea.dat"
+agent.workerflow_filename = "../../data/CensusData/BayArea-wf.bin"
 agent.case_filename = "../../data/CaseData/July4.cases"
 
 agent.nsteps = 10
-agent.plot_int = 168
-agent.random_travel_int = 24
+agent.plot_int = -1
+agent.random_travel_int = -1
 
-agent.aggregated_diag_int = 168
-agent.aggregated_diag_prefix = "cases"
+agent.aggregated_diag_int = -1
 
 contact.pSC  = 0.2
 contact.pCO  = 1.45

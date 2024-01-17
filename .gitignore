@@ -1,0 +1,6 @@
+docs/source/_static
+docs/build
+docs/doxyhtml
+docs/doxyxml
+docs/exaepi-doxygen-web.tag.xml
+docs/amrex-doxygen-web.tag.xml

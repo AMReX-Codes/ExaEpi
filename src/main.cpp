@@ -1,3 +1,7 @@
+/*! @file main.cpp
+    \brief **Main**: Contains main() and runAgent()
+*/
+
 #include <AMReX.H>
 #include <AMReX_iMultiFab.H>
 #include <AMReX_ParmParse.H>
@@ -15,6 +19,7 @@ using namespace ExaEpi;
 
 void runAgent();
 
+/*! \brief Set ExaEpi-specific defaults for memory-management */
 void override_amrex_defaults ()
 {
     amrex::ParmParse pp("amrex");
@@ -24,7 +29,9 @@ void override_amrex_defaults ()
     pp.queryAdd("the_arena_is_managed", the_arena_is_managed);
 }
 
-int main (int argc, char* argv[])
+/*! \brief Main function: initializes AMReX, calls runAgent(), finalizes AMReX */
+int main (int argc, /*!< Number of command line arguments */
+          char* argv[] /*!< Command line arguments */)
 {
     amrex::Initialize(argc,argv,true,MPI_COMM_WORLD,override_amrex_defaults);
 
@@ -33,6 +40,55 @@ int main (int argc, char* argv[])
     amrex::Finalize();
 }
 
+/*! \brief Run agent-based simulation:
+
+    \b Initialization
+    + Read test parameters (#ExaEpi::TestParams) from command line input file
+    + If initialization type (#ExaEpi::TestParams::ic_type) is ExaEpi::ICType::Census,
+      + Read #DemographicData from #ExaEpi::TestParams::census_filename
+        (see DemographicData::InitFromFile)
+      + Read #CaseData from #ExaEpi::TestParams::case_filename
+        (see CaseData::InitFromFile)
+    + Get computational domain from ExaEpi::Utils::get_geometry. Each grid cell corresponds to
+      a community.
+    + Create box arrays and distribution mapping based on #ExaEpi::TestParams::max_grid_size.
+    + Initialize the following MultiFabs:
+      + Number of residents: 6 components - number of residents in age groups under-5, 5-17,
+        18-29, 30-64, 65+, total.
+      + Unit number of the community at each grid cell (1 component).
+      + FIPS code of the community at each grid cell (2 components - FIPS code, census tract ID).
+      + Community number of the community at each grid cell.
+      + Disease statistics with 4 components (hospitalization, ICU, ventilator, deaths)
+      + Masking behavior
+    + Initialize agents (AgentContainer::initAgentsDemo or AgentContainer::initAgentsCensus).
+      If ExaEpi::TestParams::ic_type is ExaEpi::ICType::Census, then
+      + Read worker flow (ExaEpi::Initialization::read_workerflow)
+      + Initialize cases (ExaEpi::Initialization::setInitialCases)
+
+
+    \b Evolution
+    At each step from 0 to #ExaEpi::TestParams::nsteps-1:
+    + IO:
+      + if the current step number is a multiple of #ExaEpi::TestParams::plot_int, then write
+        out plot file - see ExaEpi::IO::writePlotFile()
+      + if current step number is a multiple of #ExaEpi::TestParams::aggregated_diag_int, then write
+        out aggregated diagnostic data - see ExaEpi::IO::writeFIPSData().
+    + Agents behavior:
+      + Update agent #Status based on their age, number of days since infection, hospitalization,
+        etc. - see AgentContainer::updateStatus().
+      + Move agents to work - see AgentContainer::moveAgentsToWork().
+      + Let agents interact at work - see AgentContainer::interactAgentsHomeWork().
+      + Move agents to home - see AgentContainer::moveAgentsToHome().
+      + Let agents interact at home - see AgentContainer::interactAgentsHomeWork().
+      + Infect agents based on their movements during the day - see AgentContainer::infectAgents().
+    + Get disease statistics counts - see AgentContainer::printTotals() - and update the
+      peak number of infections and cumulative deaths.
+
+    \b Finalize
+    + Report peak infections, day of peak infections, and cumulative deaths.
+    + Write out final plot file - see ExaEpi::IO::writePlotFile()
+    + Write out final aggregated diagnostic data - see ExaEpi::IO::writeFIPSData().
+*/
 void runAgent ()
 {
     BL_PROFILE("runAgent");
@@ -52,6 +108,10 @@ void runAgent ()
     ba.define(geom.Domain());
     ba.maxSize(params.max_grid_size);
     dm.define(ba);
+
+    amrex::Print() << "Base domain is: " << geom.Domain() << "\n";
+    amrex::Print() << "Max grid size is: " << params.max_grid_size << "\n";
+    amrex::Print() << "Number of boxes is: " << ba.size() << " over " << ParallelDescriptor::NProcs() << " ranks. \n";
 
     iMultiFab num_residents(ba, dm, 6, 0);
     iMultiFab unit_mf(ba, dm, 1, 0);
@@ -78,6 +138,14 @@ void runAgent ()
     int  step_of_peak = 0;
     Long num_infected_peak = 0;
     Long cumulative_deaths = 0;
+    {
+        auto counts = pc.printTotals();
+        if (counts[1] > num_infected_peak) {
+            num_infected_peak = counts[1];
+            step_of_peak = 0;
+        }
+        cumulative_deaths = counts[4];
+    }
 
     {
         BL_PROFILE_REGION("Evolution");

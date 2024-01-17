@@ -1,3 +1,6 @@
+/*! @file AgentContainer.H
+    \brief Contains #AgentContainer class and related structs
+*/
 #ifndef AGENT_CONTAINER_H_
 #define AGENT_CONTAINER_H_
 
@@ -159,50 +162,56 @@ struct IntIdx
 #endif // Epicast particle type
 
 // simplified particle type
+
+/*! \brief Real-type SoA attributes of agent */
 struct RealIdx
 {
     enum {
         /*
           Disease counter starts after infection.
          */
-        disease_counter = 0,
-        treatment_timer,
-        prob,
-        nattribs
+        disease_counter = 0,    /*!< Counter since start of infection */
+        treatment_timer,        /*!< Timer since hospital admission */
+        prob,                   /*!< Probability of infection */
+        nattribs                /*!< number of real-type attribute*/
     };
 };
 
+/*! \brief Disease status */
 struct Status
 {
     enum {
-        never = 0,   // never infected
-        infected,    // infected
-        immune,      // no longer infected, immune. lasts 6 months.
-        susceptible, // no longer infected, no longer immnune
-        dead
+        never = 0,   /*!< never infected */
+        infected,    /*!< infected */
+        immune,      /*!< no longer infected, immune. lasts 6 months. */
+        susceptible, /*!< no longer infected, no longer immnune */
+        dead         /*!< passed away */
     };
 };
 
+/*! \brief Integer-type SoA attributes of agent */
 struct IntIdx
 {
     enum {
-        status = 0,
-        strain,
-        age_group,
-        family,
-        home_i,
-        home_j,
-        work_i,
-        work_j,
-        nborhood,
-        school,
-        workgroup,
-        work_nborhood,
-        withdrawn,
-        nattribs
+        status = 0,     /*!< Disease status (#Status) */
+        strain,         /*!< virus strain */
+        age_group,      /*!< Age group (under 5, 5-17, 18-29, 30-64, 65+) */
+        family,         /*!< Family ID */
+        home_i,         /*!< home location index */
+        home_j          /*!< home location index */,
+        work_i          /*!< work location index */,
+        work_j          /*!< work location index */,
+        nborhood,       /*!< home neighborhood ID */
+        school,         /*!< school type (elementary, middle, high, none) */
+        workgroup,      /*!< workgroup ID */
+        work_nborhood,  /*!< work neighborhood ID */
+        withdrawn,      /*!< quarrantine status */
+        nattribs        /*!< number of integer-type attribute */
     };
 };
 
+/*! \brief Assigns school by taking a random number between 0 and 100, and using
+ *  default distribution to choose elementary/middle/high school. */
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
 int assign_school (const int nborhood, const amrex::RandomEngine& engine) {
     int il4 = amrex::Random_int(100, engine);
@@ -214,6 +223,7 @@ int assign_school (const int nborhood, const amrex::RandomEngine& engine) {
     else if (il4 < 68) {
         school = 2;  /* middle school */
     }
+
     else if (il4 < 93) {
         school = 1;  /* high school */
     }
@@ -223,15 +233,21 @@ int assign_school (const int nborhood, const amrex::RandomEngine& engine) {
     return school;
 }
 
+/*! \brief Derived class from ParticleContainer that defines agents and their functions */
 class AgentContainer
     : public amrex::ParticleContainer<0, 0, RealIdx::nattribs, IntIdx::nattribs>
 {
 
 public:
 
-    AgentContainer (const amrex::Geometry            & a_geom,
-                    const amrex::DistributionMapping & a_dmap,
-                    const amrex::BoxArray            & a_ba)
+    /*! Constructor:
+     *  + Initializes particle container for agents
+     *  + Read in contact probabilities from command line input file
+     *  + Read in disease parameters from command line input file
+    */
+    AgentContainer (const amrex::Geometry            & a_geom,  /*!< Physical domain */
+                    const amrex::DistributionMapping & a_dmap,  /*!< Distribution mapping */
+                    const amrex::BoxArray            & a_ba     /*!< Box array */ )
         : amrex::ParticleContainer<0, 0, RealIdx::nattribs, IntIdx::nattribs>(a_geom, a_dmap, a_ba)
     {
         h_parm = new DiseaseParm{};
@@ -315,10 +331,14 @@ public:
 
 protected:
 
-    DiseaseParm* h_parm;
-    DiseaseParm* d_parm;
+    DiseaseParm* h_parm;    /*!< Disease parameters */
+    DiseaseParm* d_parm;    /*!< Disease parameters (GPU device) */
 
+    /*! Map of home bins (of agents) indexed by MultiFab iterator and tile index;
+        see AgentContainer::interactAgentsHomeWork() */
     std::map<std::pair<int, int>, amrex::DenseBins<AgentContainer::ParticleType> > m_bins_home;
+    /*! Map of work bins (of agents) indexed by MultiFab iterator and tile index;
+        see AgentContainer::interactAgentsHomeWork() */
     std::map<std::pair<int, int>, amrex::DenseBins<AgentContainer::ParticleType> > m_bins_work;
 };
 
