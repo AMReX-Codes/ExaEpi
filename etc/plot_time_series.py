@@ -66,7 +66,7 @@ def get_args() -> argparse.ArgumentParser:
     as well as a PNG file with a plot of the time series.
     '''
     describe = '''
-This tool extracts the data of a collection of time points and 
+This tool extracts the data of a collection of time points and
 computes overall case numbers for each of them. The totals are
 stored in a CSV file for further processing. They are also plotted
 for a quick visual inspection of the results.'''
@@ -79,7 +79,7 @@ def get_directories(pattern: str) -> list:
     '''
     Takes a pattern that identifies a set of sub-directories,
     looks actual directory names up, stores them in a sorted
-    list (just alphabetical sorting for now), and returns 
+    list (just alphabetical sorting for now), and returns
     the resulting list.
     '''
     dir_list = glob.glob(pattern)
@@ -116,7 +116,7 @@ def write_timeseries(dirlist: list, output: str) -> None:
     '''
     Create the CSV file, iterate over all directories extracting
     the case numbers, and write the data to the CSV file.
-    Note we do not check the output file name as the plotting 
+    Note we do not check the output file name as the plotting
     function needs to be using the same name. So that checking needs
     to happen elsewhere.
     '''
