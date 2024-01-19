@@ -1137,14 +1137,10 @@ void AgentContainer::interactAgentsHomeWork ( MultiFab& /*mask_behavior*/ /*!< M
         const auto plo = geom.ProbLoArray();
         const auto domain = geom.Domain();
 
-#ifdef AMREX_USE_OMP
-#pragma omp parallel if (Gpu::notInLaunchRegion())
-#endif
         for(MFIter mfi = MakeMFIter(lev, TilingIfNotGPU()); mfi.isValid(); ++mfi)
         {
-            amrex::DenseBins<AgentContainer::ParticleType>* bins_ptr = nullptr;
             auto pair_ind = std::make_pair(mfi.index(), mfi.LocalTileIndex());
-            bins_ptr = home ? &m_bins_home[pair_ind] : &m_bins_work[pair_ind];
+            auto bins_ptr (home ? &m_bins_home[pair_ind] : &m_bins_work[pair_ind]);
 
             auto& ptile = ParticlesAt(lev, mfi);
             auto& aos   = ptile.GetArrayOfStructs();
@@ -1152,13 +1148,31 @@ void AgentContainer::interactAgentsHomeWork ( MultiFab& /*mask_behavior*/ /*!< M
             auto pstruct_ptr = aos().dataPtr();
 
             const Box& box = mfi.validbox();
-
             int ntiles = numTilesInBox(box, true, bin_size);
 
             auto binner = GetParticleBin{plo, dxi, domain, bin_size, box};
             if (bins_ptr->numBins() < 0) {
                 bins_ptr->build(BinPolicy::Serial, np, pstruct_ptr, ntiles, binner);
             }
+            AMREX_ALWAYS_ASSERT(np == bins_ptr->numItems());
+            amrex::Gpu::synchronize();
+        }
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (Gpu::notInLaunchRegion())
+#endif
+        for(MFIter mfi = MakeMFIter(lev, TilingIfNotGPU()); mfi.isValid(); ++mfi)
+        {
+            auto pair_ind = std::make_pair(mfi.index(), mfi.LocalTileIndex());
+            auto bins_ptr (home ? &m_bins_home[pair_ind] : &m_bins_work[pair_ind]);
+
+            auto& ptile = ParticlesAt(lev, mfi);
+            auto& aos   = ptile.GetArrayOfStructs();
+            const auto np = aos.numParticles();
+            auto pstruct_ptr = aos().dataPtr();
+
+            auto binner = GetParticleBin{plo, dxi, domain, bin_size, mfi.validbox()};
+            AMREX_ALWAYS_ASSERT(bins_ptr->numBins() >= 0);
             auto inds = bins_ptr->permutationPtr();
             auto offsets = bins_ptr->offsetsPtr();
 
@@ -1183,7 +1197,6 @@ void AgentContainer::interactAgentsHomeWork ( MultiFab& /*mask_behavior*/ /*!< M
             auto prob_ptr = soa.GetRealData(RealIdx::prob).data();
             auto counter_ptr = soa.GetRealData(RealIdx::disease_counter).data();
 
-            AMREX_ALWAYS_ASSERT(np == bins_ptr->numItems());
             auto* lparm = d_parm;
             amrex::ParallelForRNG( bins_ptr->numItems(),
                                    [=] AMREX_GPU_DEVICE (int ii, amrex::RandomEngine const& /*engine*/) noexcept
