@@ -264,7 +264,7 @@ namespace Initialization
 
             auto binner = GetParticleBin{plo, dxi, domain, bin_size, box};
             if (bins.numBins() < 0) {
-                bins.build(np, pstruct_ptr, ntiles, binner);
+                bins.build(BinPolicy::Serial, np, pstruct_ptr, ntiles, binner);
             }
             auto inds = bins.permutationPtr();
             auto offsets = bins.offsetsPtr();
