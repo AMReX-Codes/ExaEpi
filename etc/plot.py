@@ -1,5 +1,6 @@
 import yt
-from yt.frontends.boxlib.data_structures import AMReXDataset
+from yt.frontends.boxlib.api import AMReXDataset
+
 import pylab as plt
 import sys
 
