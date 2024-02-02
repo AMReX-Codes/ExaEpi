@@ -76,5 +76,7 @@ struct DiseaseParm
     int symptomatic_length = 5;   /*!< Number of days person is symptomatic */ //note, this does not affect the model yet
 
     void Initialize ();
+
+    void printMatrix ();
 };
 #endif

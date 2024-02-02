@@ -4,6 +4,8 @@
 
 #include "DiseaseParm.H"
 
+#include "AMReX_Print.H"
+
 /*! \brief Initialize disease parameters
 
     Compute transmission probabilities for various situations based on disease
@@ -84,4 +86,69 @@ void DiseaseParm::Initialize ()
     }
 
     infect = 1.0;
+}
+
+void DiseaseParm::printMatrix () {
+    amrex::Print() << "xmit_comm: " << " ";
+    for (int i = 0; i < 5; ++i) {
+        amrex::Print() << xmit_comm[i] << " ";
+    }
+    amrex::Print() << "\n";
+
+    amrex::Print() << "xmit_hood: " <<  " ";
+    for (int i = 0; i < 5; ++i) {
+        amrex::Print() << xmit_hood[i] << " ";
+    }
+    amrex::Print() << "\n";
+
+    amrex::Print() << "xmit_nc_adult: " << " ";
+    for (int i = 0; i < 5; ++i) {
+        amrex::Print() << xmit_nc_adult[i] << " ";
+    }
+    amrex::Print() << "\n";
+
+    amrex::Print() << "xmit_nc_child: " << " ";
+    for (int i = 0; i < 5; ++i) {
+        amrex::Print() << xmit_nc_child[i] << " ";
+    }
+    amrex::Print() << "\n";
+
+    amrex::Print() << "xmit_work: " << " ";
+    amrex::Print() << xmit_work << "\n";
+
+    amrex::Print() << "xmit_child_SC: " << " ";
+    for (int i = 0; i < 5; ++i) {
+        amrex::Print() << xmit_child_SC[i] << " ";
+    }
+    amrex::Print() << "\n";
+
+    amrex::Print() << "xmit_nc_child_SC: " << " ";
+    for (int i = 0; i < 5; ++i) {
+        amrex::Print() << xmit_nc_child_SC[i] << " ";
+    }
+    amrex::Print() << "\n";
+
+    amrex::Print() << "xmit_adult_SC: " << " ";
+    for (int i = 0; i < 2; ++i) {
+        amrex::Print() << xmit_adult_SC[i] << " ";
+    }
+    amrex::Print() << "\n";
+
+    amrex::Print() << "xmit_nc_adult_SC: " << " ";
+    for (int i = 0; i < 2; ++i) {
+        amrex::Print() << xmit_nc_adult_SC[i] << " ";
+    }
+    amrex::Print() << "\n";
+
+    amrex::Print() << "xmit_hood_SC: " << " ";
+    for (int i = 0; i < 2; ++i) {
+        amrex::Print() << xmit_hood_SC[i] << " ";
+    }
+    amrex::Print() << "\n";
+
+    amrex::Print() << "xmit_comm_SC: " << " ";
+    for (int i = 0; i < 2; ++i) {
+        amrex::Print() << xmit_comm_SC[i] << " ";
+    }
+    amrex::Print() << "\n";
 }
