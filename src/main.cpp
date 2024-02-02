@@ -179,6 +179,12 @@ void runAgent ()
                 step_of_peak = i;
             }
             cumulative_deaths = counts[4];
+
+            amrex::Print() << "Total never: "       << counts[0] << "\n";
+            amrex::Print() << "Total infected: "    << counts[1] << "\n";
+            amrex::Print() << "Total immune: "      << counts[2] << "\n";
+            amrex::Print() << "Total susceptible: " << counts[3] << "\n";
+            amrex::Print() << "Total deaths: "      << counts[4] << "\n";
         }
     }
 
