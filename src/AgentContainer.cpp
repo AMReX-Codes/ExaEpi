@@ -887,12 +887,13 @@ void AgentContainer::updateStatus (MultiFab& disease_stats /*!< Community-wise d
                                                     DiseaseStats::death), 1.0_rt);
                                         status_ptr[i] = Status::dead;
                                         //pstruct_ptr[i].id() = -pstruct_ptr[i].id();
-                                    } else {
-                                        amrex::Gpu::Atomic::AddNoRet(
-                                                                     &ds_arr(home_i_ptr[i], home_j_ptr[i], 0,
-                                                                             DiseaseStats::hospitalization), -1.0_rt);
-                                        status_ptr[i] = Status::immune;  // If alive, hospitalized patient recovers
                                     }
+                                }
+                                amrex::Gpu::Atomic::AddNoRet(
+                                                             &ds_arr(home_i_ptr[i], home_j_ptr[i], 0,
+                                                                     DiseaseStats::hospitalization), -1.0_rt);
+                                if (status_ptr[i] != Status::dead) {
+                                    status_ptr[i] = Status::immune;  // If alive, hospitalized patient recovers
                                 }
                             }
                             if (timer_ptr[i] == 10) {
@@ -903,12 +904,13 @@ void AgentContainer::updateStatus (MultiFab& disease_stats /*!< Community-wise d
                                                     DiseaseStats::death), 1.0_rt);
                                         status_ptr[i] = Status::dead;
                                         //pstruct_ptr[i].id() = -pstruct_ptr[i].id();
-                                    } else {
-                                        amrex::Gpu::Atomic::AddNoRet(
-                                                                     &ds_arr(home_i_ptr[i], home_j_ptr[i], 0,
-                                                                             DiseaseStats::ICU), -1.0_rt);
-                                        status_ptr[i] = Status::immune;  // If alive, ICU patient recovers
                                     }
+                                }
+                                amrex::Gpu::Atomic::AddNoRet(
+                                                             &ds_arr(home_i_ptr[i], home_j_ptr[i], 0,
+                                                                     DiseaseStats::ICU), -1.0_rt);
+                                if (status_ptr[i] != Status::dead) {
+                                    status_ptr[i] = Status::immune;  // If alive, ICU patient recovers
                                 }
                             }
                             if (timer_ptr[i] == 20) {
@@ -918,12 +920,13 @@ void AgentContainer::updateStatus (MultiFab& disease_stats /*!< Community-wise d
                                                 DiseaseStats::death), 1.0_rt);
                                     status_ptr[i] = Status::dead;
                                     //pstruct_ptr[i].id() = -pstruct_ptr[i].id();
-                                } else {
-                                    amrex::Gpu::Atomic::AddNoRet(
-                                                                 &ds_arr(home_i_ptr[i], home_j_ptr[i], 0,
-                                                                         DiseaseStats::ventilator), -1.0_rt);
-                                    status_ptr[i] = Status::immune;  // If alive, ventilated patient recovers
                                 }
+                            }
+                            amrex::Gpu::Atomic::AddNoRet(
+                                                         &ds_arr(home_i_ptr[i], home_j_ptr[i], 0,
+                                                                 DiseaseStats::ventilator), -1.0_rt);
+                            if (status_ptr[i] != Status::dead) {
+                                status_ptr[i] = Status::immune;  // If alive, ventilated patient recovers
                             }
                         }
                         else { // not hospitalized, recover once not infectious
