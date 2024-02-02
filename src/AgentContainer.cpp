@@ -1217,7 +1217,8 @@ void AgentContainer::interactAgentsHomeWork ( MultiFab& /*mask_behavior*/ /*!< M
                     if (status_ptr[j] == Status::immune) {continue;}
                     if (status_ptr[i] == Status::infected && counter_ptr[j] < lparm->incubation_length) { continue; }  // incubation stage
 
-                    if (status_ptr[i] == Status::infected && status_ptr[j] != Status::infected) {
+                    if (status_ptr[i] == Status::infected &&
+                        (status_ptr[j] != Status::infected && status_ptr[j] != Status::dead)) {
                         // i can infect j
                         amrex::Real infect = lparm->infect;
                         infect *= lparm->vac_eff;
@@ -1228,7 +1229,6 @@ void AgentContainer::interactAgentsHomeWork ( MultiFab& /*mask_behavior*/ /*!< M
                         amrex::Real work_scale = 1.0;  // TODO this should vary based on cell
 
                         auto prob = prob_ptr[j];
-
                         /* Determine what connections these individuals have */
                         if ((nborhood_ptr[i] == nborhood_ptr[j]) && (family_ptr[i] == family_ptr[j]) && (!DAYTIME)) {
                             if (age_group_ptr[i] <= 1) {  /* Transmitter i is a child */
@@ -1247,7 +1247,7 @@ void AgentContainer::interactAgentsHomeWork ( MultiFab& /*mask_behavior*/ /*!< M
                             }
                         }
                         /* check for common neighborhood cluster: */
-                        else if ((nborhood_ptr[i] == nborhood_ptr[j]) && (!withdrawn_ptr[i]) && (!withdrawn_ptr[j]) && (!DAYTIME)) {
+                        else if ((nborhood_ptr[i] == nborhood_ptr[j]) && (!withdrawn_ptr[i]) && (!withdrawn_ptr[j]) && ((family_ptr[i] / 4) == (family_ptr[j] / 4)) && (!DAYTIME)) {
                             if (age_group_ptr[i] <= 1) {  /* Transmitter i is a child */
                                 if (school_ptr[i] < 0)  // not attending school, use _SC contacts
                                     prob *= 1.0 - infect * lparm->xmit_nc_child_SC[age_group_ptr[j]] * social_scale;
@@ -1266,10 +1266,11 @@ void AgentContainer::interactAgentsHomeWork ( MultiFab& /*mask_behavior*/ /*!< M
                         if ( (!withdrawn_ptr[i]) && (!withdrawn_ptr[j]) ) {
 
                             /* Should always be in the same community = same cell */
-                            if (school_ptr[i] < 0)  // not attending school, use _SC contacts
+                            if (school_ptr[i] < 0) {  // not attending school, use _SC contacts
                                 prob *= 1.0 - infect * lparm->xmit_comm_SC[age_group_ptr[j]] * social_scale;
-                            else
+                            } else {
                                 prob *= 1.0 - infect * lparm->xmit_comm[age_group_ptr[j]] * social_scale;
+                            }
 
                             /* Workgroup transmission */
                             if (DAYTIME && workgroup_ptr[i] && (work_i_ptr[i] >= 0)) { // transmitter i at work
@@ -1311,7 +1312,8 @@ void AgentContainer::interactAgentsHomeWork ( MultiFab& /*mask_behavior*/ /*!< M
                             }
                         }  /* within society */
                         Gpu::Atomic::Multiply(&prob_ptr[j], prob);
-                    } else if (status_ptr[j] == Status::infected && status_ptr[i] != Status::infected) {
+                    } else if (status_ptr[j] == Status::infected &&
+                               (status_ptr[i] != Status::infected && status_ptr[i] != Status::dead)) {
                         if (counter_ptr[j] < lparm->incubation_length) { continue; }
                         // j can infect i
                         amrex::Real infect = lparm->infect;
@@ -1323,7 +1325,6 @@ void AgentContainer::interactAgentsHomeWork ( MultiFab& /*mask_behavior*/ /*!< M
                         amrex::Real work_scale = 1.0;  // TODO this should vary based on cell
 
                         auto prob = prob_ptr[i];
-
                         /* Determine what connections these individuals have */
                         if ((nborhood_ptr[i] == nborhood_ptr[j]) && (family_ptr[i] == family_ptr[j]) && (! DAYTIME)) {
                             if (age_group_ptr[j] <= 1) {  /* Transmitter j is a child */
@@ -1341,8 +1342,8 @@ void AgentContainer::interactAgentsHomeWork ( MultiFab& /*mask_behavior*/ /*!< M
                             }
                         }
 
-                        /* check for common neighborhood cluster: */  // ATM careful here...
-                        else if ((nborhood_ptr[i] == nborhood_ptr[j]) && (!withdrawn_ptr[i]) && (!withdrawn_ptr[j]) && (!DAYTIME)) {
+                        /* check for common neighborhood cluster: */
+                        else if ((nborhood_ptr[i] == nborhood_ptr[j]) && (!withdrawn_ptr[i]) && (!withdrawn_ptr[j]) && ((family_ptr[i] / 4) == (family_ptr[j] / 4)) && (!DAYTIME)) {
                             if (age_group_ptr[j] <= 1) {  /* Transmitter i is a child */
                                 if (school_ptr[j] < 0) { // not attending school, use _SC contacts
                                     prob *= 1.0 - infect * lparm->xmit_nc_child_SC[age_group_ptr[i]] * social_scale;

@@ -95,8 +95,10 @@ namespace Initialization
         ifs.read((char*)&from, sizeof(from));
         ifs.read((char*)&to, sizeof(to));
         ifs.read((char*)&number, sizeof(number));
+        if (from > 65334) {continue;}
         int i = demo.myIDtoUnit[from];
         if (demo.Unit_on_proc[i]) {
+            if (to > 65334) {continue;}
             int j = demo.myIDtoUnit[to];
             if (demo.Start[j+1] != demo.Start[j]) { // if there are communities in this unit
                 flow[i][j] = number;
