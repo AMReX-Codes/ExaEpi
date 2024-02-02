@@ -863,11 +863,13 @@ void AgentContainer::updateStatus (MultiFab& disease_stats /*!< Community-wise d
                                 &ds_arr(home_i_ptr[i], home_j_ptr[i], 0,
                                         DiseaseStats::hospitalization), 1.0_rt);
                             if (amrex::Random(engine) < CIC[age_group_ptr[i]]) {
+                                //std::printf("putting h in icu \n");
                                 timer_ptr[i] += 10;  // move to ICU
                                 amrex::Gpu::Atomic::AddNoRet(
                                     &ds_arr(home_i_ptr[i], home_j_ptr[i], 0,
                                             DiseaseStats::ICU), 1.0_rt);
                                 if (amrex::Random(engine) < CVE[age_group_ptr[i]]) {
+                                    //std::printf("putting icu on v \n");
                                     amrex::Gpu::Atomic::AddNoRet(
                                     &ds_arr(home_i_ptr[i], home_j_ptr[i], 0,
                                             DiseaseStats::ventilator), 1.0_rt);
@@ -921,12 +923,13 @@ void AgentContainer::updateStatus (MultiFab& disease_stats /*!< Community-wise d
                                     status_ptr[i] = Status::dead;
                                     //pstruct_ptr[i].id() = -pstruct_ptr[i].id();
                                 }
-                            }
-                            amrex::Gpu::Atomic::AddNoRet(
-                                                         &ds_arr(home_i_ptr[i], home_j_ptr[i], 0,
-                                                                 DiseaseStats::ventilator), -1.0_rt);
-                            if (status_ptr[i] != Status::dead) {
-                                status_ptr[i] = Status::immune;  // If alive, ventilated patient recovers
+
+                                amrex::Gpu::Atomic::AddNoRet(
+                                                             &ds_arr(home_i_ptr[i], home_j_ptr[i], 0,
+                                                                     DiseaseStats::ventilator), -1.0_rt);
+                                if (status_ptr[i] != Status::dead) {
+                                    status_ptr[i] = Status::immune;  // If alive, ventilated patient recovers
+                                }
                             }
                         }
                         else { // not hospitalized, recover once not infectious
