@@ -44,6 +44,7 @@ void writePlotFile (const AgentContainer& pc,   /*!< Agent (particle) container 
                     const iMultiFab& unit_mf,   /*!< MultiFab with unit number of each community */
                     const iMultiFab& FIPS_mf,   /*!< MultiFab with FIPS code and census tract ID */
                     const iMultiFab& comm_mf,   /*!< MultiFab of community number */
+                    const Real cur_time,        /*!< current time */
                     const int step              /*!< Current step */) {
     amrex::Print() << "Writing plotfile \n";
 
@@ -58,7 +59,7 @@ void writePlotFile (const AgentContainer& pc,   /*!< Agent (particle) container 
 
     WriteSingleLevelPlotfile(amrex::Concatenate("plt", step, 5), output_mf,
                              {"total", "never_infected", "infected", "immune", "susceptible", "unit", "FIPS", "Tract", "comm"},
-                             pc.ParticleGeom(0), 0.0, 0);
+                             pc.ParticleGeom(0), cur_time, step);
 
     // uncomment this to write all the particles
     pc.WritePlotFile(amrex::Concatenate("plt", step, 5), "agents");

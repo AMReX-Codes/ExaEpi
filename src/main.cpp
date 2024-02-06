@@ -147,6 +147,7 @@ void runAgent ()
         cumulative_deaths = counts[4];
     }
 
+    amrex::Real cur_time = 0;
     {
         BL_PROFILE_REGION("Evolution");
         for (int i = 0; i < params.nsteps; ++i)
@@ -154,7 +155,7 @@ void runAgent ()
             amrex::Print() << "Taking step " << i << "\n";
 
             if ((params.plot_int > 0) && (i % params.plot_int == 0)) {
-                ExaEpi::IO::writePlotFile(pc, num_residents, unit_mf, FIPS_mf, comm_mf, i);
+                ExaEpi::IO::writePlotFile(pc, num_residents, unit_mf, FIPS_mf, comm_mf, cur_time, i);
             }
 
             if ((params.aggregated_diag_int > 0) && (i % params.aggregated_diag_int == 0)) {
@@ -185,6 +186,8 @@ void runAgent ()
             amrex::Print() << "Total immune: "      << counts[2] << "\n";
             amrex::Print() << "Total susceptible: " << counts[3] << "\n";
             amrex::Print() << "Total deaths: "      << counts[4] << "\n";
+
+            cur_time += 1.0; // time step is one day
         }
     }
 
@@ -195,7 +198,7 @@ void runAgent ()
     amrex::Print() << "\n \n";
 
     if (params.plot_int > 0) {
-        ExaEpi::IO::writePlotFile(pc, num_residents, unit_mf, FIPS_mf, comm_mf, params.nsteps);
+        ExaEpi::IO::writePlotFile(pc, num_residents, unit_mf, FIPS_mf, comm_mf, cur_time, params.nsteps);
     }
 
     if ((params.aggregated_diag_int > 0) && (params.nsteps % params.aggregated_diag_int == 0)) {
