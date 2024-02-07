@@ -15,8 +15,10 @@
 #include <AMReX_iMultiFab.H>
 #include <AMReX_Vector.H>
 
+#include "AgentDefinitions.H"
 #include "DemographicData.H"
 #include "DiseaseParm.H"
+#include "InteractionLocations.H"
 
 #if 0  // uncomment for EpiCast particle type
 
@@ -163,53 +165,6 @@ struct IntIdx
 
 // simplified particle type
 
-/*! \brief Real-type SoA attributes of agent */
-struct RealIdx
-{
-    enum {
-        /*
-          Disease counter starts after infection.
-         */
-        disease_counter = 0,    /*!< Counter since start of infection */
-        treatment_timer,        /*!< Timer since hospital admission */
-        prob,                   /*!< Probability of infection */
-        nattribs                /*!< number of real-type attribute*/
-    };
-};
-
-/*! \brief Disease status */
-struct Status
-{
-    enum {
-        never = 0,   /*!< never infected */
-        infected,    /*!< infected */
-        immune,      /*!< no longer infected, immune. lasts 6 months. */
-        susceptible, /*!< no longer infected, no longer immnune */
-        dead         /*!< passed away */
-    };
-};
-
-/*! \brief Integer-type SoA attributes of agent */
-struct IntIdx
-{
-    enum {
-        status = 0,     /*!< Disease status (#Status) */
-        strain,         /*!< virus strain */
-        age_group,      /*!< Age group (under 5, 5-17, 18-29, 30-64, 65+) */
-        family,         /*!< Family ID */
-        home_i,         /*!< home location index */
-        home_j          /*!< home location index */,
-        work_i          /*!< work location index */,
-        work_j          /*!< work location index */,
-        nborhood,       /*!< home neighborhood ID */
-        school,         /*!< school type (elementary, middle, high, none) */
-        workgroup,      /*!< workgroup ID */
-        work_nborhood,  /*!< work neighborhood ID */
-        withdrawn,      /*!< quarrantine status */
-        nattribs        /*!< number of integer-type attribute */
-    };
-};
-
 /*! \brief Assigns school by taking a random number between 0 and 100, and using
  *  default distribution to choose elementary/middle/high school. */
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
@@ -250,6 +205,8 @@ public:
                     const amrex::BoxArray            & a_ba     /*!< Box array */ )
         : amrex::ParticleContainer<0, 0, RealIdx::nattribs, IntIdx::nattribs>(a_geom, a_dmap, a_ba)
     {
+        BL_PROFILE("AgentContainer::AgentContainer");
+
         h_parm = new DiseaseParm{};
         d_parm = (DiseaseParm*)amrex::The_Arena()->alloc(sizeof(DiseaseParm));
 
@@ -261,6 +218,17 @@ public:
             pp.query("pWO", h_parm->pWO);
             pp.query("pFA", h_parm->pFA);
             pp.query("pBAR", h_parm->pBAR);
+        }
+
+        {
+            using namespace ExaEpi;
+
+            /* Create the interaction location objects and push to container */
+            m_interactions.clear();
+            m_interactions[LocationNames::generic] = new InteractionLocGeneric<AgentContainer,AgentType>;
+            m_interactions[LocationNames::home] = new InteractionLocHome<AgentContainer,AgentType>;
+            m_interactions[LocationNames::work] = new InteractionLocWork<AgentContainer,AgentType>;
+            m_interactions[LocationNames::school] = new InteractionLocSchool<AgentContainer,AgentType>;
         }
 
         {
@@ -309,19 +277,21 @@ public:
                            amrex::iMultiFab& comm_mf,
                            DemographicData& demo);
 
+    void morningCommute(amrex::MultiFab&);
+
+    void eveningCommute(amrex::MultiFab&);
+
+    void interactDay(amrex::MultiFab&);
+
+    void interactEvening(amrex::MultiFab&);
+
+    void interactNight(amrex::MultiFab&);
+
     void moveAgentsRandomWalk ();
-
-    void moveAgentsToWork ();
-
-    void moveAgentsToHome ();
 
     void moveRandomTravel ();
 
     void updateStatus (amrex::MultiFab& ds);
-
-    void interactAgents ();
-
-    void interactAgentsHomeWork (amrex::MultiFab& mask, bool home);
 
     void infectAgents ();
 
@@ -329,7 +299,36 @@ public:
 
     std::array<amrex::Long, 5> printTotals ();
 
+    void moveAgentsToWork ();
+
+    void moveAgentsToHome ();
+
+    /*! \brief Return bin pointer at a given mfi, tile and location name */
+    inline amrex::DenseBins<AgentContainer::ParticleType>* getBins( const std::pair<int,int>& a_idx,
+                                                                    const std::string& a_loc_name )
+    {
+        BL_PROFILE("AgentContainer::getBins");
+        if (a_loc_name == ExaEpi::LocationNames::home) {
+            return &m_bins_home[a_idx];
+        } else if (    (a_loc_name == ExaEpi::LocationNames::work)
+                    || (a_loc_name == ExaEpi::LocationNames::school) ) {
+            return &m_bins_work[a_idx];
+        } else {
+            amrex::Abort("Invalid a_loc_name!");
+            return nullptr;
+        }
+    }
+
+    /*! \brief Return disease parameters object pointer (GPU) */
+    inline const DiseaseParm* getDiseaseParm_d()
+    {
+        BL_PROFILE("AgentContainer::getDiseaseParm_d");
+        return d_parm;
+    }
+
 protected:
+
+    using AgentType = ParticleType;
 
     DiseaseParm* h_parm;    /*!< Disease parameters */
     DiseaseParm* d_parm;    /*!< Disease parameters (GPU device) */
@@ -340,6 +339,19 @@ protected:
     /*! Map of work bins (of agents) indexed by MultiFab iterator and tile index;
         see AgentContainer::interactAgentsHomeWork() */
     std::map<std::pair<int, int>, amrex::DenseBins<AgentContainer::ParticleType> > m_bins_work;
+
+    std::map<std::string,InteractionLocation<AgentContainer,AgentType>*> m_interactions;
+
+    /*! \brief queries if a given interaction type (location) is available */
+    inline bool haveInteractionLoc( const std::string& a_loc_name ) const
+    {
+        BL_PROFILE("AgentContainer::haveInteractionLoc");
+        std::map<std::string,InteractionLocation<AgentContainer,AgentType>*>::const_iterator
+            it(m_interactions.find(a_loc_name));
+        return (it != m_interactions.end());
+    }
+
+
 };
 
 using AgentIterator = typename AgentContainer::ParIterType;
