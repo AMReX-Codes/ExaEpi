@@ -82,26 +82,7 @@ void InteractionLocWork<ACType,AType>::interactAgents(ACType&   a_agents,  /*!< 
         const auto plo = geom.ProbLoArray();
         const auto domain = geom.Domain();
 
-        for(MFIter mfi = a_agents.MakeMFIter(lev, TilingIfNotGPU()); mfi.isValid(); ++mfi)
-        {
-            auto pair_ind = std::make_pair(mfi.index(), mfi.LocalTileIndex());
-            auto bins_ptr = a_agents.getBins(pair_ind, ExaEpi::LocationNames::work);
-
-            auto& ptile = a_agents.ParticlesAt(lev, mfi);
-            auto& aos   = ptile.GetArrayOfStructs();
-            const auto np = aos.numParticles();
-            auto pstruct_ptr = aos().dataPtr();
-
-            const Box& box = mfi.validbox();
-            int ntiles = numTilesInBox(box, true, bin_size);
-
-            auto binner = GetParticleBin{plo, dxi, domain, bin_size, box};
-            if (bins_ptr->numBins() < 0) {
-                bins_ptr->build(BinPolicy::Serial, np, pstruct_ptr, ntiles, binner);
-            }
-            AMREX_ALWAYS_ASSERT(np == bins_ptr->numItems());
-            Gpu::synchronize();
-        }
+        this->makeBins( a_agents, bin_size, lev, ExaEpi::LocationNames::work );
 
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())

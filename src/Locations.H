@@ -8,6 +8,11 @@
 #include <map>
 #include <string>
 
+#include <AMReX_BoxArray.H>
+#include <AMReX_DistributionMapping.H>
+#include <AMReX_Geometry.H>
+#include <AMReX_GpuDevice.H>
+#include <AMReX_IntVect.H>
 #include <AMReX_MultiFab.H>
 #include <AMReX_Particles.H>
 #include "AgentDefinitions.H"
@@ -96,6 +101,43 @@ class InteractionLocation
             //m_timer_ptr = soa.GetRealData(RealIdx::timer).data();
 
             m_prob_ptr = soa.GetRealData(RealIdx::prob).data();
+        }
+
+        /*! \brief Make particle bins for interactions at a given location */
+        virtual void makeBins(  ACType&             a_agents,   /*!< agent container */
+                                const IntVect&      a_bin_size, /*!< bin size */
+                                const int           a_lev,      /*!< level */
+                                const std::string&  a_loc       /*!< location */ )
+        {
+            BL_PROFILE("InteractionLocation::makeBins");
+            const Geometry& geom = a_agents.Geom(a_lev);
+            const auto dxi = geom.InvCellSizeArray();
+            const auto plo = geom.ProbLoArray();
+            const auto domain = geom.Domain();
+
+            for(MFIter mfi = a_agents.MakeMFIter(a_lev, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+
+                auto pair_ind = std::make_pair(mfi.index(), mfi.LocalTileIndex());
+                auto bins_ptr = a_agents.getBins(pair_ind, a_loc);
+
+                if (bins_ptr->numBins() < 0) {
+
+                    auto& ptile = a_agents.ParticlesAt(a_lev, mfi);
+                    auto& aos   = ptile.GetArrayOfStructs();
+                    const auto np = aos.numParticles();
+                    auto pstruct_ptr = aos().dataPtr();
+
+                    const Box& box = mfi.validbox();
+                    int ntiles = numTilesInBox(box, true, a_bin_size);
+
+                    auto binner = GetParticleBin{plo, dxi, domain, a_bin_size, box};
+                    bins_ptr->build(BinPolicy::Serial, np, pstruct_ptr, ntiles, binner);
+
+                    AMREX_ALWAYS_ASSERT(np == bins_ptr->numItems());
+                }
+
+                Gpu::synchronize();
+            }
         }
 
     private:
