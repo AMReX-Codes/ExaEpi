@@ -123,22 +123,22 @@ void InteractionLocSchool<ACType,AType>::interactAgents(ACType&   a_agents,  /*!
             auto inds = bins_ptr->permutationPtr();
             auto offsets = bins_ptr->offsetsPtr();
 
-            auto& soa   = ptile.GetStructOfArrays();
-            auto status_ptr = soa.GetIntData(IntIdx::status).data();
-            auto age_group_ptr = soa.GetIntData(IntIdx::age_group).data();
+            this->getAgentAttribs( a_agents, lev, mfi );
+            auto status_ptr( this->m_status_ptr );
+            auto age_group_ptr( this->m_age_group_ptr );
+            auto family_ptr( this->m_family_ptr );
+            auto nborhood_ptr( this->m_nborhood_ptr );
+            auto school_ptr( this->m_school_ptr );
+            auto withdrawn_ptr( this->m_withdrawn_ptr );
+            auto counter_ptr( this->m_counter_ptr );
+            //auto strain_ptr( this->m_strain_ptr );
+            //auto timer_ptr( this->m_timer_ptr );
+
+            auto prob_ptr( this->m_prob_ptr );
 
             //auto mask_arr = a_mask[mfi].array();
-
-            //auto strain_ptr = soa.GetIntData(IntIdx::strain).data();
-            //auto timer_ptr = soa.GetRealData(RealIdx::timer).data();
-            auto family_ptr = soa.GetIntData(IntIdx::family).data();
-            auto nborhood_ptr = soa.GetIntData(IntIdx::nborhood).data();
-            auto school_ptr = soa.GetIntData(IntIdx::school).data();
-            auto withdrawn_ptr = soa.GetIntData(IntIdx::withdrawn).data();
-            auto prob_ptr = soa.GetRealData(RealIdx::prob).data();
-            auto counter_ptr = soa.GetRealData(RealIdx::disease_counter).data();
-
             auto lparm = a_agents.getDiseaseParm_d();
+
             ParallelForRNG( bins_ptr->numItems(),
                             [=] AMREX_GPU_DEVICE (int ii, RandomEngine const& /*engine*/)
                             noexcept
