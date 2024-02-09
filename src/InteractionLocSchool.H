@@ -17,6 +17,53 @@
 
 using namespace amrex;
 
+/*! \brief One-on-one interaction between an infectious agent and a susceptible agent.
+ *
+ * This function defines the one-on-one interaction between an infectious agent and a
+ * susceptible agent at school. */
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+static void binaryInteractionSchool ( const int a_i,  /*!< Index of infectious agent */
+                                      const int a_j,  /*!< Index of susceptible agent */
+                                      const DiseaseParm* const a_lparm,   /*!< disease paramters */
+                                      const Real a_social_scale,  /*!< Social scale */
+                                      const int* const a_age_group_ptr,   /*!< age group */
+                                      const int* const a_nborhood_ptr,    /*!< neighborhood */
+                                      const int* const a_school_ptr,      /*!< school */
+                                      ParticleReal* const a_prob_ptr      /*!< infection probability */)
+{
+    Real infect = a_lparm->infect;
+    infect *= a_lparm->vac_eff;
+    //infect *= i_mask;
+    //infect *= j_mask;
+    auto prob = a_prob_ptr[a_j];
+    if (a_nborhood_ptr[a_i] == a_nborhood_ptr[a_j]) {
+        if (a_school_ptr[a_i] == a_school_ptr[a_j]) {
+            if (a_school_ptr[a_i] > 5) {
+                /* Playgroup */
+                prob *= 1.0 - infect * a_lparm->xmit_school[6] * a_social_scale;
+            } else if (a_school_ptr[a_i] == 5) {
+                /* Day care */
+                prob *= 1.0 - infect * a_lparm->xmit_school[5] * a_social_scale;
+            }
+        }
+    }
+    /* Elementary/middle/high school in common */
+    if (    (a_school_ptr[a_i] == a_school_ptr[a_j])
+         && (a_school_ptr[a_i] > 0)
+         && (a_school_ptr[a_i] < 5) ) {
+        if (a_age_group_ptr[a_i] <= 1) {  /* Transmitter i is a child */
+            if (a_age_group_ptr[a_j] <= 1) {  /* Receiver j is a child */
+                prob *= 1.0 - infect * a_lparm->xmit_school[a_school_ptr[a_i]] * a_social_scale;
+            } else {  // Child student -> adult teacher/staff transmission
+                prob  *= 1.0 - infect * a_lparm->xmit_sch_c2a[a_school_ptr[a_i]] * a_social_scale;
+            }
+        } else if (a_age_group_ptr[a_j] <= 1) {  // Adult teacher/staff -> child student
+            prob *= 1.0 - infect * a_lparm->xmit_sch_a2c[a_school_ptr[a_i]] * a_social_scale;
+        }
+    }
+    Gpu::Atomic::Multiply(&a_prob_ptr[a_j], prob);
+}
+
 /*! \brief Class describing agent interactions at school */
 template <typename ACType /*!< agent container type */, typename AType /*!< agent type */>
 class InteractionLocSchool : public InteractionLocation<ACType,AType>
@@ -135,6 +182,9 @@ void InteractionLocSchool<ACType,AType>::interactAgents(ACType&   a_agents,  /*!
                      || notSusceptible( i, status_ptr ) )  {
                     return;
                 }
+                if (withdrawn_ptr[i]) {
+                    return;
+                }
 
                 //Real i_mask = mask_arr(home_i_ptr[i], home_j_ptr[i], 0);
                 for (unsigned int jj = cell_start; jj < cell_stop; ++jj) {
@@ -146,96 +196,32 @@ void InteractionLocSchool<ACType,AType>::interactAgents(ACType&   a_agents,  /*!
                          || notSusceptible( j, status_ptr ) )  {
                         continue;
                     }
+                    if (withdrawn_ptr[j]) {
+                        continue;
+                    }
 
                     if ( isInfectious( i, status_ptr,counter_ptr,lparm->incubation_length )
                          && isSusceptible( j, status_ptr ) ) {
 
-                        // i can infect j
-                        Real infect = lparm->infect;
-                        infect *= lparm->vac_eff;
-                        //infect *= i_mask;
-                        //infect *= j_mask;
-
                         Real social_scale = 1.0;  // TODO this should vary based on cell
-
-                        auto prob = prob_ptr[j];
-
-                        if ( (!withdrawn_ptr[i]) && (!withdrawn_ptr[j]) ) {
-
-                            if (nborhood_ptr[i] == nborhood_ptr[j]) {
-                                if (school_ptr[i] == school_ptr[j]) {
-                                    if (school_ptr[i] > 5) {
-                                        /* Playgroup */
-                                        prob *= 1.0 - infect * lparm->xmit_school[6] * social_scale;
-                                    } else if (school_ptr[i] == 5) {
-                                        /* Day care */
-                                        prob *= 1.0 - infect * lparm->xmit_school[5] * social_scale;
-                                    }
-                                }
-                            }
-                            /* Elementary/middle/high school in common */
-                            if (    (school_ptr[i] == school_ptr[j])
-                                 && (school_ptr[i] > 0)
-                                 && (school_ptr[i] < 5) ) {
-                                if (age_group_ptr[i] <= 1) {  /* Transmitter i is a child */
-                                    if (age_group_ptr[j] <= 1) {  /* Receiver j is a child */
-                                        prob *= 1.0 - infect * lparm->xmit_school[school_ptr[i]] * social_scale;
-                                    } else {  // Child student -> adult teacher/staff transmission
-                                        prob  *= 1.0 - infect * lparm->xmit_sch_c2a[school_ptr[i]] * social_scale;
-                                    }
-                                } else if (age_group_ptr[j] <= 1) {  // Adult teacher/staff -> child student
-                                    prob *= 1.0 - infect * lparm->xmit_sch_a2c[school_ptr[i]] * social_scale;
-                                }
-                            }
-                        }
-
-                        Gpu::Atomic::Multiply(&prob_ptr[j], prob);
+                        binaryInteractionSchool(  i, j,
+                                                  lparm, social_scale,
+                                                  age_group_ptr,
+                                                  nborhood_ptr,
+                                                  school_ptr,
+                                                  prob_ptr );
 
                     } else if ( isInfectious( j, status_ptr,counter_ptr,lparm->incubation_length )
                                 && isSusceptible( i, status_ptr ) ) {
 
-                        // j can infect i
-                        Real infect = lparm->infect;
-                        infect *= lparm->vac_eff;
-                        //infect *= i_mask;
-                        //infect *= j_mask;
-
                         Real social_scale = 1.0;  // TODO this should vary based on cell
+                        binaryInteractionSchool(  j, i,
+                                                  lparm, social_scale,
+                                                  age_group_ptr,
+                                                  nborhood_ptr,
+                                                  school_ptr,
+                                                  prob_ptr );
 
-                        auto prob = prob_ptr[i];
-
-                        if ( (!withdrawn_ptr[i]) && (!withdrawn_ptr[j]) ) {
-
-                            /* Neighborhood? */
-                            if (nborhood_ptr[i] == nborhood_ptr[j]) {
-                                if (school_ptr[i] == school_ptr[j]) {
-                                    if (school_ptr[i] > 5) {
-                                        /* Playgroup */
-                                        prob *= 1.0 - infect * lparm->xmit_school[6] * social_scale;
-                                    } else if (school_ptr[i] == 5) {
-                                        /* Day care */
-                                        prob *= 1.0 - infect * lparm->xmit_school[5] * social_scale;
-                                    }
-                                }
-                            }
-
-                            /* Elementary/middle/high school in common */
-                            if (    (school_ptr[i] == school_ptr[j])
-                                 && (school_ptr[i] > 0)
-                                 && (school_ptr[i] < 5) ) {
-                                if (age_group_ptr[i] <= 1) {  /* Receiver i is a child */
-                                    if (age_group_ptr[j] <= 1) {  /* Transmitter j is a child */
-                                        prob *= 1.0 - infect * lparm->xmit_school[school_ptr[i]] * social_scale;
-                                    } else {   // Adult teacher/staff -> child student transmission
-                                        prob *= 1.0 - infect * lparm->xmit_sch_a2c[school_ptr[i]] * social_scale;
-                                    }
-                                } else if (age_group_ptr[j] <= 1) {  // Child student -> adult teacher/staff
-                                    prob *= 1.0 - infect * lparm->xmit_sch_c2a[school_ptr[i]] * social_scale;
-                                }
-                            }
-                        }
-
-                        Gpu::Atomic::Multiply(&prob_ptr[i], prob);
                     }
                 }
             });

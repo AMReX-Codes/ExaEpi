@@ -13,9 +13,86 @@
 #include <AMReX_Particles.H>
 
 #include "Locations.H"
+#include "DiseaseParm.H"
 #include "AgentDefinitions.H"
 
 using namespace amrex;
+
+/*! \brief One-on-one interaction between an infectious agent and a susceptible agent.
+ *
+ * This function defines the one-on-one interaction between an infectious agent and a
+ * susceptible agent at home. */
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+static void binaryInteractionHome ( const int a_i,  /*!< Index of infectious agent */
+                                    const int a_j,  /*!< Index of susceptible agent */
+                                    const DiseaseParm* const a_lparm,   /*!< disease paramters */
+                                    const Real a_social_scale,  /*!< Social scale */
+                                    const int* const a_age_group_ptr,   /*!< age group */
+                                    const int* const a_family_ptr,      /*!< family */
+                                    const int* const a_nborhood_ptr,    /*!< neighborhood */
+                                    const int* const a_school_ptr,      /*!< school */
+                                    const int* const a_withdrawn_ptr,      /*!< quarrantine */
+                                    ParticleReal* const a_prob_ptr      /*!< infection probability */)
+{
+    Real infect = a_lparm->infect;
+    infect *= a_lparm->vac_eff;
+    //infect *= i_mask;
+    //infect *= j_mask;
+    auto prob = a_prob_ptr[a_j];
+    if (     (a_nborhood_ptr[a_i] == a_nborhood_ptr[a_j])
+          && (a_family_ptr[a_i] == a_family_ptr[a_j]) ) {
+        /* at home, within a family */
+        if (a_age_group_ptr[a_i] <= 1) {  /* Transmitter i is a child */
+            if (a_school_ptr[a_i] < 0) { // not attending school, use _SC contacts
+                prob *= 1.0 - infect * a_lparm->xmit_child_SC[a_age_group_ptr[a_j]];
+            } else {
+                prob *= 1.0 - infect * a_lparm->xmit_child[a_age_group_ptr[a_j]];
+            }
+        } else {
+            if (a_school_ptr[a_i] < 0) { // not attending school, use _SC contacts
+                prob *= 1.0 - infect * a_lparm->xmit_adult_SC[a_age_group_ptr[a_j]];
+            } else {
+                prob *= 1.0 - infect * a_lparm->xmit_adult[a_age_group_ptr[a_j]];
+            }
+        }
+    } else if (    (a_nborhood_ptr[a_i] == a_nborhood_ptr[a_j])
+                && (!a_withdrawn_ptr[a_i]) && (!a_withdrawn_ptr[a_j])
+                && ((a_family_ptr[a_i] / 4) == (a_family_ptr[a_j] / 4)) ) {
+        /* check for common neighborhood cluster: */
+        if (a_age_group_ptr[a_i] <= 1) {  /* Transmitter i is a child */
+            if (a_school_ptr[a_i] < 0)  // not attending school, use _SC contacts
+                prob *= 1.0 - infect * a_lparm->xmit_nc_child_SC[a_age_group_ptr[a_j]] * a_social_scale;
+            else
+                prob *= 1.0 - infect * a_lparm->xmit_nc_child[a_age_group_ptr[a_j]] * a_social_scale;
+        } else {
+            if (a_school_ptr[a_i] < 0)  {
+                // not attending school, use _SC contacts
+                prob *= 1.0 - infect * a_lparm->xmit_nc_adult_SC[a_age_group_ptr[a_j]] * a_social_scale;
+            } else {
+                prob *= 1.0 - infect * a_lparm->xmit_nc_adult[a_age_group_ptr[a_j]] * a_social_scale;
+            }
+        }
+    }
+    if ( (!a_withdrawn_ptr[a_i]) && (!a_withdrawn_ptr[a_j]) ) {
+        // school < 0 means a child normally attends school, but not today
+        /* Should always be in the same community = same cell */
+        if (a_school_ptr[a_i] < 0) {  // not attending school, use _SC contacts
+            prob *= 1.0 - infect * a_lparm->xmit_comm_SC[a_age_group_ptr[a_j]] * a_social_scale;
+        } else {
+            prob *= 1.0 - infect * a_lparm->xmit_comm[a_age_group_ptr[a_j]] * a_social_scale;
+        }
+        // /* Neighborhood? */
+        if (a_nborhood_ptr[a_i] == a_nborhood_ptr[a_j]) {
+            if (a_school_ptr[a_i] < 0)  {
+                // not attending school, use _SC contacts
+                prob *= 1.0 - infect * a_lparm->xmit_hood_SC[a_age_group_ptr[a_j]] * a_social_scale;
+            } else {
+                prob *= 1.0 - infect * a_lparm->xmit_hood[a_age_group_ptr[a_j]] * a_social_scale;
+            }
+        }
+    }
+    Gpu::Atomic::Multiply(&a_prob_ptr[a_j], prob);
+}
 
 /*! \brief Class describing agent interactions at home */
 template <typename ACType /*!< agent container type */, typename AType /*!< agent type */>
@@ -153,137 +230,29 @@ void InteractionLocHome<ACType,AType>::interactAgents(ACType&   a_agents,  /*!< 
                     if ( isInfectious( i, status_ptr,counter_ptr,lparm->incubation_length )
                          && isSusceptible( j, status_ptr ) ) {
 
-                        // i can infect j
-                        Real infect = lparm->infect;
-                        infect *= lparm->vac_eff;
-                        //infect *= i_mask;
-                        //infect *= j_mask;
-
                         Real social_scale = 1.0;  // TODO this should vary based on cell
-                        auto prob = prob_ptr[j];
-                        if (     (nborhood_ptr[i] == nborhood_ptr[j])
-                              && (family_ptr[i] == family_ptr[j]) ) {
-                            if (age_group_ptr[i] <= 1) {  /* Transmitter i is a child */
-                                if (school_ptr[i] < 0) { // not attending school, use _SC contacts
-                                    prob *= 1.0 - infect * lparm->xmit_child_SC[age_group_ptr[j]];
-                                } else {
-                                    prob *= 1.0 - infect * lparm->xmit_child[age_group_ptr[j]];
-                                }
-                            }
-                            else {
-                                if (school_ptr[i] < 0) { // not attending school, use _SC contacts
-                                    prob *= 1.0 - infect * lparm->xmit_adult_SC[age_group_ptr[j]];
-                                } else {
-                                    prob *= 1.0 - infect * lparm->xmit_adult[age_group_ptr[j]];
-                                }
-                            }
-                        } else if (    (nborhood_ptr[i] == nborhood_ptr[j])
-                                    && (!withdrawn_ptr[i]) && (!withdrawn_ptr[j])
-                                    && ((family_ptr[i] / 4) == (family_ptr[j] / 4)) ) {
-                            /* check for common neighborhood cluster: */
-                            if (age_group_ptr[i] <= 1) {  /* Transmitter i is a child */
-                                if (school_ptr[i] < 0)  // not attending school, use _SC contacts
-                                    prob *= 1.0 - infect * lparm->xmit_nc_child_SC[age_group_ptr[j]] * social_scale;
-                                else
-                                    prob *= 1.0 - infect * lparm->xmit_nc_child[age_group_ptr[j]] * social_scale;
-                            }
-                            else {
-                                if (school_ptr[i] < 0)  // not attending school, use _SC contacts
-                                    prob *= 1.0 - infect * lparm->xmit_nc_adult_SC[age_group_ptr[j]] * social_scale;
-                                else
-                                    prob *= 1.0 - infect * lparm->xmit_nc_adult[age_group_ptr[j]] * social_scale;
-                            }
-                        }
-
-                        // /* Home isolation or household quarantine? */
-                        if ( (!withdrawn_ptr[i]) && (!withdrawn_ptr[j]) ) {
-                            // school < 0 means a child normally attends school, but not today
-                            /* Should always be in the same community = same cell */
-                            if (school_ptr[i] < 0) {  // not attending school, use _SC contacts
-                                prob *= 1.0 - infect * lparm->xmit_comm_SC[age_group_ptr[j]] * social_scale;
-                            } else {
-                                prob *= 1.0 - infect * lparm->xmit_comm[age_group_ptr[j]] * social_scale;
-                            }
-                            // /* Neighborhood? */
-                            if (nborhood_ptr[i] == nborhood_ptr[j]) {
-                                if (school_ptr[i] < 0)  {
-                                    // not attending school, use _SC contacts
-                                    prob *= 1.0 - infect * lparm->xmit_hood_SC[age_group_ptr[j]] * social_scale;
-                                } else {
-                                    prob *= 1.0 - infect * lparm->xmit_hood[age_group_ptr[j]] * social_scale;
-                                }
-                            }
-                        }
-
-                        Gpu::Atomic::Multiply(&prob_ptr[j], prob);
+                        binaryInteractionHome( i, j,
+                                               lparm, social_scale,
+                                               age_group_ptr,
+                                               family_ptr,
+                                               nborhood_ptr,
+                                               school_ptr,
+                                               withdrawn_ptr,
+                                               prob_ptr );
 
                     } else if ( isInfectious( j, status_ptr,counter_ptr,lparm->incubation_length )
                                 && isSusceptible( i, status_ptr ) ) {
 
-                        // j can infect i
-                        Real infect = lparm->infect;
-                        infect *= lparm->vac_eff;
-                        //infect *= i_mask;
-                        //infect *= j_mask;
-
                         Real social_scale = 1.0;  // TODO this should vary based on cell
-                        auto prob = prob_ptr[i];
-                        /* Determine what connections these individuals have */
-                        if (    (nborhood_ptr[i] == nborhood_ptr[j])
-                             && (family_ptr[i] == family_ptr[j]) ) {
-                            if (age_group_ptr[j] <= 1) {  /* Transmitter j is a child */
-                                if (school_ptr[j] < 0) { // not attending school, use _SC contacts
-                                    prob *= 1.0 - infect * lparm->xmit_child_SC[age_group_ptr[i]];
-                                } else {
-                                    prob *= 1.0 - infect * lparm->xmit_child[age_group_ptr[i]];
-                                }
-                            } else {
-                                if (school_ptr[j] < 0) {  // not attending school, use _SC contacts
-                                    prob *= 1.0 - infect * lparm->xmit_adult_SC[age_group_ptr[i]];
-                                } else {
-                                    prob *= 1.0 - infect * lparm->xmit_adult[age_group_ptr[i]];
-                                }
-                            }
-                        } else if (    (nborhood_ptr[i] == nborhood_ptr[j])
-                                    && (!withdrawn_ptr[i])
-                                    && (!withdrawn_ptr[j])
-                                    && ((family_ptr[i] / 4) == (family_ptr[j] / 4))  ) {
-                            /* check for common neighborhood cluster: */
-                            if (age_group_ptr[j] <= 1) {  /* Transmitter i is a child */
-                                if (school_ptr[j] < 0) { // not attending school, use _SC contacts
-                                    prob *= 1.0 - infect * lparm->xmit_nc_child_SC[age_group_ptr[i]] * social_scale;
-                                } else {
-                                    prob *= 1.0 - infect * lparm->xmit_nc_child[age_group_ptr[i]] * social_scale;
-                                }
-                            } else {
-                                if (school_ptr[j] < 0) {  // not attending school, use _SC contacts
-                                    prob *= 1.0 - infect * lparm->xmit_nc_adult_SC[age_group_ptr[i]] * social_scale;
-                                } else {
-                                    prob *= 1.0 - infect * lparm->xmit_nc_adult[age_group_ptr[i]] * social_scale;
-                                }
-                            }
-                        }
+                        binaryInteractionHome( j, i,
+                                               lparm, social_scale,
+                                               age_group_ptr,
+                                               family_ptr,
+                                               nborhood_ptr,
+                                               school_ptr,
+                                               withdrawn_ptr,
+                                               prob_ptr );
 
-                        if ( (!withdrawn_ptr[i]) && (!withdrawn_ptr[j]) ) {
-                            // school < 0 means a child normally attends school, but not today
-                            /* Should always be in the same community = same cell */
-                            if (school_ptr[j] < 0) {  // not attending school, use _SC contacts
-                                prob *= 1.0 - infect * lparm->xmit_comm_SC[age_group_ptr[i]] * social_scale;
-                            } else {
-                                prob *= 1.0 - infect * lparm->xmit_comm[age_group_ptr[i]] * social_scale;
-                            }
-                            /* Neighborhood? */
-                            if (nborhood_ptr[i] == nborhood_ptr[j]) {
-                                if (school_ptr[j] < 0) { // not attending school, use _SC contacts
-                                    prob *= 1.0 - infect * lparm->xmit_hood_SC[age_group_ptr[i]] * social_scale;
-                                } else {
-                                    prob *= 1.0 - infect * lparm->xmit_hood[age_group_ptr[i]] * social_scale;
-                                }
-                            }
-                        }
-
-
-                        Gpu::Atomic::Multiply(&prob_ptr[i], prob);
                     }
                 }
             });
