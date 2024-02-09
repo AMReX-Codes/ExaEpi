@@ -5,6 +5,8 @@
 #ifndef _AGENT_DEF_H_
 #define _AGENT_DEF_H_
 
+#include <AMReX_Particles.H>
+
 /*! \brief Real-type SoA attributes of agent */
 struct RealIdx
 {
@@ -51,6 +53,47 @@ struct Status
         dead         /*!< passed away */
     };
 };
+
+/*! \brief Is an agent infected but not infectious? */
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+bool notInfectiousButInfected (  const int                  a_idx,      /*!< Agent index */
+                                 const int*                 a_status,   /*!< Status pointer */
+                                 const amrex::ParticleReal* a_counter,  /*!< Counter pointer */
+                                 const amrex::Real          a_incub_len /*!< Disease incubation period */ )
+{
+    return (    (a_status[a_idx] == Status::infected)
+             && (a_counter[a_idx] < a_incub_len) );
+}
+
+/*! \brief Is an agent infectious? */
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+bool isInfectious ( const int                  a_idx,       /*!< Agent index */
+                    const int*                 a_status,    /*!< Status pointer */
+                    const amrex::ParticleReal* a_counter,   /*!< Counter pointer */
+                    const amrex::Real          a_incub_len  /*!< Disease incubation period */ )
+{
+    return (   (a_status[a_idx] == Status::infected)
+            && (a_counter[a_idx] >= a_incub_len) );
+}
+
+/*! \brief Is an agent susceptible? */
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+bool isSusceptible ( const int  a_idx,    /*!< Agent index */
+                     const int* a_status  /*!< Status pointer */ )
+{
+    return (   (a_status[a_idx] != Status::immune)
+            && (a_status[a_idx] != Status::dead)
+            && (a_status[a_idx] != Status::infected) );
+}
+
+/*! \brief Is an agent not susceptible (i.e., dead, immune, or already infected)? */
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+bool notSusceptible ( const int  a_idx,   /*!< Agent index */
+                      const int* a_status /*!< Status pointer */ )
+{
+    return (   (a_status[a_idx] == Status::immune)
+            || (a_status[a_idx] == Status::dead) );
+}
 
 #endif
 

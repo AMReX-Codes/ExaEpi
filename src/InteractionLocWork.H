@@ -129,35 +129,26 @@ void InteractionLocWork<ACType,AType>::interactAgents(ACType&   a_agents,  /*!< 
 
                 AMREX_ALWAYS_ASSERT( (Long) i < np);
 
-                if (status_ptr[i] == Status::immune) {
-                    return;
-                }
-                if (status_ptr[i] == Status::dead) {
-                    return;
-                }
-                if (status_ptr[i] == Status::infected && counter_ptr[i] < lparm->incubation_length) {
-                    // incubation stage
+                if ( notInfectiousButInfected( i, status_ptr, counter_ptr, lparm->incubation_length )
+                     || notSusceptible( i, status_ptr ) )  {
                     return;
                 }
 
                 //Real i_mask = mask_arr(home_i_ptr[i], home_j_ptr[i], 0);
                 for (unsigned int jj = cell_start; jj < cell_stop; ++jj) {
+
                     auto j = inds[jj];
                     AMREX_ALWAYS_ASSERT( (Long) j < np);
+
                     //Real j_mask = mask_arr(home_i_ptr[j], home_j_ptr[j], 0);
-                    if (status_ptr[j] == Status::immune) {
-                        continue;
-                    }
-                    if (status_ptr[j] == Status::dead) {
-                        continue;
-                    }
-                    if (status_ptr[j] == Status::infected && counter_ptr[j] < lparm->incubation_length) {
-                        // incubation stage
+
+                    if ( notInfectiousButInfected( j, status_ptr,counter_ptr,lparm->incubation_length )
+                         || notSusceptible( j, status_ptr ) )  {
                         continue;
                     }
 
-                    if (status_ptr[i] == Status::infected &&
-                        (status_ptr[j] != Status::infected && status_ptr[j] != Status::dead)) {
+                    if ( isInfectious( i, status_ptr,counter_ptr,lparm->incubation_length )
+                         && isSusceptible( j, status_ptr ) ) {
 
                         // i can infect j
                         Real infect = lparm->infect;
@@ -197,13 +188,8 @@ void InteractionLocWork<ACType,AType>::interactAgents(ACType&   a_agents,  /*!< 
 
                         Gpu::Atomic::Multiply(&prob_ptr[j], prob);
 
-                    } else if (status_ptr[j] == Status::infected &&
-                               (status_ptr[i] != Status::infected && status_ptr[i] != Status::dead)) {
-
-                        if (counter_ptr[j] < lparm->incubation_length) {
-                            // TODO: this is already checked above?
-                            continue;
-                        }
+                    } else if ( isInfectious( j, status_ptr,counter_ptr,lparm->incubation_length )
+                                && isSusceptible( i, status_ptr ) ) {
 
                         // j can infect i
                         Real infect = lparm->infect;
