@@ -1214,6 +1214,7 @@ void AgentContainer::interactAgentsHomeWork ( MultiFab& /*mask_behavior*/ /*!< M
 
                 AMREX_ALWAYS_ASSERT( (Long) i < np);
                 if (status_ptr[i] == Status::immune) { return; }
+                if (status_ptr[i] == Status::dead) { return; }
                 if (status_ptr[i] == Status::infected && counter_ptr[i] < lparm->incubation_length) { return; }  // incubation stage
                 //amrex::Real i_mask = mask_arr(home_i_ptr[i], home_j_ptr[i], 0);
                 for (unsigned int jj = cell_start; jj < cell_stop; ++jj) {
@@ -1221,7 +1222,8 @@ void AgentContainer::interactAgentsHomeWork ( MultiFab& /*mask_behavior*/ /*!< M
                     AMREX_ALWAYS_ASSERT( (Long) j < np);
                     //amrex::Real j_mask = mask_arr(home_i_ptr[j], home_j_ptr[j], 0);
                     if (status_ptr[j] == Status::immune) {continue;}
-                    if (status_ptr[i] == Status::infected && counter_ptr[j] < lparm->incubation_length) { continue; }  // incubation stage
+                    if (status_ptr[j] == Status::dead) {continue;}
+                    if (status_ptr[j] == Status::infected && counter_ptr[j] < lparm->incubation_length) { continue; }  // incubation stage
 
                     if (status_ptr[i] == Status::infected &&
                         (status_ptr[j] != Status::infected && status_ptr[j] != Status::dead)) {
