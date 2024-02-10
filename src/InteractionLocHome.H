@@ -5,13 +5,6 @@
 #ifndef _INTERACTION_LOC_HOME_H_
 #define _INTERACTION_LOC_HOME_H_
 
-#include <AMReX_BoxArray.H>
-#include <AMReX_DistributionMapping.H>
-#include <AMReX_Geometry.H>
-#include <AMReX_GpuDevice.H>
-#include <AMReX_IntVect.H>
-#include <AMReX_Particles.H>
-
 #include "Locations.H"
 #include "DiseaseParm.H"
 #include "AgentDefinitions.H"
