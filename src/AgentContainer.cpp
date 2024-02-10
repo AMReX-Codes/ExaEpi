@@ -1067,7 +1067,7 @@ std::array<Long, 5> AgentContainer::printTotals () {
  * + Move agents to work
  * + Simulate interactions during morning commute (public transit/carpool/etc ?)
 */
-void AgentContainer::morningCommute ( MultiFab& a_mask_behavior /*!< Masking behavior */ )
+void AgentContainer::morningCommute ( MultiFab& /*a_mask_behavior*/ /*!< Masking behavior */ )
 {
     BL_PROFILE("AgentContainer::morningCommute");
     //if (haveInteractionLoc(ExaEpi::LocationNames::transit)) {
@@ -1082,7 +1082,7 @@ void AgentContainer::morningCommute ( MultiFab& a_mask_behavior /*!< Masking beh
  * + Simulate interactions at locations agents may stop by on their way home
  * + Move agents to home
 */
-void AgentContainer::eveningCommute ( MultiFab& a_mask_behavior /*!< Masking behavior */ )
+void AgentContainer::eveningCommute ( MultiFab& /*a_mask_behavior*/ /*!< Masking behavior */ )
 {
     BL_PROFILE("AgentContainer::eveningCommute");
     //if (haveInteractionLoc(ExaEpi::LocationNames::transit)) {
@@ -1107,7 +1107,7 @@ void AgentContainer::interactDay ( MultiFab& a_mask_behavior /*!< Masking behavi
 }
 
 /*! \brief Interaction of agents during evening (after work) - social stuff */
-void AgentContainer::interactEvening ( MultiFab& a_mask_behavior /*!< Masking behavior */ )
+void AgentContainer::interactEvening ( MultiFab& /*a_mask_behavior*/ /*!< Masking behavior */ )
 {
     BL_PROFILE("AgentContainer::interactEvening");
 }

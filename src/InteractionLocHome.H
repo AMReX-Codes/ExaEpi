@@ -150,7 +150,7 @@ class InteractionLocHome : public InteractionLocation<ACType,AType>
 */
 template <typename ACType, typename AType>
 void InteractionLocHome<ACType,AType>::interactAgents(ACType&   a_agents,  /*!< Agent container */
-                                                      MultiFab& a_mask     /*!< Masking behavior */)
+                                                      MultiFab& /*a_mask*/     /*!< Masking behavior */)
 {
     BL_PROFILE("InteractionLocHome::interactAgents");
 

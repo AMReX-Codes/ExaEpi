@@ -120,7 +120,7 @@ class InteractionLocWork : public InteractionLocation<ACType,AType>
 */
 template <typename ACType, typename AType>
 void InteractionLocWork<ACType,AType>::interactAgents(ACType&   a_agents,  /*!< Agent container */
-                                                      MultiFab& a_mask     /*!< Masking behavior */)
+                                                      MultiFab& /*a_mask*/     /*!< Masking behavior */)
 {
     BL_PROFILE("InteractionLocWork::interactAgents");
 

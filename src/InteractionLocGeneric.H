@@ -58,7 +58,7 @@ class InteractionLocGeneric : public InteractionLocation<ACType,AType>
 */
 template <typename ACType, typename AType>
 void InteractionLocGeneric<ACType,AType>::interactAgents(ACType&   a_agents,  /*!< Agent container */
-                                                         MultiFab& a_mask     /*!< Masking behavior */)
+                                                         MultiFab& /* a_mask */  /*!< Masking behavior */)
 {
     BL_PROFILE("InteractionLocGeneric::interactAgents");
 

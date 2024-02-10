@@ -119,7 +119,7 @@ class InteractionLocSchool : public InteractionLocation<ACType,AType>
 */
 template <typename ACType, typename AType>
 void InteractionLocSchool<ACType,AType>::interactAgents(ACType&   a_agents,  /*!< Agent container */
-                                                        MultiFab& a_mask     /*!< Masking behavior */)
+                                                        MultiFab& /*a_mask*/     /*!< Masking behavior */)
 {
     BL_PROFILE("InteractionLocSchool::interactAgents");
 
@@ -154,7 +154,6 @@ void InteractionLocSchool<ACType,AType>::interactAgents(ACType&   a_agents,  /*!
             this->getAgentAttribs( a_agents, lev, mfi );
             auto status_ptr( this->m_status_ptr );
             auto age_group_ptr( this->m_age_group_ptr );
-            auto family_ptr( this->m_family_ptr );
             auto nborhood_ptr( this->m_nborhood_ptr );
             auto school_ptr( this->m_school_ptr );
             auto withdrawn_ptr( this->m_withdrawn_ptr );

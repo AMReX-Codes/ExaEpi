@@ -29,8 +29,8 @@ namespace ExaEpi
         const std::string work = "work";
         const std::string school = "school";
         const std::string transit = "transit";
-    };
-};
+    }
+}
 
 /*! \brief Base class for defining locations and agent interactions at them
  *
