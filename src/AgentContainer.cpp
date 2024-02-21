@@ -1209,6 +1209,7 @@ void AgentContainer::interactAgentsHomeWork ( MultiFab& /*mask_behavior*/ /*!< M
 
                 AMREX_ALWAYS_ASSERT( (Long) i < np);
                 if (status_ptr[i] == Status::immune) { return; }
+                if (status_ptr[i] == Status::dead) { return; }
                 if (status_ptr[i] == Status::infected && counter_ptr[i] < lparm->incubation_length) { return; }  // incubation stage
                 //amrex::Real i_mask = mask_arr(home_i_ptr[i], home_j_ptr[i], 0);
                 for (unsigned int jj = cell_start; jj < cell_stop; ++jj) {
@@ -1216,7 +1217,8 @@ void AgentContainer::interactAgentsHomeWork ( MultiFab& /*mask_behavior*/ /*!< M
                     AMREX_ALWAYS_ASSERT( (Long) j < np);
                     //amrex::Real j_mask = mask_arr(home_i_ptr[j], home_j_ptr[j], 0);
                     if (status_ptr[j] == Status::immune) {continue;}
-                    if (status_ptr[i] == Status::infected && counter_ptr[j] < lparm->incubation_length) { continue; }  // incubation stage
+                    if (status_ptr[j] == Status::dead) {continue;}
+                    if (status_ptr[j] == Status::infected && counter_ptr[j] < lparm->incubation_length) { continue; }  // incubation stage
 
                     if (status_ptr[i] == Status::infected &&
                         (status_ptr[j] != Status::infected && status_ptr[j] != Status::dead)) {
@@ -1229,7 +1231,7 @@ void AgentContainer::interactAgentsHomeWork ( MultiFab& /*mask_behavior*/ /*!< M
                         amrex::Real social_scale = 1.0;  // TODO this should vary based on cell
                         amrex::Real work_scale = 1.0;  // TODO this should vary based on cell
 
-                        auto prob = 1.0;
+                        amrex::ParticleReal prob = 1.0;
                         /* Determine what connections these individuals have */
                         if ((nborhood_ptr[i] == nborhood_ptr[j]) && (family_ptr[i] == family_ptr[j]) && (!DAYTIME)) {
                             if (age_group_ptr[i] <= 1) {  /* Transmitter i is a child */
@@ -1325,7 +1327,7 @@ void AgentContainer::interactAgentsHomeWork ( MultiFab& /*mask_behavior*/ /*!< M
                         amrex::Real social_scale = 1.0;  // TODO this should vary based on cell
                         amrex::Real work_scale = 1.0;  // TODO this should vary based on cell
 
-                        auto prob = 1.0;
+                        amrex::ParticleReal prob = 1.0;
                         /* Determine what connections these individuals have */
                         if ((nborhood_ptr[i] == nborhood_ptr[j]) && (family_ptr[i] == family_ptr[j]) && (! DAYTIME)) {
                             if (age_group_ptr[j] <= 1) {  /* Transmitter j is a child */
