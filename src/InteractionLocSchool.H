@@ -28,7 +28,7 @@ static void binaryInteractionSchool ( const int a_i,  /*!< Index of infectious a
     infect *= a_lparm->vac_eff;
     //infect *= i_mask;
     //infect *= j_mask;
-    auto prob = a_prob_ptr[a_j];
+    ParticleReal prob = 1.0;
     if (a_nborhood_ptr[a_i] == a_nborhood_ptr[a_j]) {
         if (a_school_ptr[a_i] == a_school_ptr[a_j]) {
             if (a_school_ptr[a_i] > 5) {

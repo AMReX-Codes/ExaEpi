@@ -31,7 +31,7 @@ static void binaryInteractionWork ( const int a_i,  /*!< Index of infectious age
     infect *= a_lparm->vac_eff;
     //infect *= i_mask;
     //infect *= j_mask;
-    auto prob = a_prob_ptr[a_j];
+    ParticleReal prob = 1.0;
 
     /* Workgroup transmission */
     if (a_workgroup_ptr[a_i] && (a_work_i_ptr[a_i] >= 0)) { // transmitter i at work

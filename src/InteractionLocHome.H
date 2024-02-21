@@ -31,7 +31,7 @@ static void binaryInteractionHome ( const int a_i,  /*!< Index of infectious age
     infect *= a_lparm->vac_eff;
     //infect *= i_mask;
     //infect *= j_mask;
-    auto prob = a_prob_ptr[a_j];
+    ParticleReal prob = 1.0;
     if (     (a_nborhood_ptr[a_i] == a_nborhood_ptr[a_j])
           && (a_family_ptr[a_i] == a_family_ptr[a_j]) ) {
         /* at home, within a family */
