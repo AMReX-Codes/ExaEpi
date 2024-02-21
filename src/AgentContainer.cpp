@@ -646,8 +646,6 @@ void AgentContainer::moveAgentsToWork ()
 {
     BL_PROFILE("AgentContainer::moveAgentsToWork");
 
-    amrex::Print() << " moving agents to work. \n";
-
     for (int lev = 0; lev <= finestLevel(); ++lev)
     {
         const auto dx = Geom(lev).CellSizeArray();
@@ -687,8 +685,6 @@ void AgentContainer::moveAgentsToWork ()
 void AgentContainer::moveAgentsToHome ()
 {
     BL_PROFILE("AgentContainer::moveAgentsToHome");
-
-    amrex::Print() << " moving agents to home. \n";
 
     for (int lev = 0; lev <= finestLevel(); ++lev)
     {
@@ -1204,8 +1200,7 @@ void AgentContainer::interactAgentsHomeWork ( MultiFab& /*mask_behavior*/ /*!< M
             auto counter_ptr = soa.GetRealData(RealIdx::disease_counter).data();
 
             auto* lparm = d_parm;
-            amrex::ParallelForRNG( bins_ptr->numItems(),
-                                   [=] AMREX_GPU_DEVICE (int ii, amrex::RandomEngine const& /*engine*/) noexcept
+            amrex::ParallelFor( bins_ptr->numItems(), [=] AMREX_GPU_DEVICE (int ii) noexcept
             {
                 auto i = inds[ii];
                 int i_cell = binner(pstruct_ptr[i]);
@@ -1234,7 +1229,7 @@ void AgentContainer::interactAgentsHomeWork ( MultiFab& /*mask_behavior*/ /*!< M
                         amrex::Real social_scale = 1.0;  // TODO this should vary based on cell
                         amrex::Real work_scale = 1.0;  // TODO this should vary based on cell
 
-                        auto prob = prob_ptr[j];
+                        auto prob = 1.0;
                         /* Determine what connections these individuals have */
                         if ((nborhood_ptr[i] == nborhood_ptr[j]) && (family_ptr[i] == family_ptr[j]) && (!DAYTIME)) {
                             if (age_group_ptr[i] <= 1) {  /* Transmitter i is a child */
@@ -1330,7 +1325,7 @@ void AgentContainer::interactAgentsHomeWork ( MultiFab& /*mask_behavior*/ /*!< M
                         amrex::Real social_scale = 1.0;  // TODO this should vary based on cell
                         amrex::Real work_scale = 1.0;  // TODO this should vary based on cell
 
-                        auto prob = prob_ptr[i];
+                        auto prob = 1.0;
                         /* Determine what connections these individuals have */
                         if ((nborhood_ptr[i] == nborhood_ptr[j]) && (family_ptr[i] == family_ptr[j]) && (! DAYTIME)) {
                             if (age_group_ptr[j] <= 1) {  /* Transmitter j is a child */
