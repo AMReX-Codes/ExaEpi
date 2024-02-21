@@ -1236,7 +1236,7 @@ void AgentContainer::interactAgentsHomeWork ( MultiFab& /*mask_behavior*/ /*!< M
                         amrex::Real social_scale = 1.0;  // TODO this should vary based on cell
                         amrex::Real work_scale = 1.0;  // TODO this should vary based on cell
 
-                        auto prob = 1.0;
+                        amrex::ParticleReal prob = 1.0;
                         /* Determine what connections these individuals have */
                         if ((nborhood_ptr[i] == nborhood_ptr[j]) && (family_ptr[i] == family_ptr[j]) && (!DAYTIME)) {
                             if (age_group_ptr[i] <= 1) {  /* Transmitter i is a child */
@@ -1332,7 +1332,7 @@ void AgentContainer::interactAgentsHomeWork ( MultiFab& /*mask_behavior*/ /*!< M
                         amrex::Real social_scale = 1.0;  // TODO this should vary based on cell
                         amrex::Real work_scale = 1.0;  // TODO this should vary based on cell
 
-                        auto prob = 1.0;
+                        amrex::ParticleReal prob = 1.0;
                         /* Determine what connections these individuals have */
                         if ((nborhood_ptr[i] == nborhood_ptr[j]) && (family_ptr[i] == family_ptr[j]) && (! DAYTIME)) {
                             if (age_group_ptr[j] <= 1) {  /* Transmitter j is a child */
