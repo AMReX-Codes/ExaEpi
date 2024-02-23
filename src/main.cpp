@@ -152,7 +152,7 @@ void runAgent ()
         BL_PROFILE_REGION("Evolution");
         for (int i = 0; i < params.nsteps; ++i)
         {
-            amrex::Print() << "Taking step " << i << "\n";
+            amrex::Print() << "Simulating day " << i << "\n";
 
             if ((params.plot_int > 0) && (i % params.plot_int == 0)) {
                 ExaEpi::IO::writePlotFile(pc, num_residents, unit_mf, FIPS_mf, comm_mf, cur_time, i);
@@ -181,11 +181,12 @@ void runAgent ()
             }
             cumulative_deaths = counts[4];
 
-            amrex::Print() << "Total never: "       << counts[0] << "\n";
-            amrex::Print() << "Total infected: "    << counts[1] << "\n";
-            amrex::Print() << "Total immune: "      << counts[2] << "\n";
-            amrex::Print() << "Total susceptible: " << counts[3] << "\n";
-            amrex::Print() << "Total deaths: "      << counts[4] << "\n";
+            amrex::Print() << "    Total never: "       << counts[0] << "\n";
+            amrex::Print() << "    Total infected: "    << counts[1] << "\n";
+            amrex::Print() << "    Total immune: "      << counts[2] << "\n";
+         // amrex::Print() << "    Total susceptible: " << counts[3] << "\n";
+            amrex::Print() << "    Total deaths: "      << counts[4] << "\n";
+            amrex::Print() << "\n";
 
             cur_time += 1.0; // time step is one day
         }
@@ -193,7 +194,7 @@ void runAgent ()
 
     amrex::Print() << "\n \n";
     amrex::Print() << "Peak number of infected: " << num_infected_peak << "\n";
-    amrex::Print() << "Day of peak: " << step_of_peak / 2 << "\n";
+    amrex::Print() << "Day of peak: " << step_of_peak << "\n";
     amrex::Print() << "Cumulative deaths: " << cumulative_deaths << "\n";
     amrex::Print() << "\n \n";
 
