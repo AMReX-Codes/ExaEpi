@@ -644,8 +644,6 @@ void AgentContainer::moveAgentsToWork ()
 {
     BL_PROFILE("AgentContainer::moveAgentsToWork");
 
-    amrex::Print() << " moving agents to work. \n";
-
     for (int lev = 0; lev <= finestLevel(); ++lev)
     {
         const auto dx = Geom(lev).CellSizeArray();
@@ -687,8 +685,6 @@ void AgentContainer::moveAgentsToWork ()
 void AgentContainer::moveAgentsToHome ()
 {
     BL_PROFILE("AgentContainer::moveAgentsToHome");
-
-    amrex::Print() << " moving agents to home. \n";
 
     for (int lev = 0; lev <= finestLevel(); ++lev)
     {

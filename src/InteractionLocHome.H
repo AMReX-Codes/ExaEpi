@@ -109,8 +109,6 @@ class InteractionLocHome : public InteractionLocation<ACType,AType>
         + If the agent is #Status::immune, do nothing.
         + If the agent is #Status::infected with the number of days infected (RealIdx::disease_counter)
           less than the #DiseaseParm::incubation_length, do nothing.
-        + If *i* is infected and *j* is not infected, compute probability of *j* getting infected from i
-          (see below).
         + Else if *i* is not infected and *j* is infected, compute probability of *i* getting infected
           from *j* (see below).
 
@@ -196,27 +194,15 @@ void InteractionLocHome<ACType,AType>::interactAgents(ACType&   a_agents,  /*!< 
                     AMREX_ALWAYS_ASSERT( (Long) j < np);
 
                     //Real j_mask = mask_arr(home_i_ptr[j], home_j_ptr[j], 0);
+                    if (i == j) continue;
 
                     if ( notInfectiousButInfected( j, status_ptr,counter_ptr,lparm->incubation_length )
                          || notSusceptible( j, status_ptr ) )  {
                         continue;
                     }
 
-                    if ( isInfectious( i, status_ptr,counter_ptr,lparm->incubation_length )
-                         && isSusceptible( j, status_ptr ) ) {
-
-                        Real social_scale = 1.0;  // TODO this should vary based on cell
-                        binaryInteractionHome( i, j,
-                                               lparm, social_scale,
-                                               age_group_ptr,
-                                               family_ptr,
-                                               nborhood_ptr,
-                                               school_ptr,
-                                               withdrawn_ptr,
-                                               prob_ptr );
-
-                    } else if ( isInfectious( j, status_ptr,counter_ptr,lparm->incubation_length )
-                                && isSusceptible( i, status_ptr ) ) {
+                    if ( isInfectious( j, status_ptr,counter_ptr,lparm->incubation_length )
+                         && isSusceptible( i, status_ptr ) ) {
 
                         Real social_scale = 1.0;  // TODO this should vary based on cell
                         binaryInteractionHome( j, i,
