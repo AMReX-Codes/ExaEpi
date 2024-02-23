@@ -18,13 +18,9 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE
 static void binaryInteractionWork ( const int a_i,  /*!< Index of infectious agent */
                                     const int a_j,  /*!< Index of susceptible agent */
                                     const DiseaseParm* const a_lparm,  /*!< disease paramters */
-                                    const Real a_social_scale,  /*!< Social scale */
                                     const Real a_work_scale,  /*!< Work scale */
-                                    const int* const a_age_group_ptr,   /*!< age group */
                                     const int* const a_work_i_ptr,  /*!< workgroup */
                                     const int* const a_workgroup_ptr,   /*!< workgroup */
-                                    const int* const a_nborhood_ptr,    /*!< neighborhood */
-                                    const int* const a_school_ptr,      /*!< school */
                                     ParticleReal* const a_prob_ptr      /*!< infection probability */)
 {
     Real infect = a_lparm->infect;
@@ -128,9 +124,6 @@ void InteractionLocWork<ACType,AType>::interactAgents(ACType&   a_agents,  /*!< 
 
             this->getAgentAttribs( a_agents, lev, mfi );
             auto status_ptr( this->m_status_ptr );
-            auto age_group_ptr( this->m_age_group_ptr );
-            auto nborhood_ptr( this->m_nborhood_ptr );
-            auto school_ptr = ( this->m_school_ptr );
             auto work_i_ptr( this->m_work_i_ptr );
             auto workgroup_ptr( this->m_workgroup_ptr );
             auto withdrawn_ptr( this->m_withdrawn_ptr );
@@ -181,13 +174,10 @@ void InteractionLocWork<ACType,AType>::interactAgents(ACType&   a_agents,  /*!< 
                     if ( isInfectious( j, status_ptr,counter_ptr,lparm->incubation_length )
                          && isSusceptible( i, status_ptr ) ) {
 
-                        Real social_scale = 1.0;  // TODO this should vary based on cell
                         Real work_scale = 1.0;  // TODO this should vary based on cell
                         binaryInteractionWork(  j, i,
-                                                lparm, social_scale, work_scale,
-                                                age_group_ptr,
+                                                lparm, work_scale,
                                                 work_i_ptr, workgroup_ptr,
-                                                nborhood_ptr, school_ptr,
                                                 prob_ptr );
 
                     }
