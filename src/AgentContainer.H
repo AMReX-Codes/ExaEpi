@@ -229,6 +229,7 @@ public:
             m_interactions[LocationNames::home] = new InteractionLocHome<AgentContainer,AgentType>;
             m_interactions[LocationNames::work] = new InteractionLocWork<AgentContainer,AgentType>;
             m_interactions[LocationNames::school] = new InteractionLocSchool<AgentContainer,AgentType>;
+            m_interactions[LocationNames::nborhood] = new InteractionLocNborhood<AgentContainer,AgentType>;
         }
 
         {
@@ -313,6 +314,9 @@ public:
         } else if (    (a_loc_name == ExaEpi::LocationNames::work)
                     || (a_loc_name == ExaEpi::LocationNames::school) ) {
             return &m_bins_work[a_idx];
+        } else if (a_loc_name == ExaEpi::LocationNames::nborhood) {
+            if (m_at_work) { return &m_bins_work[a_idx]; }
+            else           { return &m_bins_home[a_idx]; }
         } else {
             amrex::Abort("Invalid a_loc_name!");
             return nullptr;
@@ -341,6 +345,9 @@ protected:
     std::map<std::pair<int, int>, amrex::DenseBins<AgentContainer::ParticleType> > m_bins_work;
 
     std::map<std::string,InteractionLocation<AgentContainer,AgentType>*> m_interactions;
+
+    /*! Flag to indicate if agents are at work */
+    bool m_at_work;
 
     /*! \brief queries if a given interaction type (location) is available */
     inline bool haveInteractionLoc( const std::string& a_loc_name ) const

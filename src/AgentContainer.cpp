@@ -676,6 +676,8 @@ void AgentContainer::moveAgentsToWork ()
             });
         }
     }
+
+    m_at_work = true;
 }
 
 /*! \brief Move agents to home
@@ -718,6 +720,8 @@ void AgentContainer::moveAgentsToHome ()
             });
         }
     }
+
+    m_at_work = false;
 }
 
 /*! \brief Move agents randomly
@@ -1104,6 +1108,9 @@ void AgentContainer::interactDay ( MultiFab& a_mask_behavior /*!< Masking behavi
     if (haveInteractionLoc(ExaEpi::LocationNames::school)) {
         m_interactions[ExaEpi::LocationNames::school]->interactAgents( *this, a_mask_behavior );
     }
+    if (haveInteractionLoc(ExaEpi::LocationNames::nborhood)) {
+        m_interactions[ExaEpi::LocationNames::nborhood]->interactAgents( *this, a_mask_behavior );
+    }
 }
 
 /*! \brief Interaction of agents during evening (after work) - social stuff */
@@ -1118,5 +1125,8 @@ void AgentContainer::interactNight ( MultiFab& a_mask_behavior /*!< Masking beha
     BL_PROFILE("AgentContainer::interactNight");
     if (haveInteractionLoc(ExaEpi::LocationNames::home)) {
         m_interactions[ExaEpi::LocationNames::home]->interactAgents( *this, a_mask_behavior );
+    }
+    if (haveInteractionLoc(ExaEpi::LocationNames::nborhood)) {
+        m_interactions[ExaEpi::LocationNames::nborhood]->interactAgents( *this, a_mask_behavior );
     }
 }

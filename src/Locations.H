@@ -1,6 +1,5 @@
 /*! @file Locations.H
- *  \brief Defines interaction for various locations
- */
+    \brief Defines interaction for various locations */
 
 #ifndef _LOCATIONS_H_
 #define _LOCATIONS_H_
@@ -28,6 +27,7 @@ namespace ExaEpi
         const std::string home = "home";
         const std::string work = "work";
         const std::string school = "school";
+        const std::string nborhood = "neighborhood";
         const std::string transit = "transit";
     }
 }

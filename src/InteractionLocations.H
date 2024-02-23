@@ -7,7 +7,8 @@
 #include "Locations.H"
 #include "InteractionLocGeneric.H"
 #include "InteractionLocHome.H"
-#include "InteractionLocWork.H"
+#include "InteractionLocNborhood.H"
 #include "InteractionLocSchool.H"
+#include "InteractionLocWork.H"
 
 #endif

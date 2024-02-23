@@ -40,23 +40,6 @@ static void binaryInteractionWork ( const int a_i,  /*!< Index of infectious age
         }
     }
 
-    // school < 0 means a child normally attends school, but not today
-    /* Should always be in the same community = same cell */
-    if (a_school_ptr[a_i] < 0) {  // not attending school, use _SC contacts
-        prob *= 1.0 - infect * a_lparm->xmit_comm_SC[a_age_group_ptr[a_j]] * a_social_scale;
-    } else {
-        prob *= 1.0 - infect * a_lparm->xmit_comm[a_age_group_ptr[a_j]] * a_social_scale;
-    }
-    // /* Neighborhood? */
-    if (a_nborhood_ptr[a_i] == a_nborhood_ptr[a_j]) {
-        if (a_school_ptr[a_i] < 0)  {
-            // not attending school, use _SC contacts
-            prob *= 1.0 - infect * a_lparm->xmit_hood_SC[a_age_group_ptr[a_j]] * a_social_scale;
-        } else {
-            prob *= 1.0 - infect * a_lparm->xmit_hood[a_age_group_ptr[a_j]] * a_social_scale;
-        }
-    }
-
     Gpu::Atomic::Multiply(&a_prob_ptr[a_j], prob);
 }
 
