@@ -337,6 +337,14 @@ public:
 
     std::array<amrex::Long, 5> printTotals ();
 
+    const DiseaseParm * getDiseaseParameters_h () const {
+        return h_parm;
+    }
+
+    const DiseaseParm * getDiseaseParameters_d () const {
+        return d_parm;
+    }
+
 protected:
 
     DiseaseParm* h_parm;    /*!< Disease parameters */

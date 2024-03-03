@@ -273,9 +273,15 @@ namespace Initialization
 
             auto status_ptr = soa.GetIntData(IntIdx::status).data();
             auto counter_ptr = soa.GetRealData(RealIdx::disease_counter).data();
+            auto incubation_period_ptr = soa.GetRealData(RealIdx::incubation_period).data();
+            auto infectious_period_ptr = soa.GetRealData(RealIdx::infectious_period).data();
+            auto symptomdev_period_ptr = soa.GetRealData(RealIdx::symptomdev_period).data();
+
             //auto unit_arr = unit_mf[mfi].array();
             auto comm_arr = comm_mf[mfi].array();
             auto bx = mfi.tilebox();
+
+            const auto* lparm = pc.getDiseaseParameters_d();
 
             Gpu::DeviceScalar<int> num_infected_d(num_infected);
             int* num_infected_p = num_infected_d.dataPtr();
@@ -310,6 +316,9 @@ namespace Initialization
                     } else {
                         status_ptr[pindex] = Status::infected;
                         counter_ptr[pindex] = 0;
+                        incubation_period_ptr[pindex] = amrex::RandomNormal(lparm->incubation_length_mean, lparm->incubation_length_std, engine);
+                        infectious_period_ptr[pindex] = amrex::RandomNormal(lparm->infectious_length_mean, lparm->infectious_length_std, engine);
+                        symptomdev_period_ptr[pindex] = amrex::RandomNormal(lparm->symptomdev_length_mean, lparm->symptomdev_length_std, engine);
                         ++ni;
                     }
                 }

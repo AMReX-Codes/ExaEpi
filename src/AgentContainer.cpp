@@ -838,7 +838,7 @@ void AgentContainer::updateStatus (MultiFab& disease_stats /*!< Community-wise d
                         // incubation phase
                         return;
                     }
-                    if (counter_ptr[i] == incubation_period_ptr[i]) {
+                    if (counter_ptr[i] == amrex::Math::ceil(incubation_period_ptr[i])) {
                         // decide if hospitalized
                         Real p_hosp = CHR[age_group_ptr[i]];
                         if (amrex::Random(engine) < p_hosp) {
@@ -928,7 +928,7 @@ void AgentContainer::updateStatus (MultiFab& disease_stats /*!< Community-wise d
                             }
                         }
                         else { // not hospitalized, recover once not infectious
-                            if (counter_ptr[i] == incubation_period_ptr[i] + infectious_period_ptr[i]) {
+                            if (counter_ptr[i] >= (incubation_period_ptr[i] + infectious_period_ptr[i])) {
                                 status_ptr[i] = Status::immune;
                             }
                         }
