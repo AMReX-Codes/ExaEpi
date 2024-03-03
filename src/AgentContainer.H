@@ -173,6 +173,9 @@ struct RealIdx
         disease_counter = 0,    /*!< Counter since start of infection */
         treatment_timer,        /*!< Timer since hospital admission */
         prob,                   /*!< Probability of infection */
+        incubation_period,      /*!< Time until infectious */
+        infectious_period,       /*!< Length of time infectious */
+        symptomdev_period,       /*!< Time until symptoms would develop */
         nattribs                /*!< number of real-type attribute*/
     };
 };
@@ -205,7 +208,8 @@ struct IntIdx
         school,         /*!< school type (elementary, middle, high, none) */
         workgroup,      /*!< workgroup ID */
         work_nborhood,  /*!< work neighborhood ID */
-        withdrawn,      /*!< quarrantine status */
+        withdrawn,      /*!< quarantine status */
+        symptomatic,    /*!< currently symptomatic? */
         nattribs        /*!< number of integer-type attribute */
     };
 };
@@ -284,9 +288,13 @@ public:
                 h_parm->reduced_inf[i] = reduced_inf[i];
             }
 
-            pp.query("incubation_length", h_parm->incubation_length);
-            pp.query("infectious_length", h_parm->infectious_length);
-            pp.query("symptomatic_length", h_parm->symptomatic_length);
+            pp.query("incubation_length_mean", h_parm->incubation_length_mean);
+            pp.query("infectious_length_mean", h_parm->infectious_length_mean);
+            pp.query("symptomdev_length_mean", h_parm->symptomdev_length_mean);
+
+            pp.query("incubation_length_std", h_parm->incubation_length_std);
+            pp.query("infectious_length_std", h_parm->infectious_length_std);
+            pp.query("symptomdev_length_std", h_parm->symptomdev_length_std);
         }
 
         h_parm->Initialize();
@@ -328,6 +336,14 @@ public:
     void generateCellData (amrex::MultiFab& mf) const;
 
     std::array<amrex::Long, 5> printTotals ();
+
+    const DiseaseParm * getDiseaseParameters_h () const {
+        return h_parm;
+    }
+
+    const DiseaseParm * getDiseaseParameters_d () const {
+        return d_parm;
+    }
 
 protected:
 
