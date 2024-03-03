@@ -819,8 +819,6 @@ void AgentContainer::updateStatus (MultiFab& disease_stats /*!< Community-wise d
                 };
             };
 
-            auto* lparm = d_parm;
-
             // Track hospitalization, ICU, ventilator, and fatalities
             Real CHR[] = {.0104, .0104, .070, .28, 1.0};  // sick -> hospital probabilities
             Real CIC[] = {.24, .24, .24, .36, .35};      // hospital -> ICU probabilities
