@@ -71,9 +71,13 @@ struct DiseaseParm
     amrex::Real Child_compliance, /*!< Child compliance with masking ?? */
                 Child_HH_closure; /*!< Multiplier for household contacts during school closure */
 
-    int incubation_length  = 3;   /*!< Incubation period of disease (in days) */
-    int infectious_length  = 6;   /*!< Number of days person is infectious */
-    int symptomatic_length = 5;   /*!< Number of days person is symptomatic */ //note, this does not affect the model yet
+    amrex::Real incubation_length_mean = 3.0;   /*!< mean time (in days) until infectious*/
+    amrex::Real infectious_length_mean = 6.0;   /*!< mean time (in days) agents are infectious */
+    amrex::Real symptomdev_length_mean = 5.0;   /*!< mean time (in days) until symptoms show */
+
+    amrex::Real incubation_length_std = 1.0;   /*!< std dev (in days) for the above*/
+    amrex::Real infectious_length_std = 1.0;   /*!< std dev (in days) for the above */
+    amrex::Real symptomdev_length_std = 1.0;   /*!< std dev (in days) for the above */
 
     void Initialize ();
 

@@ -163,13 +163,14 @@ void InteractionLocHome<ACType,AType>::interactAgents(ACType&   a_agents,  /*!< 
             auto school_ptr( this->m_school_ptr );
             auto withdrawn_ptr( this->m_withdrawn_ptr );
             auto counter_ptr( this->m_counter_ptr );
+            auto incubation_period_ptr( this->m_incubation_period_ptr );
             //auto strain_ptr( this->m_strain_ptr );
             //auto timer_ptr( this->m_timer_ptr );
 
             auto prob_ptr( this->m_prob_ptr );
 
             //auto mask_arr = a_mask[mfi].array();
-            auto lparm = a_agents.getDiseaseParm_d();
+            auto lparm = a_agents.getDiseaseParameters_d();
 
             ParallelForRNG( bins_ptr->numItems(),
                             [=] AMREX_GPU_DEVICE (int ii, RandomEngine const& /*engine*/)
@@ -182,7 +183,7 @@ void InteractionLocHome<ACType,AType>::interactAgents(ACType&   a_agents,  /*!< 
 
                 AMREX_ALWAYS_ASSERT( (Long) i < np);
 
-                if ( notInfectiousButInfected( i, status_ptr, counter_ptr, lparm->incubation_length )
+                if ( notInfectiousButInfected( i, status_ptr, counter_ptr, incubation_period_ptr )
                      || notSusceptible( i, status_ptr ) )  {
                     return;
                 }
@@ -196,12 +197,12 @@ void InteractionLocHome<ACType,AType>::interactAgents(ACType&   a_agents,  /*!< 
                     //Real j_mask = mask_arr(home_i_ptr[j], home_j_ptr[j], 0);
                     if (i == j) continue;
 
-                    if ( notInfectiousButInfected( j, status_ptr,counter_ptr,lparm->incubation_length )
+                    if ( notInfectiousButInfected( j, status_ptr,counter_ptr,incubation_period_ptr )
                          || notSusceptible( j, status_ptr ) )  {
                         continue;
                     }
 
-                    if ( isInfectious( j, status_ptr,counter_ptr,lparm->incubation_length )
+                    if ( isInfectious( j, status_ptr,counter_ptr,incubation_period_ptr )
                          && isSusceptible( i, status_ptr ) ) {
 
                         Real social_scale = 1.0;  // TODO this should vary based on cell

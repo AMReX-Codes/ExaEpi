@@ -253,9 +253,13 @@ public:
                 h_parm->reduced_inf[i] = reduced_inf[i];
             }
 
-            pp.query("incubation_length", h_parm->incubation_length);
-            pp.query("infectious_length", h_parm->infectious_length);
-            pp.query("symptomatic_length", h_parm->symptomatic_length);
+            pp.query("incubation_length_mean", h_parm->incubation_length_mean);
+            pp.query("infectious_length_mean", h_parm->infectious_length_mean);
+            pp.query("symptomdev_length_mean", h_parm->symptomdev_length_mean);
+
+            pp.query("incubation_length_std", h_parm->incubation_length_std);
+            pp.query("infectious_length_std", h_parm->infectious_length_std);
+            pp.query("symptomdev_length_std", h_parm->symptomdev_length_std);
         }
 
         h_parm->Initialize();
@@ -323,10 +327,13 @@ public:
         }
     }
 
-    /*! \brief Return disease parameters object pointer (GPU) */
-    inline const DiseaseParm* getDiseaseParm_d()
-    {
-        BL_PROFILE("AgentContainer::getDiseaseParm_d");
+    /*! \brief Return disease parameters object pointer (host) */
+    inline const DiseaseParm* getDiseaseParameters_h () const {
+        return h_parm;
+    }
+
+    /*! \brief Return disease parameters object pointer (device) */
+    inline const DiseaseParm* getDiseaseParameters_d () const {
         return d_parm;
     }
 

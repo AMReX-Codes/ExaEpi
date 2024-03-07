@@ -806,8 +806,9 @@ void AgentContainer::updateStatus (MultiFab& disease_stats /*!< Community-wise d
             auto counter_ptr = soa.GetRealData(RealIdx::disease_counter).data();
             auto timer_ptr = soa.GetRealData(RealIdx::treatment_timer).data();
             auto prob_ptr = soa.GetRealData(RealIdx::prob).data();
-            //auto& aos   = ptile.GetArrayOfStructs();
-            //auto pstruct_ptr = aos.data();
+            auto incubation_period_ptr = soa.GetRealData(RealIdx::incubation_period).data();
+            auto infectious_period_ptr = soa.GetRealData(RealIdx::infectious_period).data();
+
             auto ds_arr = disease_stats[mfi].array();
 
             struct DiseaseStats
@@ -819,8 +820,6 @@ void AgentContainer::updateStatus (MultiFab& disease_stats /*!< Community-wise d
                     death
                 };
             };
-
-            auto* lparm = d_parm;
 
             // Track hospitalization, ICU, ventilator, and fatalities
             Real CHR[] = {.0104, .0104, .070, .28, 1.0};  // sick -> hospital probabilities
@@ -837,11 +836,11 @@ void AgentContainer::updateStatus (MultiFab& disease_stats /*!< Community-wise d
                 }
                 else if (status_ptr[i] == Status::infected) {
                     counter_ptr[i] += 1;
-                    if (counter_ptr[i] < lparm->incubation_length) {
+                    if (counter_ptr[i] < incubation_period_ptr[i]) {
                         // incubation phase
                         return;
                     }
-                    if (counter_ptr[i] == lparm->incubation_length) {
+                    if (counter_ptr[i] == amrex::Math::ceil(incubation_period_ptr[i])) {
                         // decide if hospitalized
                         Real p_hosp = CHR[age_group_ptr[i]];
                         if (amrex::Random(engine) < p_hosp) {
@@ -931,7 +930,7 @@ void AgentContainer::updateStatus (MultiFab& disease_stats /*!< Community-wise d
                             }
                         }
                         else { // not hospitalized, recover once not infectious
-                            if (counter_ptr[i] == lparm->incubation_length + lparm->infectious_length) {
+                            if (counter_ptr[i] >= (incubation_period_ptr[i] + infectious_period_ptr[i])) {
                                 status_ptr[i] = Status::immune;
                             }
                         }
@@ -967,6 +966,11 @@ void AgentContainer::infectAgents ()
             auto status_ptr = soa.GetIntData(IntIdx::status).data();
             auto counter_ptr = soa.GetRealData(RealIdx::disease_counter).data();
             auto prob_ptr = soa.GetRealData(RealIdx::prob).data();
+            auto incubation_period_ptr = soa.GetRealData(RealIdx::incubation_period).data();
+            auto infectious_period_ptr = soa.GetRealData(RealIdx::infectious_period).data();
+            auto symptomdev_period_ptr = soa.GetRealData(RealIdx::symptomdev_period).data();
+
+            auto* lparm = d_parm;
 
             amrex::ParallelForRNG( np,
             [=] AMREX_GPU_DEVICE (int i, amrex::RandomEngine const& engine) noexcept
@@ -977,6 +981,9 @@ void AgentContainer::infectAgents ()
                     if (amrex::Random(engine) < prob_ptr[i]) {
                         status_ptr[i] = Status::infected;
                         counter_ptr[i] = 0.0;
+                        incubation_period_ptr[i] = amrex::RandomNormal(lparm->incubation_length_mean, lparm->incubation_length_std, engine);
+                        infectious_period_ptr[i] = amrex::RandomNormal(lparm->infectious_length_mean, lparm->infectious_length_std, engine);
+                        symptomdev_period_ptr[i] = amrex::RandomNormal(lparm->symptomdev_length_mean, lparm->symptomdev_length_std, engine);
                         return;
                     }
                 }

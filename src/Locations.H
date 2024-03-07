@@ -72,6 +72,8 @@ class InteractionLocation
 
         const ParticleReal* m_counter_ptr; /*!< day counter since infection */
         const ParticleReal* m_timer_ptr; /*!< timer since onset of disease */
+        const ParticleReal* m_incubation_period_ptr; /*!< incubation period */
+        const ParticleReal* m_symptomdev_period_ptr; /*!< symptom development period */
 
         ParticleReal* m_prob_ptr; /*!< infection probability */
 
@@ -85,6 +87,8 @@ class InteractionLocation
             auto& ptile = a_agents.ParticlesAt(a_lev, a_mfi);
             auto& soa   = ptile.GetStructOfArrays();
 
+            m_home_i_ptr = soa.GetIntData(IntIdx::home_i).data();
+            m_home_j_ptr = soa.GetIntData(IntIdx::home_j).data();
             m_work_i_ptr = soa.GetIntData(IntIdx::work_i).data();
             m_work_j_ptr = soa.GetIntData(IntIdx::work_j).data();
 
@@ -96,6 +100,8 @@ class InteractionLocation
             m_workgroup_ptr = soa.GetIntData(IntIdx::workgroup).data();
             m_withdrawn_ptr = soa.GetIntData(IntIdx::withdrawn).data();
             m_counter_ptr = soa.GetRealData(RealIdx::disease_counter).data();
+            m_incubation_period_ptr = soa.GetRealData(RealIdx::incubation_period).data();
+            //m_symptomdev_period_ptr = soa.GetRealData(RealIdx::symptomdev_period).data();
 
             //m_strain_ptr = soa.GetIntData(IntIdx::strain).data();
             //m_timer_ptr = soa.GetRealData(RealIdx::timer).data();

@@ -11,12 +11,13 @@
 struct RealIdx
 {
     enum {
-        /*
-          Disease counter starts after infection.
-         */
+        /* Disease counter starts after infection. */
         disease_counter = 0,    /*!< Counter since start of infection */
         treatment_timer,        /*!< Timer since hospital admission */
         prob,                   /*!< Probability of infection */
+        incubation_period,      /*!< Time until infectious */
+        infectious_period,      /*!< Length of time infectious */
+        symptomdev_period,      /*!< Time until symptoms would develop */
         nattribs                /*!< number of real-type attribute*/
     };
 };
@@ -37,7 +38,8 @@ struct IntIdx
         school,         /*!< school type (elementary, middle, high, none) */
         workgroup,      /*!< workgroup ID */
         work_nborhood,  /*!< work neighborhood ID */
-        withdrawn,      /*!< quarrantine status */
+        withdrawn,      /*!< quarantine status */
+        symptomatic,    /*!< currently symptomatic? */
         nattribs        /*!< number of integer-type attribute */
     };
 };
@@ -56,30 +58,30 @@ struct Status
 
 /*! \brief Is an agent infected but not infectious? */
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-bool notInfectiousButInfected (  const int                  a_idx,      /*!< Agent index */
-                                 const int*                 a_status,   /*!< Status pointer */
-                                 const amrex::ParticleReal* a_counter,  /*!< Counter pointer */
-                                 const amrex::Real          a_incub_len /*!< Disease incubation period */ )
+bool notInfectiousButInfected (  const int                          a_idx,      /*!< Agent index */
+                                 const int* const                   a_status,   /*!< Status pointer */
+                                 const amrex::ParticleReal* const   a_counter,  /*!< Counter pointer */
+                                 const amrex::ParticleReal* const   a_incub_len /*!< Disease incubation period */ )
 {
     return (    (a_status[a_idx] == Status::infected)
-             && (a_counter[a_idx] < a_incub_len) );
+             && (a_counter[a_idx] < a_incub_len[a_idx]) );
 }
 
 /*! \brief Is an agent infectious? */
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-bool isInfectious ( const int                  a_idx,       /*!< Agent index */
-                    const int*                 a_status,    /*!< Status pointer */
-                    const amrex::ParticleReal* a_counter,   /*!< Counter pointer */
-                    const amrex::Real          a_incub_len  /*!< Disease incubation period */ )
+bool isInfectious ( const int                        a_idx,       /*!< Agent index */
+                    const int* const                 a_status,    /*!< Status pointer */
+                    const amrex::ParticleReal* const a_counter,   /*!< Counter pointer */
+                    const amrex::ParticleReal* const a_incub_len  /*!< Disease incubation period */ )
 {
     return (   (a_status[a_idx] == Status::infected)
-            && (a_counter[a_idx] >= a_incub_len) );
+            && (a_counter[a_idx] >= a_incub_len[a_idx]) );
 }
 
 /*! \brief Is an agent susceptible? */
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-bool isSusceptible ( const int  a_idx,    /*!< Agent index */
-                     const int* a_status  /*!< Status pointer */ )
+bool isSusceptible ( const int          a_idx,    /*!< Agent index */
+                     const int* const   a_status  /*!< Status pointer */ )
 {
     return (   (a_status[a_idx] != Status::immune)
             && (a_status[a_idx] != Status::dead)
@@ -88,8 +90,8 @@ bool isSusceptible ( const int  a_idx,    /*!< Agent index */
 
 /*! \brief Is an agent not susceptible (i.e., dead, immune, or already infected)? */
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-bool notSusceptible ( const int  a_idx,   /*!< Agent index */
-                      const int* a_status /*!< Status pointer */ )
+bool notSusceptible ( const int         a_idx,   /*!< Agent index */
+                      const int* const  a_status /*!< Status pointer */ )
 {
     return (   (a_status[a_idx] == Status::immune)
             || (a_status[a_idx] == Status::dead) );
