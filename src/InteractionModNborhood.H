@@ -14,36 +14,43 @@ using namespace amrex;
  *
  * This function defines the one-on-one interaction between an infectious agent and a
  * susceptible agent in the neighborhood/community. */
+template <typename PTDType>
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-static void binaryInteractionNborhood ( const int a_i,  /*!< Index of infectious agent */
-                                        const int a_j,  /*!< Index of susceptible agent */
-                                        const DiseaseParm* const a_lparm,  /*!< disease paramters */
-                                        const Real a_social_scale,  /*!< Social scale */
-                                        const int* const a_age_group_ptr,   /*!< age group */
-                                        const int* const a_nborhood_ptr,    /*!< neighborhood */
-                                        const int* const a_school_ptr,      /*!< school */
-                                        ParticleReal* const a_prob_ptr      /*!< infection probability */)
+static void binaryInteractionNborhood ( const int a_i, /*!< Index of infectious agent */
+                                        const int a_j, /*!< Index of susceptible agent */
+                                        const PTDType& a_ptd, /*!< Particle tile data */
+                                        const DiseaseParm* const a_lparm, /*!< disease paramters */
+                                        const Real a_social_scale, /*!< Social scale */
+                                        ParticleReal* const a_prob_ptr /*!< infection probability */)
 {
     Real infect = a_lparm->infect;
     infect *= a_lparm->vac_eff;
+
+    auto age_group_ptr = a_ptd.m_idata[IntIdx::age_group];
+    auto nborhood_ptr = a_ptd.m_idata[IntIdx::nborhood];
+    auto school_ptr = a_ptd.m_idata[IntIdx::school];
+    auto withdrawn_ptr = a_ptd.m_idata[IntIdx::withdrawn];
+
+    if (withdrawn_ptr[a_i] || withdrawn_ptr[a_j]) { return; }
+
     //infect *= i_mask;
     //infect *= j_mask;
     ParticleReal prob = 1.0;
 
     // school < 0 means a child normally attends school, but not today
     /* Should always be in the same community = same cell */
-    if (a_school_ptr[a_i] < 0) {  // not attending school, use _SC contacts
-        prob *= 1.0 - infect * a_lparm->xmit_comm_SC[a_age_group_ptr[a_j]] * a_social_scale;
+    if (school_ptr[a_i] < 0) {  // not attending school, use _SC contacts
+        prob *= 1.0 - infect * a_lparm->xmit_comm_SC[age_group_ptr[a_j]] * a_social_scale;
     } else {
-        prob *= 1.0 - infect * a_lparm->xmit_comm[a_age_group_ptr[a_j]] * a_social_scale;
+        prob *= 1.0 - infect * a_lparm->xmit_comm[age_group_ptr[a_j]] * a_social_scale;
     }
     // /* Neighborhood? */
-    if (a_nborhood_ptr[a_i] == a_nborhood_ptr[a_j]) {
-        if (a_school_ptr[a_i] < 0)  {
+    if (nborhood_ptr[a_i] == nborhood_ptr[a_j]) {
+        if (school_ptr[a_i] < 0)  {
             // not attending school, use _SC contacts
-            prob *= 1.0 - infect * a_lparm->xmit_hood_SC[a_age_group_ptr[a_j]] * a_social_scale;
+            prob *= 1.0 - infect * a_lparm->xmit_hood_SC[age_group_ptr[a_j]] * a_social_scale;
         } else {
-            prob *= 1.0 - infect * a_lparm->xmit_hood[a_age_group_ptr[a_j]] * a_social_scale;
+            prob *= 1.0 - infect * a_lparm->xmit_hood[age_group_ptr[a_j]] * a_social_scale;
         }
     }
 
@@ -51,8 +58,8 @@ static void binaryInteractionNborhood ( const int a_i,  /*!< Index of infectious
 }
 
 /*! \brief Class describing agent interactions in the neighborhood/community */
-template <typename ACType /*!< agent container type */, typename AType /*!< agent type */>
-class InteractionModNborhood : public InteractionModel<ACType,AType>
+template <typename AC, typename ACT, typename ACTD, typename A>
+class InteractionModNborhood : public InteractionModel<AC,ACT,ACTD,A>
 {
     public:
 
@@ -63,7 +70,7 @@ class InteractionModNborhood : public InteractionModel<ACType,AType>
         virtual ~InteractionModNborhood() = default;
 
         /*! \brief Simulate agent interaction in the neighborhood/community */
-        virtual void interactAgents( ACType&, MultiFab& );
+        virtual void interactAgents( AC&, MultiFab& );
 
     protected:
 
@@ -98,9 +105,9 @@ class InteractionModNborhood : public InteractionModel<ACType,AType>
     + Compute probability from community transmission
     + Compute probability from neighborhood
 */
-template <typename ACType, typename AType>
-void InteractionModNborhood<ACType,AType>::interactAgents(ACType&   a_agents,  /*!< Agent container */
-                                                      MultiFab& /*a_mask*/     /*!< Masking behavior */)
+template <typename AC, typename ACT, typename ACTD, typename A>
+void InteractionModNborhood<AC,ACT,ACTD,A>::interactAgents( AC& a_agents, /*!< Agent container */
+                                                            MultiFab& /*a_mask*/ /*!< Masking behavior */)
 {
     BL_PROFILE("InteractionModNborhood::interactAgents");
 
@@ -123,6 +130,7 @@ void InteractionModNborhood<ACType,AType>::interactAgents(ACType&   a_agents,  /
             auto bins_ptr = a_agents.getBins(pair_ind, ExaEpi::InteractionNames::nborhood);
 
             auto& ptile = a_agents.ParticlesAt(lev, mfi);
+            const auto& ptd = ptile.getParticleTileData();
             auto& aos   = ptile.GetArrayOfStructs();
             const auto np = aos.numParticles();
             auto pstruct_ptr = aos().dataPtr();
@@ -132,21 +140,10 @@ void InteractionModNborhood<ACType,AType>::interactAgents(ACType&   a_agents,  /
             auto inds = bins_ptr->permutationPtr();
             auto offsets = bins_ptr->offsetsPtr();
 
-            this->getAgentAttribs( a_agents, lev, mfi );
-            auto status_ptr( this->m_status_ptr );
-            auto age_group_ptr( this->m_age_group_ptr );
-            auto nborhood_ptr( this->m_nborhood_ptr );
-            auto school_ptr = ( this->m_school_ptr );
-            auto withdrawn_ptr( this->m_withdrawn_ptr );
-            auto counter_ptr( this->m_counter_ptr );
-            auto incubation_period_ptr( this->m_incubation_period_ptr );
-            //auto strain_ptr( this->m_strain_ptr );
-            //auto timer_ptr( this->m_timer_ptr );
-
-            auto prob_ptr( this->m_prob_ptr );
-
+            auto prob_ptr( this->getAgentProbPtr(a_agents,lev,mfi) );
             //auto mask_arr = a_mask[mfi].array();
             auto lparm = a_agents.getDiseaseParameters_d();
+
             ParallelForRNG( bins_ptr->numItems(),
                             [=] AMREX_GPU_DEVICE (int ii, RandomEngine const& /*engine*/)
                             noexcept
@@ -157,9 +154,7 @@ void InteractionModNborhood<ACType,AType>::interactAgents(ACType&   a_agents,  /
                 auto cell_stop  = offsets[i_cell+1];
 
                 AMREX_ALWAYS_ASSERT( (Long) i < np);
-
-                if ( notSusceptible( i, status_ptr ) )  { return; }
-                if (withdrawn_ptr[i]) { return; }
+                if ( notSusceptible<ACTD>(i, ptd) )  { return; }
 
                 //Real i_mask = mask_arr(home_i_ptr[i], home_j_ptr[i], 0);
                 for (unsigned int jj = cell_start; jj < cell_stop; ++jj) {
@@ -169,17 +164,10 @@ void InteractionModNborhood<ACType,AType>::interactAgents(ACType&   a_agents,  /
 
                     //Real j_mask = mask_arr(home_i_ptr[j], home_j_ptr[j], 0);
                     if (i == j) continue;
-                    if (withdrawn_ptr[j]) { continue; }
 
-                    if ( isInfectious( j, status_ptr,counter_ptr,incubation_period_ptr ) ) {
-
+                    if ( isInfectious<ACTD>(j, ptd) ) {
                         Real social_scale = 1.0;  // TODO this should vary based on cell
-                        binaryInteractionNborhood(  j, i,
-                                                    lparm, social_scale,
-                                                    age_group_ptr,
-                                                    nborhood_ptr, school_ptr,
-                                                    prob_ptr );
-
+                        binaryInteractionNborhood<ACTD>( j, i, ptd, lparm, social_scale, prob_ptr );
                     }
                 }
             });

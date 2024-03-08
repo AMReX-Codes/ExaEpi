@@ -11,8 +11,8 @@
 using namespace amrex;
 
 /*! \brief Class describing a simple generic agent interactions */
-template <typename ACType /*!< agent container type */, typename AType /*!< agent type */>
-class InteractionModGeneric : public InteractionModel<ACType,AType>
+template <typename AC, typename ACT, typename ACTD, typename A>
+class InteractionModGeneric : public InteractionModel<AC,ACT,ACTD,A>
 {
     public:
 
@@ -23,7 +23,7 @@ class InteractionModGeneric : public InteractionModel<ACType,AType>
         virtual ~InteractionModGeneric() = default;
 
         /*! \brief Simulate agent interaction with a simple generic model */
-        virtual void interactAgents( ACType&, MultiFab& );
+        virtual void interactAgents( AC&, MultiFab& );
 
     protected:
 
@@ -49,9 +49,9 @@ class InteractionModGeneric : public InteractionModel<ACType,AType>
         with a probability of 0.00001 and 0.00002 times the number of infections for each
         strain respectively.
 */
-template <typename ACType, typename AType>
-void InteractionModGeneric<ACType,AType>::interactAgents(ACType&   a_agents,  /*!< Agent container */
-                                                         MultiFab& /* a_mask */  /*!< Masking behavior */)
+template <typename AC, typename ACT, typename ACTD, typename A>
+void InteractionModGeneric<AC,ACT,ACTD,A>::interactAgents( AC& a_agents, /*!< Agent container */
+                                                           MultiFab& /* a_mask */ /*!< Masking behavior */)
 {
     BL_PROFILE("InteractionModGeneric::interactAgents");
 
@@ -68,7 +68,7 @@ void InteractionModGeneric<ACType,AType>::interactAgents(ACType&   a_agents,  /*
 #endif
         for(MFIter mfi = a_agents.MakeMFIter(lev, TilingIfNotGPU()); mfi.isValid(); ++mfi)
         {
-            DenseBins<AType> bins;
+            DenseBins<A> bins;
             auto& ptile = a_agents.ParticlesAt(lev, mfi);
             auto& aos   = ptile.GetArrayOfStructs();
             const size_t np = aos.numParticles();

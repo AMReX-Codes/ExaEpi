@@ -15,63 +15,68 @@ using namespace amrex;
  *
  * This function defines the one-on-one interaction between an infectious agent and a
  * susceptible agent at home. */
+template <typename PTDType>
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-static void binaryInteractionHome ( const int a_i,  /*!< Index of infectious agent */
-                                    const int a_j,  /*!< Index of susceptible agent */
-                                    const DiseaseParm* const a_lparm,   /*!< disease paramters */
-                                    const Real a_social_scale,  /*!< Social scale */
-                                    const int* const a_age_group_ptr,   /*!< age group */
-                                    const int* const a_family_ptr,      /*!< family */
-                                    const int* const a_nborhood_ptr,    /*!< neighborhood */
-                                    const int* const a_school_ptr,      /*!< school */
-                                    const int* const a_withdrawn_ptr,      /*!< quarrantine */
-                                    ParticleReal* const a_prob_ptr      /*!< infection probability */)
+static void binaryInteractionHome ( const int a_i, /*!< Index of infectious agent */
+                                    const int a_j, /*!< Index of susceptible agent */
+                                    const PTDType& a_ptd, /*!< Particle tile data */
+                                    const DiseaseParm* const a_lparm,  /*!< disease paramters */
+                                    const Real a_social_scale, /*!< Social scale */
+                                    ParticleReal* const a_prob_ptr /*!< infection probability */)
 {
     Real infect = a_lparm->infect;
     infect *= a_lparm->vac_eff;
+
+    auto age_group_ptr = a_ptd.m_idata[IntIdx::age_group];
+    auto family_ptr = a_ptd.m_idata[IntIdx::family];
+    auto nborhood_ptr = a_ptd.m_idata[IntIdx::nborhood];
+    auto school_ptr = a_ptd.m_idata[IntIdx::school];
+    auto withdrawn_ptr = a_ptd.m_idata[IntIdx::withdrawn];
+
     //infect *= i_mask;
     //infect *= j_mask;
     ParticleReal prob = 1.0;
-    if (     (a_nborhood_ptr[a_i] == a_nborhood_ptr[a_j])
-          && (a_family_ptr[a_i] == a_family_ptr[a_j]) ) {
+    if (     (nborhood_ptr[a_i] == nborhood_ptr[a_j])
+          && (family_ptr[a_i] == family_ptr[a_j]) ) {
         /* at home, within a family */
-        if (a_age_group_ptr[a_i] <= 1) {  /* Transmitter i is a child */
-            if (a_school_ptr[a_i] < 0) { // not attending school, use _SC contacts
-                prob *= 1.0 - infect * a_lparm->xmit_child_SC[a_age_group_ptr[a_j]];
+        if (age_group_ptr[a_i] <= 1) {  /* Transmitter i is a child */
+            if (school_ptr[a_i] < 0) { // not attending school, use _SC contacts
+                prob *= 1.0 - infect * a_lparm->xmit_child_SC[age_group_ptr[a_j]];
             } else {
-                prob *= 1.0 - infect * a_lparm->xmit_child[a_age_group_ptr[a_j]];
+                prob *= 1.0 - infect * a_lparm->xmit_child[age_group_ptr[a_j]];
             }
         } else {
-            if (a_school_ptr[a_i] < 0) { // not attending school, use _SC contacts
-                prob *= 1.0 - infect * a_lparm->xmit_adult_SC[a_age_group_ptr[a_j]];
+            if (school_ptr[a_i] < 0) { // not attending school, use _SC contacts
+                prob *= 1.0 - infect * a_lparm->xmit_adult_SC[age_group_ptr[a_j]];
             } else {
-                prob *= 1.0 - infect * a_lparm->xmit_adult[a_age_group_ptr[a_j]];
+                prob *= 1.0 - infect * a_lparm->xmit_adult[age_group_ptr[a_j]];
             }
         }
-    } else if (    (a_nborhood_ptr[a_i] == a_nborhood_ptr[a_j])
-                && (!a_withdrawn_ptr[a_i]) && (!a_withdrawn_ptr[a_j])
-                && ((a_family_ptr[a_i] / 4) == (a_family_ptr[a_j] / 4)) ) {
+    } else if (    (nborhood_ptr[a_i] == nborhood_ptr[a_j])
+                && (!withdrawn_ptr[a_i]) && (!withdrawn_ptr[a_j])
+                && ((family_ptr[a_i] / 4) == (family_ptr[a_j] / 4)) ) {
         /* check for common neighborhood cluster: */
-        if (a_age_group_ptr[a_i] <= 1) {  /* Transmitter i is a child */
-            if (a_school_ptr[a_i] < 0)  // not attending school, use _SC contacts
-                prob *= 1.0 - infect * a_lparm->xmit_nc_child_SC[a_age_group_ptr[a_j]] * a_social_scale;
+        if (age_group_ptr[a_i] <= 1) {  /* Transmitter i is a child */
+            if (school_ptr[a_i] < 0)  // not attending school, use _SC contacts
+                prob *= 1.0 - infect * a_lparm->xmit_nc_child_SC[age_group_ptr[a_j]] * a_social_scale;
             else
-                prob *= 1.0 - infect * a_lparm->xmit_nc_child[a_age_group_ptr[a_j]] * a_social_scale;
+                prob *= 1.0 - infect * a_lparm->xmit_nc_child[age_group_ptr[a_j]] * a_social_scale;
         } else {
-            if (a_school_ptr[a_i] < 0)  {
+            if (school_ptr[a_i] < 0)  {
                 // not attending school, use _SC contacts
-                prob *= 1.0 - infect * a_lparm->xmit_nc_adult_SC[a_age_group_ptr[a_j]] * a_social_scale;
+                prob *= 1.0 - infect * a_lparm->xmit_nc_adult_SC[age_group_ptr[a_j]] * a_social_scale;
             } else {
-                prob *= 1.0 - infect * a_lparm->xmit_nc_adult[a_age_group_ptr[a_j]] * a_social_scale;
+                prob *= 1.0 - infect * a_lparm->xmit_nc_adult[age_group_ptr[a_j]] * a_social_scale;
             }
         }
     }
+
     Gpu::Atomic::Multiply(&a_prob_ptr[a_j], prob);
 }
 
 /*! \brief Class describing agent interactions at home */
-template <typename ACType /*!< agent container type */, typename AType /*!< agent type */>
-class InteractionModHome : public InteractionModel<ACType,AType>
+template <typename AC, typename ACT, typename ACTD, typename A>
+class InteractionModHome : public InteractionModel<AC,ACT,ACTD,A>
 {
     public:
 
@@ -82,7 +87,7 @@ class InteractionModHome : public InteractionModel<ACType,AType>
         virtual ~InteractionModHome() = default;
 
         /*! \brief Simulate agent interaction at home */
-        virtual void interactAgents( ACType&, MultiFab& );
+        virtual void interactAgents( AC&, MultiFab& );
 
     protected:
 
@@ -121,9 +126,9 @@ class InteractionModHome : public InteractionModel<ACType,AType>
       + If B is an adult, use the appropriate transmission probability (#DiseaseParm::xmit_adult_SC or
         #DiseaseParm::xmit_adult) depending on whether B works at a school or not (#IntIdx::school)
 */
-template <typename ACType, typename AType>
-void InteractionModHome<ACType,AType>::interactAgents(ACType&   a_agents,  /*!< Agent container */
-                                                      MultiFab& /*a_mask*/     /*!< Masking behavior */)
+template <typename AC, typename ACT, typename ACTD, typename A>
+void InteractionModHome<AC,ACT,ACTD,A>::interactAgents(AC& a_agents, /*!< Agent container */
+                                                       MultiFab& /*a_mask*/ /*!< Masking behavior */)
 {
     BL_PROFILE("InteractionModHome::interactAgents");
 
@@ -146,6 +151,7 @@ void InteractionModHome<ACType,AType>::interactAgents(ACType&   a_agents,  /*!< 
             auto bins_ptr = a_agents.getBins(pair_ind, ExaEpi::InteractionNames::home);
 
             auto& ptile = a_agents.ParticlesAt(lev, mfi);
+            const auto& ptd = ptile.getParticleTileData();
             auto& aos   = ptile.GetArrayOfStructs();
             const auto np = aos.numParticles();
             auto pstruct_ptr = aos().dataPtr();
@@ -155,20 +161,7 @@ void InteractionModHome<ACType,AType>::interactAgents(ACType&   a_agents,  /*!< 
             auto inds = bins_ptr->permutationPtr();
             auto offsets = bins_ptr->offsetsPtr();
 
-            this->getAgentAttribs( a_agents, lev, mfi );
-            auto status_ptr( this->m_status_ptr );
-            auto age_group_ptr( this->m_age_group_ptr );
-            auto family_ptr( this->m_family_ptr );
-            auto nborhood_ptr( this->m_nborhood_ptr );
-            auto school_ptr( this->m_school_ptr );
-            auto withdrawn_ptr( this->m_withdrawn_ptr );
-            auto counter_ptr( this->m_counter_ptr );
-            auto incubation_period_ptr( this->m_incubation_period_ptr );
-            //auto strain_ptr( this->m_strain_ptr );
-            //auto timer_ptr( this->m_timer_ptr );
-
-            auto prob_ptr( this->m_prob_ptr );
-
+            auto prob_ptr( this->getAgentProbPtr(a_agents,lev,mfi) );
             //auto mask_arr = a_mask[mfi].array();
             auto lparm = a_agents.getDiseaseParameters_d();
 
@@ -183,7 +176,7 @@ void InteractionModHome<ACType,AType>::interactAgents(ACType&   a_agents,  /*!< 
 
                 AMREX_ALWAYS_ASSERT( (Long) i < np);
 
-                if ( notSusceptible( i, status_ptr ) )  { return; }
+                if ( notSusceptible<ACTD>(i, ptd) )  { return; }
 
                 //Real i_mask = mask_arr(home_i_ptr[i], home_j_ptr[i], 0);
                 for (unsigned int jj = cell_start; jj < cell_stop; ++jj) {
@@ -194,18 +187,9 @@ void InteractionModHome<ACType,AType>::interactAgents(ACType&   a_agents,  /*!< 
                     //Real j_mask = mask_arr(home_i_ptr[j], home_j_ptr[j], 0);
                     if (i == j) continue;
 
-                    if ( isInfectious( j, status_ptr,counter_ptr,incubation_period_ptr ) ) {
-
+                    if ( isInfectious<ACTD>(j, ptd) ) {
                         Real social_scale = 1.0;  // TODO this should vary based on cell
-                        binaryInteractionHome( j, i,
-                                               lparm, social_scale,
-                                               age_group_ptr,
-                                               family_ptr,
-                                               nborhood_ptr,
-                                               school_ptr,
-                                               withdrawn_ptr,
-                                               prob_ptr );
-
+                        binaryInteractionHome<ACTD>( j, i, ptd, lparm, social_scale, prob_ptr );
                     }
                 }
             });

@@ -57,44 +57,44 @@ struct Status
 };
 
 /*! \brief Is an agent infected but not infectious? */
+template <typename PTDType>
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-bool notInfectiousButInfected (  const int                          a_idx,      /*!< Agent index */
-                                 const int* const                   a_status,   /*!< Status pointer */
-                                 const amrex::ParticleReal* const   a_counter,  /*!< Counter pointer */
-                                 const amrex::ParticleReal* const   a_incub_len /*!< Disease incubation period */ )
+bool notInfectiousButInfected ( const int      a_idx, /*!< Agent index */
+                                const PTDType& a_ptd  /*!< Particle tile data */ )
 {
-    return (    (a_status[a_idx] == Status::infected)
-             && (a_counter[a_idx] < a_incub_len[a_idx]) );
+    return (    (a_ptd.m_idata[IntIdx::status][a_idx] == Status::infected)
+             && (a_ptd.m_rdata[RealIdx::disease_counter][a_idx] < a_ptd.m_rdata[RealIdx::incubation_period][a_idx]) );
 }
 
 /*! \brief Is an agent infectious? */
+template <typename PTDType>
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-bool isInfectious ( const int                        a_idx,       /*!< Agent index */
-                    const int* const                 a_status,    /*!< Status pointer */
-                    const amrex::ParticleReal* const a_counter,   /*!< Counter pointer */
-                    const amrex::ParticleReal* const a_incub_len  /*!< Disease incubation period */ )
+bool isInfectious ( const int      a_idx, /*!< Agent index */
+                    const PTDType& a_ptd  /*!< Particle tile data */ )
 {
-    return (   (a_status[a_idx] == Status::infected)
-            && (a_counter[a_idx] >= a_incub_len[a_idx]) );
+    return (   (a_ptd.m_idata[IntIdx::status][a_idx] == Status::infected)
+            && (a_ptd.m_rdata[RealIdx::disease_counter][a_idx] >= a_ptd.m_rdata[RealIdx::incubation_period][a_idx]) );
 }
 
 /*! \brief Is an agent susceptible? */
+template <typename PTDType>
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-bool isSusceptible ( const int          a_idx,    /*!< Agent index */
-                     const int* const   a_status  /*!< Status pointer */ )
+bool isSusceptible ( const int      a_idx, /*!< Agent index */
+                     const PTDType& a_ptd  /*!< Particle tile data */ )
 {
-    return (   (a_status[a_idx] != Status::immune)
-            && (a_status[a_idx] != Status::dead)
-            && (a_status[a_idx] != Status::infected) );
+    return (   (a_ptd.m_idata[IntIdx::status][a_idx] != Status::immune)
+            && (a_ptd.m_idata[IntIdx::status][a_idx] != Status::dead)
+            && (a_ptd.m_idata[IntIdx::status][a_idx] != Status::infected) );
 }
 
 /*! \brief Is an agent not susceptible (i.e., dead, immune, or already infected)? */
+template <typename PTDType>
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-bool notSusceptible ( const int         a_idx,   /*!< Agent index */
-                      const int* const  a_status /*!< Status pointer */ )
+bool notSusceptible ( const int      a_idx, /*!< Agent index */
+                      const PTDType& a_ptd  /*!< Particle tile data */ )
 {
-    return (   (a_status[a_idx] == Status::immune)
-            || (a_status[a_idx] == Status::dead) );
+    return (   (a_ptd.m_idata[IntIdx::status][a_idx] == Status::immune)
+            || (a_ptd.m_idata[IntIdx::status][a_idx] == Status::dead) );
 }
 
 #endif

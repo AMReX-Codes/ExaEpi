@@ -40,77 +40,39 @@ namespace ExaEpi
  *    inheriting from this class, InteractionModel::getAgentAttribs() is called
  *    to set these pointers before using them.
  */
-template <typename ACType /*!< agent container type */, typename AType /*!< agent type */>
+template <  typename AC /*!< agent container type */,
+            typename ACT, /*!< agent container tile type */
+            typename ACTD, /*!< agent container tile data type */
+            typename A /*!< agent type */>
 class InteractionModel
 {
     public:
 
         /*! \brief null constructor */
-        InteractionModel<ACType,AType>() { }
+        InteractionModel<AC,ACT,ACTD,A>() { }
 
         /*! \brief default destructor */
-        virtual ~InteractionModel<ACType,AType>() = default;
+        virtual ~InteractionModel<AC,ACT,ACTD,A>() = default;
 
         /*! \brief Interact agents for a model */
-        virtual void interactAgents(ACType&, MultiFab&) = 0;
+        virtual void interactAgents(AC&, MultiFab&) = 0;
 
     protected:
 
-        const int* m_home_i_ptr; /*!< i-index of home location */
-        const int* m_home_j_ptr; /*!< j-index of home location */
-        const int* m_work_i_ptr; /*!< i-index of work location */
-        const int* m_work_j_ptr; /*!< j-index of work location */
 
-        const int* m_status_ptr; /*!< infection status */
-        const int* m_age_group_ptr; /*!< age group */
-        const int* m_family_ptr; /*!< family */
-        const int* m_nborhood_ptr; /*!< neighborhood */
-        const int* m_school_ptr; /*!< school */
-        const int* m_workgroup_ptr; /*!< workgroup */
-        const int* m_withdrawn_ptr; /*!< withdrawn/quarrantining */
-        const int* m_strain_ptr; /*!< disease strain */
-
-        const ParticleReal* m_counter_ptr; /*!< day counter since infection */
-        const ParticleReal* m_timer_ptr; /*!< timer since onset of disease */
-        const ParticleReal* m_incubation_period_ptr; /*!< incubation period */
-        const ParticleReal* m_symptomdev_period_ptr; /*!< symptom development period */
-
-        ParticleReal* m_prob_ptr; /*!< infection probability */
-
-        /*! \brief Get attribute pointers from agent container */
-        virtual void getAgentAttribs ( ACType&       a_agents,  /*!< agent container */
-                                       const int     a_lev,     /*!< level */
-                                       const MFIter& a_mfi      /*!< multifab iterator*/ )
+        /*! \brief Get probability pointer from agent container */
+        inline ParticleReal* getAgentProbPtr (  AC&           a_agents,  /*!< agent container */
+                                                const int     a_lev,     /*!< level */
+                                                const MFIter& a_mfi      /*!< multifab iterator*/ )
         {
-            BL_PROFILE("InteractionModel::getAgentAttribs");
-
+            BL_PROFILE("InteractionModel::getAgentProbPtr");
             auto& ptile = a_agents.ParticlesAt(a_lev, a_mfi);
             auto& soa   = ptile.GetStructOfArrays();
-
-            m_home_i_ptr = soa.GetIntData(IntIdx::home_i).data();
-            m_home_j_ptr = soa.GetIntData(IntIdx::home_j).data();
-            m_work_i_ptr = soa.GetIntData(IntIdx::work_i).data();
-            m_work_j_ptr = soa.GetIntData(IntIdx::work_j).data();
-
-            m_status_ptr = soa.GetIntData(IntIdx::status).data();
-            m_age_group_ptr = soa.GetIntData(IntIdx::age_group).data();
-            m_family_ptr = soa.GetIntData(IntIdx::family).data();
-            m_nborhood_ptr = soa.GetIntData(IntIdx::nborhood).data();
-            m_school_ptr = soa.GetIntData(IntIdx::school).data();
-            m_workgroup_ptr = soa.GetIntData(IntIdx::workgroup).data();
-            m_withdrawn_ptr = soa.GetIntData(IntIdx::withdrawn).data();
-            m_counter_ptr = soa.GetRealData(RealIdx::disease_counter).data();
-            m_incubation_period_ptr = soa.GetRealData(RealIdx::incubation_period).data();
-            //m_symptomdev_period_ptr = soa.GetRealData(RealIdx::symptomdev_period).data();
-
-            //m_strain_ptr = soa.GetIntData(IntIdx::strain).data();
-            //m_timer_ptr = soa.GetRealData(RealIdx::timer).data();
-
-            m_prob_ptr = soa.GetRealData(RealIdx::prob).data();
+            return soa.GetRealData(RealIdx::prob).data();
         }
 
         /*! \brief Make particle bins for interactions at a given model */
-        virtual void makeBins(  ACType&             a_agents,   /*!< agent container */
+        virtual void makeBins(  AC&                 a_agents,   /*!< agent container */
                                 const IntVect&      a_bin_size, /*!< bin size */
                                 const int           a_lev,      /*!< level */
                                 const std::string&  a_mod       /*!< interaction model */ )

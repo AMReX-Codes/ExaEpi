@@ -193,6 +193,12 @@ class AgentContainer
     : public amrex::ParticleContainer<0, 0, RealIdx::nattribs, IntIdx::nattribs>
 {
 
+    using PCType = AgentContainer;
+    using PType = ParticleType;
+    using PTileType = ParticleTileType;
+    using PTDType = PTileType::ParticleTileDataType;
+    using IntModel = InteractionModel<PCType,PTileType,PTDType,PType>;
+
 public:
 
     /*! Constructor:
@@ -225,11 +231,11 @@ public:
 
             /* Create the interaction model objects and push to container */
             m_interactions.clear();
-            m_interactions[InteractionNames::generic] = new InteractionModGeneric<AgentContainer,AgentType>;
-            m_interactions[InteractionNames::home] = new InteractionModHome<AgentContainer,AgentType>;
-            m_interactions[InteractionNames::work] = new InteractionModWork<AgentContainer,AgentType>;
-            m_interactions[InteractionNames::school] = new InteractionModSchool<AgentContainer,AgentType>;
-            m_interactions[InteractionNames::nborhood] = new InteractionModNborhood<AgentContainer,AgentType>;
+            m_interactions[InteractionNames::generic] = new InteractionModGeneric<PCType,PTileType,PTDType,PType>;
+            m_interactions[InteractionNames::home] = new InteractionModHome<PCType,PTileType,PTDType,PType>;
+            m_interactions[InteractionNames::work] = new InteractionModWork<PCType,PTileType,PTDType,PType>;
+            m_interactions[InteractionNames::school] = new InteractionModSchool<PCType,PTileType,PTDType,PType>;
+            m_interactions[InteractionNames::nborhood] = new InteractionModNborhood<PCType,PTileType,PTDType,PType>;
         }
 
         {
@@ -309,8 +315,8 @@ public:
     void moveAgentsToHome ();
 
     /*! \brief Return bin pointer at a given mfi, tile and model name */
-    inline amrex::DenseBins<AgentContainer::ParticleType>* getBins( const std::pair<int,int>& a_idx,
-                                                                    const std::string& a_mod_name )
+    inline amrex::DenseBins<PType>* getBins( const std::pair<int,int>& a_idx,
+                                             const std::string& a_mod_name )
     {
         BL_PROFILE("AgentContainer::getBins");
         if (a_mod_name == ExaEpi::InteractionNames::home) {
@@ -339,19 +345,17 @@ public:
 
 protected:
 
-    using AgentType = ParticleType;
-
     DiseaseParm* h_parm;    /*!< Disease parameters */
     DiseaseParm* d_parm;    /*!< Disease parameters (GPU device) */
 
     /*! Map of home bins (of agents) indexed by MultiFab iterator and tile index;
         see AgentContainer::interactAgentsHomeWork() */
-    std::map<std::pair<int, int>, amrex::DenseBins<AgentContainer::ParticleType> > m_bins_home;
+    std::map<std::pair<int, int>, amrex::DenseBins<PType> > m_bins_home;
     /*! Map of work bins (of agents) indexed by MultiFab iterator and tile index;
         see AgentContainer::interactAgentsHomeWork() */
-    std::map<std::pair<int, int>, amrex::DenseBins<AgentContainer::ParticleType> > m_bins_work;
+    std::map<std::pair<int, int>, amrex::DenseBins<PType> > m_bins_work;
 
-    std::map<std::string,InteractionModel<AgentContainer,AgentType>*> m_interactions;
+    std::map<std::string,IntModel*> m_interactions;
 
     /*! Flag to indicate if agents are at work */
     bool m_at_work;
@@ -360,8 +364,7 @@ protected:
     inline bool haveInteractionModel( const std::string& a_mod_name ) const
     {
         BL_PROFILE("AgentContainer::haveInteractionModel");
-        std::map<std::string,InteractionModel<AgentContainer,AgentType>*>::const_iterator
-            it(m_interactions.find(a_mod_name));
+        std::map<std::string,IntModel*>::const_iterator it(m_interactions.find(a_mod_name));
         return (it != m_interactions.end());
     }
 

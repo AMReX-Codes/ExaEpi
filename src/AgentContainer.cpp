@@ -479,8 +479,8 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,    /*!< Number 
 #pragma omp critical (init_agents_nextid)
 #endif
         {
-            pid = AgentType::NextID();
-            AgentType::NextID(pid+nagents);
+            pid = PType::NextID();
+            PType::NextID(pid+nagents);
         }
         AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
             static_cast<Long>(pid + nagents) < LastParticleID,
