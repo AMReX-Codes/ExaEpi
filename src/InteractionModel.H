@@ -1,8 +1,8 @@
-/*! @file Locations.H
-    \brief Defines interaction for various locations */
+/*! @file InteractionModel.H
+    \brief Defines interaction model base class */
 
-#ifndef _LOCATIONS_H_
-#define _LOCATIONS_H_
+#ifndef _INTERACTION_MODEL_H_
+#define _INTERACTION_MODEL_H_
 
 #include <map>
 #include <string>
@@ -20,8 +20,8 @@ using namespace amrex;
 
 namespace ExaEpi
 {
-    /*! \brief Name of locations */
-    namespace LocationNames
+    /*! \brief Name of models */
+    namespace InteractionNames
     {
         const std::string generic = "generic";
         const std::string home = "home";
@@ -32,26 +32,26 @@ namespace ExaEpi
     }
 }
 
-/*! \brief Base class for defining locations and agent interactions at them
+/*! \brief Base class for defining interaction models
  *
- *  Contains things that are common to all interaction location classes.
+ *  Contains things that are common to all interaction model classes.
  *  + The member data pointers are used to temporarily point to the SoA attributes of
- *    the agents for a given level and MFIter; for the various interaction locations
- *    inheriting from this class, InteractionLocation::getAgentAttribs() is called
+ *    the agents for a given level and MFIter; for the various interaction models
+ *    inheriting from this class, InteractionModel::getAgentAttribs() is called
  *    to set these pointers before using them.
  */
 template <typename ACType /*!< agent container type */, typename AType /*!< agent type */>
-class InteractionLocation
+class InteractionModel
 {
     public:
 
         /*! \brief null constructor */
-        InteractionLocation<ACType,AType>() { }
+        InteractionModel<ACType,AType>() { }
 
         /*! \brief default destructor */
-        virtual ~InteractionLocation<ACType,AType>() = default;
+        virtual ~InteractionModel<ACType,AType>() = default;
 
-        /*! \brief Interact agents at a location */
+        /*! \brief Interact agents for a model */
         virtual void interactAgents(ACType&, MultiFab&) = 0;
 
     protected:
@@ -82,7 +82,7 @@ class InteractionLocation
                                        const int     a_lev,     /*!< level */
                                        const MFIter& a_mfi      /*!< multifab iterator*/ )
         {
-            BL_PROFILE("InteractionLocation::getAgentAttribs");
+            BL_PROFILE("InteractionModel::getAgentAttribs");
 
             auto& ptile = a_agents.ParticlesAt(a_lev, a_mfi);
             auto& soa   = ptile.GetStructOfArrays();
@@ -109,13 +109,13 @@ class InteractionLocation
             m_prob_ptr = soa.GetRealData(RealIdx::prob).data();
         }
 
-        /*! \brief Make particle bins for interactions at a given location */
+        /*! \brief Make particle bins for interactions at a given model */
         virtual void makeBins(  ACType&             a_agents,   /*!< agent container */
                                 const IntVect&      a_bin_size, /*!< bin size */
                                 const int           a_lev,      /*!< level */
-                                const std::string&  a_loc       /*!< location */ )
+                                const std::string&  a_mod       /*!< interaction model */ )
         {
-            BL_PROFILE("InteractionLocation::makeBins");
+            BL_PROFILE("InteractionModel::makeBins");
             const Geometry& geom = a_agents.Geom(a_lev);
             const auto dxi = geom.InvCellSizeArray();
             const auto plo = geom.ProbLoArray();
@@ -124,7 +124,7 @@ class InteractionLocation
             for(MFIter mfi = a_agents.MakeMFIter(a_lev, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
 
                 auto pair_ind = std::make_pair(mfi.index(), mfi.LocalTileIndex());
-                auto bins_ptr = a_agents.getBins(pair_ind, a_loc);
+                auto bins_ptr = a_agents.getBins(pair_ind, a_mod);
 
                 if (bins_ptr->numBins() < 0) {
 

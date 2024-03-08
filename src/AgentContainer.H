@@ -18,7 +18,7 @@
 #include "AgentDefinitions.H"
 #include "DemographicData.H"
 #include "DiseaseParm.H"
-#include "InteractionLocations.H"
+#include "InteractionModelLibrary.H"
 
 #if 0  // uncomment for EpiCast particle type
 
@@ -223,13 +223,13 @@ public:
         {
             using namespace ExaEpi;
 
-            /* Create the interaction location objects and push to container */
+            /* Create the interaction model objects and push to container */
             m_interactions.clear();
-            m_interactions[LocationNames::generic] = new InteractionLocGeneric<AgentContainer,AgentType>;
-            m_interactions[LocationNames::home] = new InteractionLocHome<AgentContainer,AgentType>;
-            m_interactions[LocationNames::work] = new InteractionLocWork<AgentContainer,AgentType>;
-            m_interactions[LocationNames::school] = new InteractionLocSchool<AgentContainer,AgentType>;
-            m_interactions[LocationNames::nborhood] = new InteractionLocNborhood<AgentContainer,AgentType>;
+            m_interactions[InteractionNames::generic] = new InteractionModGeneric<AgentContainer,AgentType>;
+            m_interactions[InteractionNames::home] = new InteractionModHome<AgentContainer,AgentType>;
+            m_interactions[InteractionNames::work] = new InteractionModWork<AgentContainer,AgentType>;
+            m_interactions[InteractionNames::school] = new InteractionModSchool<AgentContainer,AgentType>;
+            m_interactions[InteractionNames::nborhood] = new InteractionModNborhood<AgentContainer,AgentType>;
         }
 
         {
@@ -308,21 +308,21 @@ public:
 
     void moveAgentsToHome ();
 
-    /*! \brief Return bin pointer at a given mfi, tile and location name */
+    /*! \brief Return bin pointer at a given mfi, tile and model name */
     inline amrex::DenseBins<AgentContainer::ParticleType>* getBins( const std::pair<int,int>& a_idx,
-                                                                    const std::string& a_loc_name )
+                                                                    const std::string& a_mod_name )
     {
         BL_PROFILE("AgentContainer::getBins");
-        if (a_loc_name == ExaEpi::LocationNames::home) {
+        if (a_mod_name == ExaEpi::InteractionNames::home) {
             return &m_bins_home[a_idx];
-        } else if (    (a_loc_name == ExaEpi::LocationNames::work)
-                    || (a_loc_name == ExaEpi::LocationNames::school) ) {
+        } else if (    (a_mod_name == ExaEpi::InteractionNames::work)
+                    || (a_mod_name == ExaEpi::InteractionNames::school) ) {
             return &m_bins_work[a_idx];
-        } else if (a_loc_name == ExaEpi::LocationNames::nborhood) {
+        } else if (a_mod_name == ExaEpi::InteractionNames::nborhood) {
             if (m_at_work) { return &m_bins_work[a_idx]; }
             else           { return &m_bins_home[a_idx]; }
         } else {
-            amrex::Abort("Invalid a_loc_name!");
+            amrex::Abort("Invalid a_mod_name!");
             return nullptr;
         }
     }
@@ -351,17 +351,17 @@ protected:
         see AgentContainer::interactAgentsHomeWork() */
     std::map<std::pair<int, int>, amrex::DenseBins<AgentContainer::ParticleType> > m_bins_work;
 
-    std::map<std::string,InteractionLocation<AgentContainer,AgentType>*> m_interactions;
+    std::map<std::string,InteractionModel<AgentContainer,AgentType>*> m_interactions;
 
     /*! Flag to indicate if agents are at work */
     bool m_at_work;
 
-    /*! \brief queries if a given interaction type (location) is available */
-    inline bool haveInteractionLoc( const std::string& a_loc_name ) const
+    /*! \brief queries if a given interaction type (model) is available */
+    inline bool haveInteractionModel( const std::string& a_mod_name ) const
     {
-        BL_PROFILE("AgentContainer::haveInteractionLoc");
-        std::map<std::string,InteractionLocation<AgentContainer,AgentType>*>::const_iterator
-            it(m_interactions.find(a_loc_name));
+        BL_PROFILE("AgentContainer::haveInteractionModel");
+        std::map<std::string,InteractionModel<AgentContainer,AgentType>*>::const_iterator
+            it(m_interactions.find(a_mod_name));
         return (it != m_interactions.end());
     }
 

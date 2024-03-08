@@ -1,28 +1,28 @@
-/*! @file InteractionLocGeneric.H
- * \brief Contains the class describing agent interactions at a generic location
+/*! @file InteractionModGeneric.H
+ * \brief Contains the class describing agent interactions with a simple generic model
  */
 
-#ifndef _INTERACTION_LOC_GENERIC_H_
-#define _INTERACTION_LOC_GENERIC_H_
+#ifndef _INTERACTION_MOD_GENERIC_H_
+#define _INTERACTION_MOD_GENERIC_H_
 
-#include "Locations.H"
+#include "InteractionModel.H"
 #include "AgentDefinitions.H"
 
 using namespace amrex;
 
-/*! \brief Class describing agent interactions at a generic location */
+/*! \brief Class describing a simple generic agent interactions */
 template <typename ACType /*!< agent container type */, typename AType /*!< agent type */>
-class InteractionLocGeneric : public InteractionLocation<ACType,AType>
+class InteractionModGeneric : public InteractionModel<ACType,AType>
 {
     public:
 
         /*! \brief null constructor */
-        InteractionLocGeneric() { }
+        InteractionModGeneric() { }
 
         /*! \brief default destructor */
-        virtual ~InteractionLocGeneric() = default;
+        virtual ~InteractionModGeneric() = default;
 
-        /*! \brief Simulate agent interaction at a generic location */
+        /*! \brief Simulate agent interaction with a simple generic model */
         virtual void interactAgents( ACType&, MultiFab& );
 
     protected:
@@ -50,10 +50,10 @@ class InteractionLocGeneric : public InteractionLocation<ACType,AType>
         strain respectively.
 */
 template <typename ACType, typename AType>
-void InteractionLocGeneric<ACType,AType>::interactAgents(ACType&   a_agents,  /*!< Agent container */
+void InteractionModGeneric<ACType,AType>::interactAgents(ACType&   a_agents,  /*!< Agent container */
                                                          MultiFab& /* a_mask */  /*!< Masking behavior */)
 {
-    BL_PROFILE("InteractionLocGeneric::interactAgents");
+    BL_PROFILE("InteractionModGeneric::interactAgents");
 
     IntVect bin_size = {AMREX_D_DECL(1, 1, 1)};
     for (int lev = 0; lev < a_agents.numLevels(); ++lev)

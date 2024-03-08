@@ -1077,8 +1077,8 @@ std::array<Long, 5> AgentContainer::printTotals () {
 void AgentContainer::morningCommute ( MultiFab& /*a_mask_behavior*/ /*!< Masking behavior */ )
 {
     BL_PROFILE("AgentContainer::morningCommute");
-    //if (haveInteractionLoc(ExaEpi::LocationNames::transit)) {
-    //    m_interactions[ExaEpi::LocationNames::transit]->interactAgents( *this, a_mask_behavior );
+    //if (haveInteractionModel(ExaEpi::InteractionNames::transit)) {
+    //    m_interactions[ExaEpi::InteractionNames::transit]->interactAgents( *this, a_mask_behavior );
     //}
     moveAgentsToWork();
 }
@@ -1092,11 +1092,11 @@ void AgentContainer::morningCommute ( MultiFab& /*a_mask_behavior*/ /*!< Masking
 void AgentContainer::eveningCommute ( MultiFab& /*a_mask_behavior*/ /*!< Masking behavior */ )
 {
     BL_PROFILE("AgentContainer::eveningCommute");
-    //if (haveInteractionLoc(ExaEpi::LocationNames::transit)) {
-    //    m_interactions[ExaEpi::LocationNames::transit]->interactAgents( *this, a_mask_behavior );
+    //if (haveInteractionModel(ExaEpi::InteractionNames::transit)) {
+    //    m_interactions[ExaEpi::InteractionNames::transit]->interactAgents( *this, a_mask_behavior );
     //}
-    //if (haveInteractionLoc(ExaEpi::LocationNames::grocery_store)) {
-    //    m_interactions[ExaEpi::LocationNames::grocery_store]->interactAgents( *this, a_mask_behavior );
+    //if (haveInteractionModel(ExaEpi::InteractionNames::grocery_store)) {
+    //    m_interactions[ExaEpi::InteractionNames::grocery_store]->interactAgents( *this, a_mask_behavior );
     //}
     moveAgentsToHome();
 }
@@ -1105,14 +1105,14 @@ void AgentContainer::eveningCommute ( MultiFab& /*a_mask_behavior*/ /*!< Masking
 void AgentContainer::interactDay ( MultiFab& a_mask_behavior /*!< Masking behavior */ )
 {
     BL_PROFILE("AgentContainer::interactDay");
-    if (haveInteractionLoc(ExaEpi::LocationNames::work)) {
-        m_interactions[ExaEpi::LocationNames::work]->interactAgents( *this, a_mask_behavior );
+    if (haveInteractionModel(ExaEpi::InteractionNames::work)) {
+        m_interactions[ExaEpi::InteractionNames::work]->interactAgents( *this, a_mask_behavior );
     }
-    if (haveInteractionLoc(ExaEpi::LocationNames::school)) {
-        m_interactions[ExaEpi::LocationNames::school]->interactAgents( *this, a_mask_behavior );
+    if (haveInteractionModel(ExaEpi::InteractionNames::school)) {
+        m_interactions[ExaEpi::InteractionNames::school]->interactAgents( *this, a_mask_behavior );
     }
-    if (haveInteractionLoc(ExaEpi::LocationNames::nborhood)) {
-        m_interactions[ExaEpi::LocationNames::nborhood]->interactAgents( *this, a_mask_behavior );
+    if (haveInteractionModel(ExaEpi::InteractionNames::nborhood)) {
+        m_interactions[ExaEpi::InteractionNames::nborhood]->interactAgents( *this, a_mask_behavior );
     }
 }
 
@@ -1126,10 +1126,10 @@ void AgentContainer::interactEvening ( MultiFab& /*a_mask_behavior*/ /*!< Maskin
 void AgentContainer::interactNight ( MultiFab& a_mask_behavior /*!< Masking behavior */ )
 {
     BL_PROFILE("AgentContainer::interactNight");
-    if (haveInteractionLoc(ExaEpi::LocationNames::home)) {
-        m_interactions[ExaEpi::LocationNames::home]->interactAgents( *this, a_mask_behavior );
+    if (haveInteractionModel(ExaEpi::InteractionNames::home)) {
+        m_interactions[ExaEpi::InteractionNames::home]->interactAgents( *this, a_mask_behavior );
     }
-    if (haveInteractionLoc(ExaEpi::LocationNames::nborhood)) {
-        m_interactions[ExaEpi::LocationNames::nborhood]->interactAgents( *this, a_mask_behavior );
+    if (haveInteractionModel(ExaEpi::InteractionNames::nborhood)) {
+        m_interactions[ExaEpi::InteractionNames::nborhood]->interactAgents( *this, a_mask_behavior );
     }
 }

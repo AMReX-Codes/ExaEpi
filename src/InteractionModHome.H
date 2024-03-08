@@ -1,11 +1,11 @@
-/*! @file InteractionLocHome.H
+/*! @file InteractionModHome.H
  * \brief Contains the class describing agent interactions at home
  */
 
-#ifndef _INTERACTION_LOC_HOME_H_
-#define _INTERACTION_LOC_HOME_H_
+#ifndef _INTERACTION_MOD_HOME_H_
+#define _INTERACTION_MOD_HOME_H_
 
-#include "Locations.H"
+#include "InteractionModel.H"
 #include "DiseaseParm.H"
 #include "AgentDefinitions.H"
 
@@ -71,15 +71,15 @@ static void binaryInteractionHome ( const int a_i,  /*!< Index of infectious age
 
 /*! \brief Class describing agent interactions at home */
 template <typename ACType /*!< agent container type */, typename AType /*!< agent type */>
-class InteractionLocHome : public InteractionLocation<ACType,AType>
+class InteractionModHome : public InteractionModel<ACType,AType>
 {
     public:
 
         /*! \brief null constructor */
-        InteractionLocHome() { }
+        InteractionModHome() { }
 
         /*! \brief default destructor */
-        virtual ~InteractionLocHome() = default;
+        virtual ~InteractionModHome() = default;
 
         /*! \brief Simulate agent interaction at home */
         virtual void interactAgents( ACType&, MultiFab& );
@@ -122,10 +122,10 @@ class InteractionLocHome : public InteractionLocation<ACType,AType>
         #DiseaseParm::xmit_adult) depending on whether B works at a school or not (#IntIdx::school)
 */
 template <typename ACType, typename AType>
-void InteractionLocHome<ACType,AType>::interactAgents(ACType&   a_agents,  /*!< Agent container */
+void InteractionModHome<ACType,AType>::interactAgents(ACType&   a_agents,  /*!< Agent container */
                                                       MultiFab& /*a_mask*/     /*!< Masking behavior */)
 {
-    BL_PROFILE("InteractionLocHome::interactAgents");
+    BL_PROFILE("InteractionModHome::interactAgents");
 
     IntVect bin_size = {AMREX_D_DECL(1, 1, 1)};
     for (int lev = 0; lev < a_agents.numLevels(); ++lev)
@@ -135,7 +135,7 @@ void InteractionLocHome<ACType,AType>::interactAgents(ACType&   a_agents,  /*!< 
         const auto plo = geom.ProbLoArray();
         const auto domain = geom.Domain();
 
-        this->makeBins( a_agents, bin_size, lev, ExaEpi::LocationNames::home );
+        this->makeBins( a_agents, bin_size, lev, ExaEpi::InteractionNames::home );
 
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
@@ -143,7 +143,7 @@ void InteractionLocHome<ACType,AType>::interactAgents(ACType&   a_agents,  /*!< 
         for(MFIter mfi = a_agents.MakeMFIter(lev, TilingIfNotGPU()); mfi.isValid(); ++mfi)
         {
             auto pair_ind = std::make_pair(mfi.index(), mfi.LocalTileIndex());
-            auto bins_ptr = a_agents.getBins(pair_ind, ExaEpi::LocationNames::home);
+            auto bins_ptr = a_agents.getBins(pair_ind, ExaEpi::InteractionNames::home);
 
             auto& ptile = a_agents.ParticlesAt(lev, mfi);
             auto& aos   = ptile.GetArrayOfStructs();

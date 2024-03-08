@@ -14,12 +14,13 @@ set(_sources
          Initialization.cpp
          IO.H
          IO.cpp
-         InteractionLocGeneric.H
-         InteractionLocHome.H
-         InteractionLocSchool.H
-         InteractionLocWork.H
-         InteractionLocations.H
-         Locations.H
+         InteractionModel.H
+         InteractionModGeneric.H
+         InteractionModHome.H
+         InteractionModNborhood.H
+         InteractionModSchool.H
+         InteractionModWork.H
+         InteractionModelLibrary.H
          Utils.H
          Utils.cpp)
 
