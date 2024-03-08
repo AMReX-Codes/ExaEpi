@@ -1,6 +1,7 @@
 # List of source files
 set(_sources
          main.cpp
+         AgentDefinitions.H
          AgentContainer.H
          AgentContainer.cpp
          CaseData.H
@@ -13,6 +14,13 @@ set(_sources
          Initialization.cpp
          IO.H
          IO.cpp
+         InteractionModel.H
+         InteractionModGeneric.H
+         InteractionModHome.H
+         InteractionModNborhood.H
+         InteractionModSchool.H
+         InteractionModWork.H
+         InteractionModelLibrary.H
          Utils.H
          Utils.cpp)
 

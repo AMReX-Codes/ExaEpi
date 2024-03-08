@@ -162,11 +162,17 @@ void runAgent ()
                 ExaEpi::IO::writeFIPSData(pc, unit_mf, FIPS_mf, comm_mf, demo, params.aggregated_diag_prefix, i);
             }
 
+            // Update agents' disease status
             pc.updateStatus(disease_stats);
-            pc.moveAgentsToWork();
-            pc.interactAgentsHomeWork(mask_behavior, false);
-            pc.moveAgentsToHome();
-            pc.interactAgentsHomeWork(mask_behavior, true);
+
+            // Typical day
+            pc.morningCommute(mask_behavior);
+            pc.interactDay(mask_behavior);
+            pc.eveningCommute(mask_behavior);
+            pc.interactEvening(mask_behavior);
+            pc.interactNight(mask_behavior);
+
+            // Infect agents based on their interactions
             pc.infectAgents();
 
             //            if ((params.random_travel_int > 0) && (i % params.random_travel_int == 0)) {
