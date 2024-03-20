@@ -804,8 +804,10 @@ void AgentContainer::updateStatus (MultiFab& disease_stats /*!< Community-wise d
             auto counter_ptr = soa.GetRealData(RealIdx::disease_counter).data();
             auto timer_ptr = soa.GetRealData(RealIdx::treatment_timer).data();
             auto prob_ptr = soa.GetRealData(RealIdx::prob).data();
+            auto withdrawn_ptr = soa.GetIntData(IntIdx::withdrawn).data();
             auto incubation_period_ptr = soa.GetRealData(RealIdx::incubation_period).data();
             auto infectious_period_ptr = soa.GetRealData(RealIdx::infectious_period).data();
+            auto symptomdev_period_ptr = soa.GetRealData(RealIdx::symptomdev_period).data();
 
             auto ds_arr = disease_stats[mfi].array();
 
@@ -834,6 +836,9 @@ void AgentContainer::updateStatus (MultiFab& disease_stats /*!< Community-wise d
                 }
                 else if (status_ptr[i] == Status::infected) {
                     counter_ptr[i] += 1;
+                    if (counter_ptr[i] == amrex::Math::ceil(symptomdev_period_ptr[i])) {
+                        withdrawn_ptr[i] = 1;
+                    }
                     if (counter_ptr[i] < incubation_period_ptr[i]) {
                         // incubation phase
                         return;
@@ -930,6 +935,7 @@ void AgentContainer::updateStatus (MultiFab& disease_stats /*!< Community-wise d
                         else { // not hospitalized, recover once not infectious
                             if (counter_ptr[i] >= (incubation_period_ptr[i] + infectious_period_ptr[i])) {
                                 status_ptr[i] = Status::immune;
+                                withdrawn_ptr[i] = 0;
                             }
                         }
                     }
