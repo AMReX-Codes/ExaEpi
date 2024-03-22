@@ -113,6 +113,27 @@ void runAgent ()
     amrex::Print() << "Max grid size is: " << params.max_grid_size << "\n";
     amrex::Print() << "Number of boxes is: " << ba.size() << " over " << ParallelDescriptor::NProcs() << " ranks. \n";
 
+    std::string output_filename = "output.dat";
+    if (ParallelDescriptor::IOProcessor())
+    {
+        std::ofstream File;
+        File.open(output_filename.c_str(), std::ios::out|std::ios::trunc);
+
+        if (!File.good()) {
+            amrex::FileOpenFailed(output_filename);
+        }
+
+        File << "Day Never Infected Immune Deaths\n";
+
+        File.flush();
+
+        File.close();
+
+        if (!File.good()) {
+            amrex::Abort("problem writing output file");
+        }
+    }
+
     iMultiFab num_residents(ba, dm, 6, 0);
     iMultiFab unit_mf(ba, dm, 1, 0);
     iMultiFab FIPS_mf(ba, dm, 2, 0);
@@ -181,12 +202,25 @@ void runAgent ()
             }
             cumulative_deaths = counts[4];
 
-            amrex::Print() << "    Total never: "       << counts[0] << "\n";
-            amrex::Print() << "    Total infected: "    << counts[1] << "\n";
-            amrex::Print() << "    Total immune: "      << counts[2] << "\n";
-         // amrex::Print() << "    Total susceptible: " << counts[3] << "\n";
-            amrex::Print() << "    Total deaths: "      << counts[4] << "\n";
-            amrex::Print() << "\n";
+            if (ParallelDescriptor::IOProcessor())
+            {
+                std::ofstream File;
+                File.open(output_filename.c_str(), std::ios::out|std::ios::app);
+
+                if (!File.good()) {
+                    amrex::FileOpenFailed(output_filename);
+                }
+
+                File << i << " " << counts[0] << " " << counts[1] << " " << counts[2] << " " << counts[4] << "\n";
+
+                File.flush();
+
+                File.close();
+
+                if (!File.good()) {
+                    amrex::Abort("problem writing output file");
+                }
+            }
 
             cur_time += 1.0; // time step is one day
         }
