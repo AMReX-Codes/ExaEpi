@@ -335,7 +335,7 @@ public:
 
     void generateCellData (amrex::MultiFab& mf) const;
 
-    std::array<amrex::Long, 5> printTotals ();
+    std::array<amrex::Long, 5> getTotals ();
 
     const DiseaseParm * getDiseaseParameters_h () const {
         return h_parm;

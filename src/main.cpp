@@ -123,7 +123,7 @@ void runAgent ()
             amrex::FileOpenFailed(output_filename);
         }
 
-        File << "Day Never Infected Immune Deaths\n";
+        File << "Day Never Infected Immune Deaths Hospitalized Ventilated ICU\n";
 
         File.flush();
 
@@ -160,7 +160,7 @@ void runAgent ()
     Long num_infected_peak = 0;
     Long cumulative_deaths = 0;
     {
-        auto counts = pc.printTotals();
+        auto counts = pc.getTotals();
         if (counts[1] > num_infected_peak) {
             num_infected_peak = counts[1];
             step_of_peak = 0;
@@ -195,12 +195,30 @@ void runAgent ()
             //            }
             //            pc.Redistribute();
 
-            auto counts = pc.printTotals();
+            auto counts = pc.getTotals();
             if (counts[1] > num_infected_peak) {
                 num_infected_peak = counts[1];
                 step_of_peak = i;
             }
             cumulative_deaths = counts[4];
+
+            auto const& ma = disease_stats.const_arrays();
+            GpuTuple<Real,Real,Real,Real> mm = ParReduce(
+                         TypeList<ReduceOpSum,ReduceOpSum,ReduceOpSum,ReduceOpSum>{},
+                         TypeList<Real,Real,Real,Real>{},
+                         disease_stats, IntVect(0, 0),
+                         [=] AMREX_GPU_DEVICE (int box_no, int i, int j, int k) noexcept
+                         -> GpuTuple<Real,Real,Real,Real>
+                         {
+                             return { ma[box_no](i,j,k,0),
+                                      ma[box_no](i,j,k,1),
+                                      ma[box_no](i,j,k,2),
+                                      ma[box_no](i,j,k,3) };
+                         });
+            std::array<Real, 4> mmc = {amrex::get<0>(mm), amrex::get<1>(mm), amrex::get<2>(mm), amrex::get<3>(mm)};
+
+            // total number of deaths computed on agents and on mesh should be the same...
+            AMREX_ALWAYS_ASSERT(mmc[3] == counts[4]);
 
             if (ParallelDescriptor::IOProcessor())
             {
@@ -211,7 +229,7 @@ void runAgent ()
                     amrex::FileOpenFailed(output_filename);
                 }
 
-                File << i << " " << counts[0] << " " << counts[1] << " " << counts[2] << " " << counts[4] << "\n";
+                File << i << " " << counts[0] << " " << counts[1] << " " << counts[2] << " " << counts[4] << " " << mmc[0] << " " << mmc[1] << " " << mmc[2] << "\n";
 
                 File.flush();
 
