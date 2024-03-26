@@ -207,13 +207,13 @@ void runAgent ()
                          TypeList<ReduceOpSum,ReduceOpSum,ReduceOpSum,ReduceOpSum>{},
                          TypeList<Real,Real,Real,Real>{},
                          disease_stats, IntVect(0, 0),
-                         [=] AMREX_GPU_DEVICE (int box_no, int i, int j, int k) noexcept
+                         [=] AMREX_GPU_DEVICE (int box_no, int ii, int jj, int kk) noexcept
                          -> GpuTuple<Real,Real,Real,Real>
                          {
-                             return { ma[box_no](i,j,k,0),
-                                      ma[box_no](i,j,k,1),
-                                      ma[box_no](i,j,k,2),
-                                      ma[box_no](i,j,k,3) };
+                             return { ma[box_no](ii,jj,kk,0),
+                                      ma[box_no](ii,jj,kk,1),
+                                      ma[box_no](ii,jj,kk,2),
+                                      ma[box_no](ii,jj,kk,3) };
                          });
             std::array<Real, 4> mmc = {amrex::get<0>(mm), amrex::get<1>(mm), amrex::get<2>(mm), amrex::get<3>(mm)};
 
