@@ -225,11 +225,13 @@ void runAgent ()
                          });
             std::array<Real, 4> mmc = {amrex::get<0>(mm), amrex::get<1>(mm), amrex::get<2>(mm), amrex::get<3>(mm)};
 
-            // total number of deaths computed on agents and on mesh should be the same...
-            AMREX_ALWAYS_ASSERT(mmc[3] == counts[4]);
+            ParallelDescriptor::ReduceRealSum(&mmc[0], 4, ParallelDescriptor::IOProcessorNumber());
 
             if (ParallelDescriptor::IOProcessor())
             {
+                // total number of deaths computed on agents and on mesh should be the same...
+                AMREX_ALWAYS_ASSERT(mmc[3] == counts[4]);
+
                 std::ofstream File;
                 File.open(output_filename.c_str(), std::ios::out|std::ios::app);
 
