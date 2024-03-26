@@ -40,10 +40,15 @@ In addition to the ExaEpi inputs, there are also a number of runtime options tha
     The path to the ``*.bin`` file containing worker flow information.
     Must be provided if ``ic_type`` is ``"census"``. Examples of these data files are provided
     in ``ExaEpi/data/CensusData``.
+* ``agent.initial_case_type`` (`string`)
+    Either ``random`` or ``file``. If ``random``, ``agent.num_initial_cases`` must be set.
+    If ``file``, ``agent.case_filename`` must be set. Must be provided if ``ic_type`` is ``"census"``.
 * ``agent.case_filename`` (`string`)
     The path to the ``*.cases`` file containing the initial case data to use.
-    Must be provided if ``ic_type`` is ``"census"``. Examples of these data files are provided
+    Must be provided if ``initial_case_type`` is ``"file"``. Examples of these data files are provided
     in ``ExaEpi/data/CaseData``.
+* ``agent.num_initial_cases`` (int)
+    The number of initial cases to seed. Must be provided if ``initial_case_type`` is ``"random"``.
 * ``agent.nsteps`` (`integer`)
     The number of time steps to simulate. Currently, time steps are fixed at 12 hours, so to
     run for 30 days, input `60`.

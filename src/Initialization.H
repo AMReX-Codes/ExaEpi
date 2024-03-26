@@ -23,10 +23,13 @@ namespace Initialization
                           const amrex::iMultiFab& comm_mf,
                           AgentContainer& pc);
 
-    void setInitialCases (AgentContainer& pc, const amrex::iMultiFab& unit_mf,
-                          const amrex::iMultiFab& FIPS_mf, const amrex::iMultiFab& comm_mf,
-                          const CaseData& cases, const DemographicData& demo);
+    void setInitialCasesFromFile (AgentContainer& pc, const amrex::iMultiFab& unit_mf,
+                                  const amrex::iMultiFab& FIPS_mf, const amrex::iMultiFab& comm_mf,
+                                  const CaseData& cases, const DemographicData& demo);
 
+    void setInitialCasesRandom (AgentContainer& pc, const amrex::iMultiFab& unit_mf,
+                                const amrex::iMultiFab& FIPS_mf, const amrex::iMultiFab& comm_mf,
+                                int num_cases, const DemographicData& demo);
 }
 }
 

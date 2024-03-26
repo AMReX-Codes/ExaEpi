@@ -99,7 +99,9 @@ void runAgent ()
     if (params.ic_type == ICType::Census) { demo.InitFromFile(params.census_filename); }
 
     CaseData cases;
-    if (params.ic_type == ICType::Census) { cases.InitFromFile(params.case_filename); }
+    if (params.ic_type == ICType::Census && params.initial_case_type == "file") {
+        cases.InitFromFile(params.case_filename);
+    }
 
     Geometry geom = ExaEpi::Utils::get_geometry(demo, params);
 
@@ -152,7 +154,13 @@ void runAgent ()
         } else if (params.ic_type == ICType::Census) {
             pc.initAgentsCensus(num_residents, unit_mf, FIPS_mf, comm_mf, demo);
             ExaEpi::Initialization::read_workerflow(demo, params, unit_mf, comm_mf, pc);
-            ExaEpi::Initialization::setInitialCases(pc, unit_mf, FIPS_mf, comm_mf, cases, demo);
+            if (params.initial_case_type == "file") {
+                ExaEpi::Initialization::setInitialCasesFromFile(pc, unit_mf, FIPS_mf, comm_mf,
+                                                        cases, demo);
+            } else {
+                ExaEpi::Initialization::setInitialCasesRandom(pc, unit_mf, FIPS_mf, comm_mf,
+                                                              params.num_initial_cases, demo);
+            }
         }
     }
 

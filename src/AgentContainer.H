@@ -29,8 +29,8 @@ struct RealIdx
         treatment_timer,        /*!< Timer since hospital admission */
         prob,                   /*!< Probability of infection */
         incubation_period,      /*!< Time until infectious */
-        infectious_period,       /*!< Length of time infectious */
-        symptomdev_period,       /*!< Time until symptoms would develop */
+        infectious_period,      /*!< Length of time infectious */
+        symptomdev_period,      /*!< Time until symptoms would develop */
         nattribs                /*!< number of real-type attribute*/
     };
 };
