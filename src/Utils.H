@@ -52,6 +52,9 @@ struct TestParams
     */
     std::string workerflow_filename;
 
+    std::string initial_case_type;
+    int num_initial_cases;
+
     /*! Initial cases filename (CaseData::InitFromFile):
         The case data file is an ASCII text file with three columns of numbers:
         FIPS code, current number of cases, and cumulative number of cases till date.
