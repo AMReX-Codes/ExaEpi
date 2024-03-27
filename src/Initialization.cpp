@@ -232,15 +232,20 @@ namespace Initialization
                                   const amrex::iMultiFab& comm_mf, /*!< MultiFab with community number at each grid cell */
                                   std::map<std::pair<int, int>,
                                   amrex::DenseBins<AgentContainer::ParticleType> >& bin_map, /*!< Map of dense bins with agents */
-                                  const CaseData& /*cases*/, /*!< Case data */
                                   const DemographicData& demo, /*!< Demographic data */
                                   int unit, /*!< Unit number to infect */
                                   int ninfect /*!< Target number of agents to infect */ ) {
-        // chose random community in unit
-        int ncomms = demo.Start[unit+1] - demo.Start[unit];
+        // chose random community
+        int ncomms = demo.Ncommunity;
+        int comm_offset = 0;
+        if (unit > 0) {
+            ncomms = demo.Start[unit+1] - demo.Start[unit];
+            comm_offset = demo.Start[unit];
+        }
+
         int random_comm = -1;
         if (ParallelDescriptor::IOProcessor()) {
-            random_comm = amrex::Random_int(ncomms) + demo.Start[unit];
+            random_comm = amrex::Random_int(ncomms) + comm_offset;
         }
         ParallelDescriptor::Bcast(&random_comm, 1);
 
@@ -348,15 +353,15 @@ namespace Initialization
           number of infected agents is equal or greater than the number of infections for this
           FIPS code. See #ExaEpi::Initialization::infect_random_community().
     */
-    void setInitialCases( AgentContainer&         pc,       /*!< Agent container (particle container) */
-                          const amrex::iMultiFab& unit_mf,  /*!< MultiFab with unit number at each grid cell */
-                          const amrex::iMultiFab& FIPS_mf,  /*!< FIPS code (component 0) and
+    void setInitialCasesFromFile (AgentContainer&         pc,       /*!< Agent container (particle container) */
+                                  const amrex::iMultiFab& unit_mf,  /*!< MultiFab with unit number at each grid cell */
+                                  const amrex::iMultiFab& FIPS_mf,  /*!< FIPS code (component 0) and
                                                                  census tract number (component 1) */
-                          const amrex::iMultiFab& comm_mf,  /*!< MultiFab with community number at each grid cell */
-                          const CaseData&         cases,    /*!< Case data */
-                          const DemographicData& demo       /*!< demographic data */ )
+                                  const amrex::iMultiFab& comm_mf,  /*!< MultiFab with community number at each grid cell */
+                                  const CaseData&         cases,    /*!< Case data */
+                                  const DemographicData& demo       /*!< demographic data */ )
     {
-        BL_PROFILE("setInitialCases");
+        BL_PROFILE("setInitialCasesFromFile");
 
         std::map<std::pair<int, int>, amrex::DenseBins<AgentContainer::ParticleType> > bin_map;
 
@@ -374,13 +379,37 @@ namespace Initialization
                     int u=0;
                     int i=0;
                     while (i < cases.Size_hubs[ihub]) {
-                        int nSuccesses= infect_random_community(pc, unit_mf, FIPS_mf, comm_mf, bin_map, cases, demo, units[u], ntry);
+                        int nSuccesses= infect_random_community(pc, unit_mf, FIPS_mf, comm_mf, bin_map, demo, units[u], ntry);
                         ninf += nSuccesses;
                         i+= nSuccesses;
                         u=(u+1)%units.size(); //sometimes we infect fewer than ntry, but switch to next unit anyway
                     }
-                    amrex::Print() << "Infected " << i<< " total " << ninf << " after processing FIPS " << FIPS<< " \n";
+                    amrex::Print() << "Infected " << i<< " total " << ninf << " after processing FIPS " << FIPS << " \n";
                 }
+            }
+        }
+        amrex::ignore_unused(ninf);
+    }
+
+    void setInitialCasesRandom (AgentContainer&         pc,       /*!< Agent container (particle container) */
+                                const amrex::iMultiFab& unit_mf,  /*!< MultiFab with unit number at each grid cell */
+                                const amrex::iMultiFab& FIPS_mf,  /*!< FIPS code (component 0) and
+                                                                 census tract number (component 1) */
+                                const amrex::iMultiFab& comm_mf,  /*!< MultiFab with community number at each grid cell */
+                                int num_cases,
+                                const DemographicData& demo       /*!< demographic data */ )
+    {
+        BL_PROFILE("setInitialCasesRandom");
+
+        std::map<std::pair<int, int>, amrex::DenseBins<AgentContainer::ParticleType> > bin_map;
+
+        int ninf = 0;
+        for (int ihub = 0; ihub < num_cases; ++ihub) {
+            int i = 0;
+            while (i < 1) {
+                int nSuccesses= infect_random_community(pc, unit_mf, FIPS_mf, comm_mf, bin_map, demo, -1, 1);
+                ninf += nSuccesses;
+                i+= nSuccesses;
             }
         }
         amrex::ignore_unused(ninf);

@@ -1393,8 +1393,8 @@ void AgentContainer::generateCellData (MultiFab& mf /*!< MultiFab with at least 
     Returns a vector with 5 components corresponding to each value of #Status; each element is
     the total number of agents at a step with the corresponding #Status (in that order).
 */
-std::array<Long, 5> AgentContainer::printTotals () {
-    BL_PROFILE("printTotals");
+std::array<Long, 5> AgentContainer::getTotals () {
+    BL_PROFILE("getTotals");
     amrex::ReduceOps<ReduceOpSum, ReduceOpSum, ReduceOpSum, ReduceOpSum, ReduceOpSum> reduce_ops;
     auto r = amrex::ParticleReduce<ReduceData<int,int,int,int,int>> (
                   *this, [=] AMREX_GPU_DEVICE (const SuperParticleType& p) noexcept
