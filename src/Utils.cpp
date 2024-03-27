@@ -65,6 +65,9 @@ void ExaEpi::Utils::get_test_params (   TestParams& params,         /*!< Test pa
         pp.get("aggregated_diag_prefix", params.aggregated_diag_prefix);
     }
 
+    pp.query("shelter_start",  params.shelter_start);
+    pp.query("shelter_length", params.shelter_length);
+
     Long seed = 0;
     bool reset_seed = pp.query("seed", seed);
     if (reset_seed) {
