@@ -193,6 +193,10 @@ public:
 
     void infectAgents ();
 
+    void shelterStart ();
+
+    void shelterStop ();
+
     void generateCellData (amrex::MultiFab& mf) const;
 
     std::array<amrex::Long, 5> getTotals ();

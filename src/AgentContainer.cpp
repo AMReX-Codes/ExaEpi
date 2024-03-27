@@ -1039,6 +1039,69 @@ void AgentContainer::interactAgents ()
     }
 }
 
+void AgentContainer::shelterStart ()
+{
+    BL_PROFILE("AgentContainer::shelterStart");
+
+    amrex::Print() << "Starting shelter in place order \n";
+
+    for (int lev = 0; lev <= finestLevel(); ++lev)
+    {
+        auto& plev  = GetParticles(lev);
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (Gpu::notInLaunchRegion())
+#endif
+        for(MFIter mfi = MakeMFIter(lev, TilingIfNotGPU()); mfi.isValid(); ++mfi)
+        {
+            int gid = mfi.index();
+            int tid = mfi.LocalTileIndex();
+            auto& ptile = plev[std::make_pair(gid, tid)];
+            auto& soa   = ptile.GetStructOfArrays();
+            const auto np = ptile.numParticles();
+            auto withdrawn_ptr = soa.GetIntData(IntIdx::withdrawn).data();
+
+            amrex::ParallelForRNG( np,
+            [=] AMREX_GPU_DEVICE (int i, amrex::RandomEngine const& engine) noexcept
+            {
+                if (amrex::Random(engine) < 0.95) {
+                    withdrawn_ptr[i] = 1;
+                }
+            });
+        }
+    }
+}
+
+void AgentContainer::shelterStop ()
+{
+    BL_PROFILE("AgentContainer::shelterStop");
+
+    amrex::Print() << "Stopping shelter in place order \n";
+
+    for (int lev = 0; lev <= finestLevel(); ++lev)
+    {
+        auto& plev  = GetParticles(lev);
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (Gpu::notInLaunchRegion())
+#endif
+        for(MFIter mfi = MakeMFIter(lev, TilingIfNotGPU()); mfi.isValid(); ++mfi)
+        {
+            int gid = mfi.index();
+            int tid = mfi.LocalTileIndex();
+            auto& ptile = plev[std::make_pair(gid, tid)];
+            auto& soa   = ptile.GetStructOfArrays();
+            const auto np = ptile.numParticles();
+            auto withdrawn_ptr = soa.GetIntData(IntIdx::withdrawn).data();
+
+            amrex::ParallelFor( np, [=] AMREX_GPU_DEVICE (int i) noexcept
+            {
+                withdrawn_ptr[i] = 0;
+            });
+        }
+    }
+}
+
 /*! \brief Infect agents based on their current status and the computed probability of infection.
     The infection probability is computed in AgentContainer::interactAgentsHomeWork() or
     AgentContainer::interactAgents()

@@ -191,6 +191,14 @@ void runAgent ()
                 ExaEpi::IO::writeFIPSData(pc, unit_mf, FIPS_mf, comm_mf, demo, params.aggregated_diag_prefix, i);
             }
 
+            if (params.shelter_start > 0 && params.shelter_start == i) {
+                pc.shelterStart();
+            }
+
+            if (params.shelter_start > 0 && params.shelter_start + params.shelter_length == i) {
+                pc.shelterStop();
+            }
+
             pc.updateStatus(disease_stats);
             pc.moveAgentsToWork();
             pc.interactAgentsHomeWork(mask_behavior, false);
