@@ -1094,8 +1094,7 @@ void AgentContainer::shelterStop ()
             const auto np = ptile.numParticles();
             auto withdrawn_ptr = soa.GetIntData(IntIdx::withdrawn).data();
 
-            amrex::ParallelForRNG( np,
-            [=] AMREX_GPU_DEVICE (int i, amrex::RandomEngine const& engine) noexcept
+            amrex::ParallelFor( np, [=] AMREX_GPU_DEVICE (int i) noexcept
             {
                 withdrawn_ptr[i] = 0;
             });
