@@ -113,6 +113,11 @@ public:
         d_parm = (DiseaseParm*)amrex::The_Arena()->alloc(sizeof(DiseaseParm));
 
         {
+            amrex::ParmParse pp("agent");
+            pp.query("symptomatic_withdraw", m_symptomatic_withdraw);
+        }
+
+        {
             amrex::ParmParse pp("contact");
             pp.query("pSC", h_parm->pSC);
             pp.query("pCO", h_parm->pCO);
@@ -201,6 +206,8 @@ public:
     }
 
 protected:
+
+    int m_symptomatic_withdraw = 0;
 
     DiseaseParm* h_parm;    /*!< Disease parameters */
     DiseaseParm* d_parm;    /*!< Disease parameters (GPU device) */
