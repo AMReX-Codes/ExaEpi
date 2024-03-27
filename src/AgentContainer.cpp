@@ -821,6 +821,8 @@ void AgentContainer::updateStatus (MultiFab& disease_stats /*!< Community-wise d
                 };
             };
 
+            auto symptomatic_withdraw = m_symptomatic_withdraw;
+
             // Track hospitalization, ICU, ventilator, and fatalities
             Real CHR[] = {.0104, .0104, .070, .28, 1.0};  // sick -> hospital probabilities
             Real CIC[] = {.24, .24, .24, .36, .35};      // hospital -> ICU probabilities
@@ -836,7 +838,7 @@ void AgentContainer::updateStatus (MultiFab& disease_stats /*!< Community-wise d
                 }
                 else if (status_ptr[i] == Status::infected) {
                     counter_ptr[i] += 1;
-                    if (counter_ptr[i] == amrex::Math::ceil(symptomdev_period_ptr[i])) {
+                    if (counter_ptr[i] == amrex::Math::ceil(symptomdev_period_ptr[i]) && symptomatic_withdraw) {
                         withdrawn_ptr[i] = 1;
                     }
                     if (counter_ptr[i] < incubation_period_ptr[i]) {
