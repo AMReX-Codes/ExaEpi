@@ -64,7 +64,7 @@ struct IntIdx
         workgroup,      /*!< workgroup ID */
         work_nborhood,  /*!< work neighborhood ID */
         withdrawn,      /*!< quarantine status */
-        symptomatic,    /*!< currently symptomatic? */
+        symptomatic,    /*!< currently symptomatic? 0: no, but will be, 1: yes, 2: no, and will remain so until recovered */
         nattribs        /*!< number of integer-type attribute */
     };
 };
@@ -199,7 +199,7 @@ public:
 
     void generateCellData (amrex::MultiFab& mf) const;
 
-    std::array<amrex::Long, 5> getTotals ();
+    std::array<amrex::Long, 9> getTotals ();
 
     const DiseaseParm * getDiseaseParameters_h () const {
         return h_parm;
