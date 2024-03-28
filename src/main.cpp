@@ -125,7 +125,7 @@ void runAgent ()
             amrex::FileOpenFailed(output_filename);
         }
 
-        File << "Day Never Infected Immune Deaths Hospitalized Ventilated ICU\n";
+        File << "Day Never Infected Immune Deaths Hospitalized Ventilated ICU Exposed Asymptomatic Presymptomatic Symptomatic\n";
 
         File.flush();
 
@@ -240,6 +240,13 @@ void runAgent ()
                 // total number of deaths computed on agents and on mesh should be the same...
                 AMREX_ALWAYS_ASSERT(mmc[3] == counts[4]);
 
+                // the total number of infected should equal the sum of
+                //     exposed but not infectious
+                //     infectious and asymptomatic
+                //     infectious and pre-symptomatic
+                //     infectious and symptomatic
+                AMREX_ALWAYS_ASSERT(counts[1] == counts[5] + counts[6] + counts[7] + counts[8]);
+
                 std::ofstream File;
                 File.open(output_filename.c_str(), std::ios::out|std::ios::app);
 
@@ -247,7 +254,7 @@ void runAgent ()
                     amrex::FileOpenFailed(output_filename);
                 }
 
-                File << i << " " << counts[0] << " " << counts[1] << " " << counts[2] << " " << counts[4] << " " << mmc[0] << " " << mmc[1] << " " << mmc[2] << "\n";
+                File << i << " " << counts[0] << " " << counts[1] << " " << counts[2] << " " << counts[4] << " " << mmc[0] << " " << mmc[1] << " " << mmc[2] << " " << counts[5] << " " << counts[6] << " " << counts[7] << " " << counts[8] << "\n";
 
                 File.flush();
 
