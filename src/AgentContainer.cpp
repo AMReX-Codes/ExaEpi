@@ -925,6 +925,9 @@ void AgentContainer::updateStatus (MultiFab& disease_stats /*!< Community-wise d
                                 }
                                 amrex::Gpu::Atomic::AddNoRet(
                                                              &ds_arr(home_i_ptr[i], home_j_ptr[i], 0,
+                                                                     DiseaseStats::hospitalization), -1.0_rt);
+                                amrex::Gpu::Atomic::AddNoRet(
+                                                             &ds_arr(home_i_ptr[i], home_j_ptr[i], 0,
                                                                      DiseaseStats::ICU), -1.0_rt);
                                 if (status_ptr[i] != Status::dead) {
                                     status_ptr[i] = Status::immune;  // If alive, ICU patient recovers
@@ -938,7 +941,12 @@ void AgentContainer::updateStatus (MultiFab& disease_stats /*!< Community-wise d
                                     status_ptr[i] = Status::dead;
                                     //pstruct_ptr[i].id() = -pstruct_ptr[i].id();
                                 }
-
+                                amrex::Gpu::Atomic::AddNoRet(
+                                                             &ds_arr(home_i_ptr[i], home_j_ptr[i], 0,
+                                                                     DiseaseStats::hospitalization), -1.0_rt);
+                                amrex::Gpu::Atomic::AddNoRet(
+                                                             &ds_arr(home_i_ptr[i], home_j_ptr[i], 0,
+                                                                     DiseaseStats::ICU), -1.0_rt);
                                 amrex::Gpu::Atomic::AddNoRet(
                                                              &ds_arr(home_i_ptr[i], home_j_ptr[i], 0,
                                                                      DiseaseStats::ventilator), -1.0_rt);
