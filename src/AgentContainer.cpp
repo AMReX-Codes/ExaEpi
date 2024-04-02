@@ -1084,10 +1084,11 @@ void AgentContainer::shelterStart ()
             const auto np = ptile.numParticles();
             auto withdrawn_ptr = soa.GetIntData(IntIdx::withdrawn).data();
 
+            auto shelter_compliance = m_shelter_compliance;
             amrex::ParallelForRNG( np,
             [=] AMREX_GPU_DEVICE (int i, amrex::RandomEngine const& engine) noexcept
             {
-                if (amrex::Random(engine) < 0.95) {
+                if (amrex::Random(engine) < shelter_compliance) {
                     withdrawn_ptr[i] = 1;
                 }
             });
