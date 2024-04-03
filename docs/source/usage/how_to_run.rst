@@ -68,6 +68,8 @@ In addition to the ExaEpi inputs, there are also a number of runtime options tha
     Day on which to start shelter-in-place.
 * ``agent.shelter_length`` (`integer`)
     Number of days shelter in-place-is in effect.
+* ``agent.shelter_compliance`` (`float`)
+    Fraction of agents that comply with shelter-in-place order.
 * ``agent.symptomatic_withdraw`` (`integer`)
     Whether or not to have symptomatic agents withdraw.
 * ``contact.pSC`` (`float`, default: 0.2)
