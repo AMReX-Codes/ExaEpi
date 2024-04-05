@@ -1,4 +1,5 @@
 import yt
+from yt.frontends import boxlib
 from yt.frontends.boxlib.api import AMReXDataset
 
 import pylab as plt
