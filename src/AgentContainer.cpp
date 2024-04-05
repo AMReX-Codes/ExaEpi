@@ -841,12 +841,14 @@ void AgentContainer::updateStatus (MultiFab& disease_stats /*!< Community-wise d
                 }
                 else if (status_ptr[i] == Status::infected) {
                     counter_ptr[i] += 1;
-                    if (amrex::Random(engine) < lparm->p_asymp[0]) {
-                        symptomatic_ptr[i] = 2;
-                    } else {
-                        symptomatic_ptr[i] = 0;
+                    if (counter_ptr[i] == 1) {
+                        if (amrex::Random(engine) < lparm->p_asymp[0]) {
+                            symptomatic_ptr[i] = 2;
+                        } else {
+                            symptomatic_ptr[i] = 0;
+                        }
                     }
-                    if (counter_ptr[i] == amrex::Math::ceil(symptomdev_period_ptr[i])) {
+                    if (counter_ptr[i] == amrex::Math::floor(symptomdev_period_ptr[i])) {
                         if (symptomatic_ptr[i] != 2) {
                             symptomatic_ptr[i] = 1;
                         }
@@ -858,7 +860,7 @@ void AgentContainer::updateStatus (MultiFab& disease_stats /*!< Community-wise d
                         // incubation phase
                         return;
                     }
-                    if (counter_ptr[i] == amrex::Math::ceil(incubation_period_ptr[i])) {
+                    if (counter_ptr[i] == amrex::Math::floor(incubation_period_ptr[i])) {
                         // decide if hospitalized
                         Real p_hosp = CHR[age_group_ptr[i]];
                         if (amrex::Random(engine) < p_hosp) {
@@ -1312,7 +1314,7 @@ void AgentContainer::interactAgentsHomeWork ( MultiFab& /*mask_behavior*/ /*!< M
                 AMREX_ALWAYS_ASSERT( (Long) i < np);
                 if (status_ptr[i] == Status::immune) { return; }
                 if (status_ptr[i] == Status::dead) { return; }
-                if (status_ptr[i] == Status::infected && counter_ptr[i] < incubation_period_ptr[i]) { return; }  // incubation stage
+                if ((status_ptr[i] == Status::infected) && (counter_ptr[i] < incubation_period_ptr[i])) { return; }  // incubation stage
                 //amrex::Real i_mask = mask_arr(home_i_ptr[i], home_j_ptr[i], 0);
                 for (unsigned int jj = cell_start; jj < cell_stop; ++jj) {
                     auto j = inds[jj];
@@ -1321,7 +1323,7 @@ void AgentContainer::interactAgentsHomeWork ( MultiFab& /*mask_behavior*/ /*!< M
                     //amrex::Real j_mask = mask_arr(home_i_ptr[j], home_j_ptr[j], 0);
                     if (status_ptr[j] == Status::immune) {continue;}
                     if (status_ptr[j] == Status::dead) {continue;}
-                    if (status_ptr[j] == Status::infected && counter_ptr[j] < incubation_period_ptr[j]) { continue; }  // incubation stage
+                    if ((status_ptr[j] == Status::infected) && (counter_ptr[j] < incubation_period_ptr[j])) { continue; }  // incubation stage
 
                     if (status_ptr[j] == Status::infected &&
                         (status_ptr[i] != Status::infected && status_ptr[i] != Status::dead)) {
@@ -1494,7 +1496,7 @@ std::array<Long, 9> AgentContainer::getTotals () {
                   AMREX_ALWAYS_ASSERT(p.idata(IntIdx::status) <= 4);
                   s[p.idata(IntIdx::status)] = 1;
                   if (p.idata(IntIdx::status) == 1) {  // exposed
-                      if (p.rdata(RealIdx::disease_counter) <= amrex::Math::ceil(p.rdata(RealIdx::incubation_period))) {
+                      if (p.rdata(RealIdx::disease_counter) <= p.rdata(RealIdx::incubation_period)) {
                           s[5] = 1;  // exposed, but not infectious
                       } else { // infectious
                           if (p.idata(IntIdx::symptomatic) == 2) {

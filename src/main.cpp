@@ -125,7 +125,7 @@ void runAgent ()
             amrex::FileOpenFailed(output_filename);
         }
 
-        File << "Day Never Infected Immune Deaths Hospitalized Ventilated ICU Exposed Asymptomatic Presymptomatic Symptomatic\n";
+        File << std::setw(5) << "Day" << std::setw(10) << "Never" << std::setw(10) << "Infected" << std::setw(10) << "Immune" << std::setw(10) << "Deaths" << std::setw(15) << "Hospitalized" << std::setw(15) << "Ventilated" << std::setw(10) << "ICU" << std::setw(10) << "Exposed" << std::setw(15) << "Asymptomatic" << std::setw(15) << "Presymptomatic" << std::setw(15) << "Symptomatic\n";
 
         File.flush();
 
@@ -191,25 +191,7 @@ void runAgent ()
                 ExaEpi::IO::writeFIPSData(pc, unit_mf, FIPS_mf, comm_mf, demo, params.aggregated_diag_prefix, i);
             }
 
-            if (params.shelter_start > 0 && params.shelter_start == i) {
-                pc.shelterStart();
-            }
-
-            if (params.shelter_start > 0 && params.shelter_start + params.shelter_length == i) {
-                pc.shelterStop();
-            }
-
             pc.updateStatus(disease_stats);
-            pc.moveAgentsToWork();
-            pc.interactAgentsHomeWork(mask_behavior, false);
-            pc.moveAgentsToHome();
-            pc.interactAgentsHomeWork(mask_behavior, true);
-            pc.infectAgents();
-
-            //            if ((params.random_travel_int > 0) && (i % params.random_travel_int == 0)) {
-            //                pc.moveRandomTravel();
-            //            }
-            //            pc.Redistribute();
 
             auto counts = pc.getTotals();
             if (counts[1] > num_infected_peak) {
@@ -254,7 +236,7 @@ void runAgent ()
                     amrex::FileOpenFailed(output_filename);
                 }
 
-                File << i << " " << counts[0] << " " << counts[1] << " " << counts[2] << " " << counts[4] << " " << mmc[0] << " " << mmc[1] << " " << mmc[2] << " " << counts[5] << " " << counts[6] << " " << counts[7] << " " << counts[8] << "\n";
+                File << std::setw(5) << i << std::setw(10) << counts[0] << std::setw(10) << counts[1] << std::setw(10) << counts[2] << std::setw(10) << counts[4] << std::setw(15) << mmc[0] << std::setw(15) << mmc[1] << std::setw(10) << mmc[2] << std::setw(10) << counts[5] << std::setw(15) << counts[6] << std::setw(15) << counts[7] << std::setw(15) << counts[8] << "\n";
 
                 File.flush();
 
@@ -264,6 +246,25 @@ void runAgent ()
                     amrex::Abort("problem writing output file");
                 }
             }
+
+            if (params.shelter_start > 0 && params.shelter_start == i) {
+                pc.shelterStart();
+            }
+
+            if (params.shelter_start > 0 && params.shelter_start + params.shelter_length == i) {
+                pc.shelterStop();
+            }
+
+            pc.moveAgentsToWork();
+            pc.interactAgentsHomeWork(mask_behavior, false);
+            pc.moveAgentsToHome();
+            pc.interactAgentsHomeWork(mask_behavior, true);
+            pc.infectAgents();
+
+            //            if ((params.random_travel_int > 0) && (i % params.random_travel_int == 0)) {
+            //                pc.moveRandomTravel();
+            //            }
+            //            pc.Redistribute();
 
             cur_time += 1.0; // time step is one day
         }
