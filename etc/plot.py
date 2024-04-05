@@ -9,6 +9,8 @@ fn = sys.argv[1]
 
 ds = AMReXDataset(fn)
 
+print(ds.field_list)
+
 ad = ds.all_data()
 print(ad["total"].sum())
 print(ad["infected"].sum())
