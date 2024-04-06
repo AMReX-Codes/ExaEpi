@@ -62,7 +62,7 @@ void writePlotFile (const AgentContainer& pc,   /*!< Agent (particle) container 
                              pc.ParticleGeom(0), cur_time, step);
 
     pc.WritePlotFile(amrex::Concatenate("plt", step, 5), "agents",
-                     {"disease_counter", "treantment_timer", "infection_prob", "incubation_period", "infectious_period", "symptomdev_period"},
+                     {"disease_counter", "treatment_timer", "infection_prob", "incubation_period", "infectious_period", "symptomdev_period"},
                      {"status", "strain", "age_group", "family", "home_i", "home_j", "work_i", "work_j", "nborhood", "school", "workgroup", "work_nborhood", "withdrawn", "symptomatic"});
 }
 
