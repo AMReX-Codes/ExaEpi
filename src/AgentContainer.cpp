@@ -806,8 +806,13 @@ void AgentContainer::updateStatus (MultiFab& disease_stats /*!< Community-wise d
             auto counter_ptr = soa.GetRealData(RealIdx::disease_counter).data();
             auto timer_ptr = soa.GetRealData(RealIdx::treatment_timer).data();
             auto prob_ptr = soa.GetRealData(RealIdx::prob).data();
+            auto withdrawn_ptr = soa.GetIntData(IntIdx::withdrawn).data();
+            auto symptomatic_ptr = soa.GetIntData(IntIdx::symptomatic).data();
             auto incubation_period_ptr = soa.GetRealData(RealIdx::incubation_period).data();
             auto infectious_period_ptr = soa.GetRealData(RealIdx::infectious_period).data();
+            auto symptomdev_period_ptr = soa.GetRealData(RealIdx::symptomdev_period).data();
+
+            auto* lparm = d_parm;
 
             auto ds_arr = disease_stats[mfi].array();
 
@@ -820,6 +825,8 @@ void AgentContainer::updateStatus (MultiFab& disease_stats /*!< Community-wise d
                     death
                 };
             };
+
+            auto symptomatic_withdraw = m_symptomatic_withdraw;
 
             // Track hospitalization, ICU, ventilator, and fatalities
             Real CHR[] = {.0104, .0104, .070, .28, 1.0};  // sick -> hospital probabilities
@@ -836,11 +843,26 @@ void AgentContainer::updateStatus (MultiFab& disease_stats /*!< Community-wise d
                 }
                 else if (status_ptr[i] == Status::infected) {
                     counter_ptr[i] += 1;
+                    if (counter_ptr[i] == 1) {
+                        if (amrex::Random(engine) < lparm->p_asymp[0]) {
+                            symptomatic_ptr[i] = 2;
+                        } else {
+                            symptomatic_ptr[i] = 0;
+                        }
+                    }
+                    if (counter_ptr[i] == amrex::Math::floor(symptomdev_period_ptr[i])) {
+                        if (symptomatic_ptr[i] != 2) {
+                            symptomatic_ptr[i] = 1;
+                        }
+                        if (symptomatic_ptr[i] && symptomatic_withdraw) {
+                            withdrawn_ptr[i] = 1;
+                        }
+                    }
                     if (counter_ptr[i] < incubation_period_ptr[i]) {
                         // incubation phase
                         return;
                     }
-                    if (counter_ptr[i] == amrex::Math::ceil(incubation_period_ptr[i])) {
+                    if (counter_ptr[i] == amrex::Math::floor(incubation_period_ptr[i])) {
                         // decide if hospitalized
                         Real p_hosp = CHR[age_group_ptr[i]];
                         if (amrex::Random(engine) < p_hosp) {
@@ -907,6 +929,9 @@ void AgentContainer::updateStatus (MultiFab& disease_stats /*!< Community-wise d
                                 }
                                 amrex::Gpu::Atomic::AddNoRet(
                                                              &ds_arr(home_i_ptr[i], home_j_ptr[i], 0,
+                                                                     DiseaseStats::hospitalization), -1.0_rt);
+                                amrex::Gpu::Atomic::AddNoRet(
+                                                             &ds_arr(home_i_ptr[i], home_j_ptr[i], 0,
                                                                      DiseaseStats::ICU), -1.0_rt);
                                 if (status_ptr[i] != Status::dead) {
                                     status_ptr[i] = Status::immune;  // If alive, ICU patient recovers
@@ -920,7 +945,12 @@ void AgentContainer::updateStatus (MultiFab& disease_stats /*!< Community-wise d
                                     status_ptr[i] = Status::dead;
                                     //pstruct_ptr[i].id() = -pstruct_ptr[i].id();
                                 }
-
+                                amrex::Gpu::Atomic::AddNoRet(
+                                                             &ds_arr(home_i_ptr[i], home_j_ptr[i], 0,
+                                                                     DiseaseStats::hospitalization), -1.0_rt);
+                                amrex::Gpu::Atomic::AddNoRet(
+                                                             &ds_arr(home_i_ptr[i], home_j_ptr[i], 0,
+                                                                     DiseaseStats::ICU), -1.0_rt);
                                 amrex::Gpu::Atomic::AddNoRet(
                                                              &ds_arr(home_i_ptr[i], home_j_ptr[i], 0,
                                                                      DiseaseStats::ventilator), -1.0_rt);
@@ -932,6 +962,9 @@ void AgentContainer::updateStatus (MultiFab& disease_stats /*!< Community-wise d
                         else { // not hospitalized, recover once not infectious
                             if (counter_ptr[i] >= (incubation_period_ptr[i] + infectious_period_ptr[i])) {
                                 status_ptr[i] = Status::immune;
+                                counter_ptr[i] = 0.0;
+                                symptomatic_ptr[i] = 0;
+                                withdrawn_ptr[i] = 0;
                             }
                         }
                     }
@@ -941,10 +974,75 @@ void AgentContainer::updateStatus (MultiFab& disease_stats /*!< Community-wise d
     }
 }
 
+/*! \brief Start shelter-in-place */
+void AgentContainer::shelterStart ()
+{
+    BL_PROFILE("AgentContainer::shelterStart");
+
+    amrex::Print() << "Starting shelter in place order \n";
+
+    for (int lev = 0; lev <= finestLevel(); ++lev)
+    {
+        auto& plev  = GetParticles(lev);
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (Gpu::notInLaunchRegion())
+#endif
+        for(MFIter mfi = MakeMFIter(lev, TilingIfNotGPU()); mfi.isValid(); ++mfi)
+        {
+            int gid = mfi.index();
+            int tid = mfi.LocalTileIndex();
+            auto& ptile = plev[std::make_pair(gid, tid)];
+            auto& soa   = ptile.GetStructOfArrays();
+            const auto np = ptile.numParticles();
+            auto withdrawn_ptr = soa.GetIntData(IntIdx::withdrawn).data();
+
+            auto shelter_compliance = m_shelter_compliance;
+            amrex::ParallelForRNG( np,
+            [=] AMREX_GPU_DEVICE (int i, amrex::RandomEngine const& engine) noexcept
+            {
+                if (amrex::Random(engine) < shelter_compliance) {
+                    withdrawn_ptr[i] = 1;
+                }
+            });
+        }
+    }
+}
+
+/*! \brief Stop shelter-in-place */
+void AgentContainer::shelterStop ()
+{
+    BL_PROFILE("AgentContainer::shelterStop");
+
+    amrex::Print() << "Stopping shelter in place order \n";
+
+    for (int lev = 0; lev <= finestLevel(); ++lev)
+    {
+        auto& plev  = GetParticles(lev);
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (Gpu::notInLaunchRegion())
+#endif
+        for(MFIter mfi = MakeMFIter(lev, TilingIfNotGPU()); mfi.isValid(); ++mfi)
+        {
+            int gid = mfi.index();
+            int tid = mfi.LocalTileIndex();
+            auto& ptile = plev[std::make_pair(gid, tid)];
+            auto& soa   = ptile.GetStructOfArrays();
+            const auto np = ptile.numParticles();
+            auto withdrawn_ptr = soa.GetIntData(IntIdx::withdrawn).data();
+
+            amrex::ParallelFor( np, [=] AMREX_GPU_DEVICE (int i) noexcept
+            {
+                withdrawn_ptr[i] = 0;
+            });
+        }
+    }
+}
+
 /*! \brief Infect agents based on their current status and the computed probability of infection.
     The infection probability is computed in AgentContainer::interactAgentsHomeWork() or
-    AgentContainer::interactAgents()
-*/
+    AgentContainer::interactAgents() */
 void AgentContainer::infectAgents ()
 {
     BL_PROFILE("AgentContainer::infectAgents");
@@ -1044,28 +1142,41 @@ void AgentContainer::generateCellData (MultiFab& mf /*!< MultiFab with at least 
     Returns a vector with 5 components corresponding to each value of #Status; each element is
     the total number of agents at a step with the corresponding #Status (in that order).
 */
-std::array<Long, 5> AgentContainer::printTotals () {
-    BL_PROFILE("printTotals");
-    amrex::ReduceOps<ReduceOpSum, ReduceOpSum, ReduceOpSum, ReduceOpSum, ReduceOpSum> reduce_ops;
-    auto r = amrex::ParticleReduce<ReduceData<int,int,int,int,int>> (
+std::array<Long, 9> AgentContainer::getTotals () {
+    BL_PROFILE("getTotals");
+    amrex::ReduceOps<ReduceOpSum, ReduceOpSum, ReduceOpSum, ReduceOpSum, ReduceOpSum, ReduceOpSum, ReduceOpSum, ReduceOpSum, ReduceOpSum> reduce_ops;
+    auto r = amrex::ParticleReduce<ReduceData<int,int,int,int,int,int,int,int,int>> (
                   *this, [=] AMREX_GPU_DEVICE (const SuperParticleType& p) noexcept
-                  -> amrex::GpuTuple<int,int,int,int,int>
+                  -> amrex::GpuTuple<int,int,int,int,int,int,int,int,int>
               {
-                  int s[5] = {0, 0, 0, 0, 0};
+                  int s[9] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
                   AMREX_ALWAYS_ASSERT(p.idata(IntIdx::status) >= 0);
                   AMREX_ALWAYS_ASSERT(p.idata(IntIdx::status) <= 4);
                   s[p.idata(IntIdx::status)] = 1;
-                  return {s[0], s[1], s[2], s[3], s[4]};
+                  if (p.idata(IntIdx::status) == 1) {  // exposed
+                      if (p.rdata(RealIdx::disease_counter) <= p.rdata(RealIdx::incubation_period)) {
+                          s[5] = 1;  // exposed, but not infectious
+                      } else { // infectious
+                          if (p.idata(IntIdx::symptomatic) == 2) {
+                              s[6] = 1;  // asymptomatic and will remain so
+                          }
+                          else if (p.idata(IntIdx::symptomatic) == 0) {
+                              s[7] = 1;  // asymptomatic but will develop symptoms
+                          }
+                          else if (p.idata(IntIdx::symptomatic) == 1) {
+                              s[8] = 1;  // Infectious and symptomatic
+                          } else {
+                              amrex::Abort("how did I get here?");
+                          }
+                      }
+                  }
+                  return {s[0], s[1], s[2], s[3], s[4], s[5], s[6], s[7], s[8]};
               }, reduce_ops);
 
-    std::array<Long, 5> counts = {amrex::get<0>(r), amrex::get<1>(r), amrex::get<2>(r), amrex::get<3>(r),
-                                  amrex::get<4>(r)};
-    ParallelDescriptor::ReduceLongSum(&counts[0], 5, ParallelDescriptor::IOProcessorNumber());
-    // amrex::Print() << "Never infected: " << counts[0] << "\n";
-    // amrex::Print() << "Infected: " << counts[1] << "\n";
-    // amrex::Print() << "Immune: " << counts[2] << "\n";
-    // amrex::Print() << "Previously infected: " << counts[3] << "\n";
-    // amrex::Print() << "Deaths: " << counts[4] << "\n";
+    std::array<Long, 9> counts = {amrex::get<0>(r), amrex::get<1>(r), amrex::get<2>(r), amrex::get<3>(r),
+                                  amrex::get<4>(r), amrex::get<5>(r), amrex::get<6>(r), amrex::get<7>(r),
+                                  amrex::get<8>(r)};
+    ParallelDescriptor::ReduceLongSum(&counts[0], 9, ParallelDescriptor::IOProcessorNumber());
     return counts;
 }
 

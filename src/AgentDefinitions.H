@@ -39,7 +39,7 @@ struct IntIdx
         workgroup,      /*!< workgroup ID */
         work_nborhood,  /*!< work neighborhood ID */
         withdrawn,      /*!< quarantine status */
-        symptomatic,    /*!< currently symptomatic? */
+        symptomatic,    /*!< currently symptomatic? 0: no, but will be, 1: yes, 2: no, and will remain so until recovered */
         nattribs        /*!< number of integer-type attribute */
     };
 };
@@ -94,7 +94,8 @@ bool notSusceptible ( const int      a_idx, /*!< Agent index */
                       const PTDType& a_ptd  /*!< Particle tile data */ )
 {
     return (   (a_ptd.m_idata[IntIdx::status][a_idx] == Status::immune)
-            || (a_ptd.m_idata[IntIdx::status][a_idx] == Status::dead) );
+            || (a_ptd.m_idata[IntIdx::status][a_idx] == Status::dead)
+            || (a_ptd.m_idata[IntIdx::status][a_idx] == Status::infected) );
 }
 
 #endif

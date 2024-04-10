@@ -47,7 +47,14 @@ void ExaEpi::Utils::get_test_params (   TestParams& params,         /*!< Test pa
         params.ic_type = ICType::Census;
         pp.get("census_filename", params.census_filename);
         pp.get("workerflow_filename", params.workerflow_filename);
-        pp.get("case_filename", params.case_filename);
+        pp.get("initial_case_type", params.initial_case_type);
+        if (params.initial_case_type == "file") {
+            pp.get("case_filename", params.case_filename);
+        } else if (params.initial_case_type == "random") {
+            pp.get("num_initial_cases", params.num_initial_cases);
+        } else {
+            amrex::Abort("initial case type not recognized");
+        }
     } else {
         amrex::Abort("ic type not recognized");
     }
@@ -57,6 +64,9 @@ void ExaEpi::Utils::get_test_params (   TestParams& params,         /*!< Test pa
     if (params.aggregated_diag_int >= 0) {
         pp.get("aggregated_diag_prefix", params.aggregated_diag_prefix);
     }
+
+    pp.query("shelter_start",  params.shelter_start);
+    pp.query("shelter_length", params.shelter_length);
 
     Long seed = 0;
     bool reset_seed = pp.query("seed", seed);

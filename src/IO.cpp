@@ -61,8 +61,9 @@ void writePlotFile (const AgentContainer& pc,   /*!< Agent (particle) container 
                              {"total", "never_infected", "infected", "immune", "susceptible", "unit", "FIPS", "Tract", "comm"},
                              pc.ParticleGeom(0), cur_time, step);
 
-    // uncomment this to write all the particles
-    pc.WritePlotFile(amrex::Concatenate("plt", step, 5), "agents");
+    pc.WritePlotFile(amrex::Concatenate("plt", step, 5), "agents",
+                     {"disease_counter", "treatment_timer", "infection_prob", "incubation_period", "infectious_period", "symptomdev_period"},
+                     {"status", "strain", "age_group", "family", "home_i", "home_j", "work_i", "work_j", "nborhood", "school", "workgroup", "work_nborhood", "withdrawn", "symptomatic"});
 }
 
 /*! \brief Writes diagnostic data by FIPS code
