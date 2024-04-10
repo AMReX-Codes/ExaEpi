@@ -201,7 +201,7 @@ void runAgent ()
             }
             cumulative_deaths = counts[4];
 
-            std::array<Real, 4> mmc = {0, 0, 0, 0};
+            Real mmc[4] = {0, 0, 0, 0};
 #ifdef AMREX_USE_GPU
             if (Gpu::inLaunchRegion()) {
                 auto const& ma = disease_stats.const_arrays();
@@ -217,23 +217,26 @@ void runAgent ()
                                       ma[box_no](ii,jj,kk,2),
                                       ma[box_no](ii,jj,kk,3) };
                          });
-                mmc = {amrex::get<0>(mm), amrex::get<1>(mm), amrex::get<2>(mm), amrex::get<3>(mm)};
+                mmc[0] = amrex::get<0>(mm);
+                mmc[1] = amrex::get<1>(mm);
+                mmc[2] = amrex::get<2>(mm);
+                mmc[3] = amrex::get<3>(mm);
             } else
 #endif
                 {
 #ifdef AMREX_USE_OMP
-#pragma omp parallel if (!system::regtest_reduction) reduction(+:mmc)
+#pragma omp parallel if (!system::regtest_reduction) reduction(+:mmc[:4])
 #endif
                     for (MFIter mfi(disease_stats,true); mfi.isValid(); ++mfi)
                     {
                         Box const& bx = mfi.tilebox();
                         auto const& dfab = disease_stats.const_array(mfi);
-                        AMREX_LOOP_3D(bx, i, j, k,
+                        AMREX_LOOP_3D(bx, ii, jj, kk,
                         {
-                            mmc[0] += dfab(i,j,k,0);
-                            mmc[1] += dfab(i,j,k,1);
-                            mmc[2] += dfab(i,j,k,2);
-                            mmc[3] += dfab(i,j,k,3);
+                            mmc[0] += dfab(ii,jj,kk,0);
+                            mmc[1] += dfab(ii,jj,kk,1);
+                            mmc[2] += dfab(ii,jj,kk,2);
+                            mmc[3] += dfab(ii,jj,kk,3);
                         });
                     }
                 }
