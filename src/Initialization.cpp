@@ -375,7 +375,7 @@ namespace Initialization
                 for (int i = 0; i < demo.Nunit; ++i) if(demo.FIPS[i]==FIPS)units.push_back(i);
                 //int unit = FIPS_code_to_i[FIPS];
                 if (units.size() > 0) {
-                    printf("Infecting %d people in FIPS %d\n", cases.Size_hubs[ihub], FIPS);
+                    amrex::Print() << "Attempting to infect: " << cases.Size_hubs[ihub] << " people in FIPS " << FIPS << "... ";
                     int u=0;
                     int i=0;
                     while (i < cases.Size_hubs[ihub]) {
@@ -384,7 +384,7 @@ namespace Initialization
                         i+= nSuccesses;
                         u=(u+1)%units.size(); //sometimes we infect fewer than ntry, but switch to next unit anyway
                     }
-                    amrex::Print() << "Infected " << i<< " total " << ninf << " after processing FIPS " << FIPS << " \n";
+                    amrex::Print() << "infected " << i<< " (total " << ninf << ") after processing. \n";
                 }
             }
         }
