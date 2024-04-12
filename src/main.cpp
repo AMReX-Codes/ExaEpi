@@ -142,6 +142,7 @@ void runAgent ()
     iMultiFab comm_mf(ba, dm, 1, 0);
 
     MultiFab disease_stats(ba, dm, 4, 0);
+    disease_stats.setVal(0);
     MultiFab mask_behavior(ba, dm, 1, 0);
     mask_behavior.setVal(1);
 
@@ -201,8 +202,11 @@ void runAgent ()
             }
             cumulative_deaths = counts[4];
 
-            auto const& ma = disease_stats.const_arrays();
-            GpuTuple<Real,Real,Real,Real> mm = ParReduce(
+            Real mmc[4] = {0, 0, 0, 0};
+#ifdef AMREX_USE_GPU
+            if (Gpu::inLaunchRegion()) {
+                auto const& ma = disease_stats.const_arrays();
+                GpuTuple<Real,Real,Real,Real> mm = ParReduce(
                          TypeList<ReduceOpSum,ReduceOpSum,ReduceOpSum,ReduceOpSum>{},
                          TypeList<Real,Real,Real,Real>{},
                          disease_stats, IntVect(0, 0),
@@ -214,13 +218,38 @@ void runAgent ()
                                       ma[box_no](ii,jj,kk,2),
                                       ma[box_no](ii,jj,kk,3) };
                          });
-            std::array<Real, 4> mmc = {amrex::get<0>(mm), amrex::get<1>(mm), amrex::get<2>(mm), amrex::get<3>(mm)};
+                mmc[0] = amrex::get<0>(mm);
+                mmc[1] = amrex::get<1>(mm);
+                mmc[2] = amrex::get<2>(mm);
+                mmc[3] = amrex::get<3>(mm);
+            } else
+#endif
+                {
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (!system::regtest_reduction) reduction(+:mmc[:4])
+#endif
+                    for (MFIter mfi(disease_stats,true); mfi.isValid(); ++mfi)
+                    {
+                        Box const& bx = mfi.tilebox();
+                        auto const& dfab = disease_stats.const_array(mfi);
+                        AMREX_LOOP_3D(bx, ii, jj, kk,
+                        {
+                            mmc[0] += dfab(ii,jj,kk,0);
+                            mmc[1] += dfab(ii,jj,kk,1);
+                            mmc[2] += dfab(ii,jj,kk,2);
+                            mmc[3] += dfab(ii,jj,kk,3);
+                        });
+                    }
+                }
 
             ParallelDescriptor::ReduceRealSum(&mmc[0], 4, ParallelDescriptor::IOProcessorNumber());
 
             if (ParallelDescriptor::IOProcessor())
             {
                 // total number of deaths computed on agents and on mesh should be the same...
+                if (mmc[3] != counts[4]) {
+                    amrex::Print() << mmc[3] << " " << counts[4] << "\n";
+                }
                 AMREX_ALWAYS_ASSERT(mmc[3] == counts[4]);
 
                 // the total number of infected should equal the sum of
