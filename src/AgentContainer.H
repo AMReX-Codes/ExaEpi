@@ -15,59 +15,10 @@
 #include <AMReX_iMultiFab.H>
 #include <AMReX_Vector.H>
 
+#include "AgentDefinitions.H"
 #include "DemographicData.H"
 #include "DiseaseParm.H"
-
-/*! \brief Real-type SoA attributes of agent */
-struct RealIdx
-{
-    enum {
-        /*
-          Disease counter starts after infection.
-         */
-        disease_counter = 0,    /*!< Counter since start of infection */
-        treatment_timer,        /*!< Timer since hospital admission */
-        prob,                   /*!< Probability of infection */
-        incubation_period,      /*!< Time until infectious */
-        infectious_period,      /*!< Length of time infectious */
-        symptomdev_period,      /*!< Time until symptoms would develop */
-        nattribs                /*!< number of real-type attribute*/
-    };
-};
-
-/*! \brief Disease status */
-struct Status
-{
-    enum {
-        never = 0,   /*!< never infected */
-        infected,    /*!< infected */
-        immune,      /*!< no longer infected, immune. lasts 6 months. */
-        susceptible, /*!< no longer infected, no longer immnune */
-        dead         /*!< passed away */
-    };
-};
-
-/*! \brief Integer-type SoA attributes of agent */
-struct IntIdx
-{
-    enum {
-        status = 0,     /*!< Disease status (#Status) */
-        strain,         /*!< virus strain */
-        age_group,      /*!< Age group (under 5, 5-17, 18-29, 30-64, 65+) */
-        family,         /*!< Family ID */
-        home_i,         /*!< home location index */
-        home_j          /*!< home location index */,
-        work_i          /*!< work location index */,
-        work_j          /*!< work location index */,
-        nborhood,       /*!< home neighborhood ID */
-        school,         /*!< school type (elementary, middle, high, none) */
-        workgroup,      /*!< workgroup ID */
-        work_nborhood,  /*!< work neighborhood ID */
-        withdrawn,      /*!< quarantine status */
-        symptomatic,    /*!< currently symptomatic? 0: no, but will be, 1: yes, 2: no, and will remain so until recovered */
-        nattribs        /*!< number of integer-type attribute */
-    };
-};
+#include "InteractionModelLibrary.H"
 
 /*! \brief Assigns school by taking a random number between 0 and 100, and using
  *  default distribution to choose elementary/middle/high school. */
@@ -97,6 +48,12 @@ class AgentContainer
     : public amrex::ParticleContainer<0, 0, RealIdx::nattribs, IntIdx::nattribs>
 {
 
+    using PCType = AgentContainer;
+    using PType = ParticleType;
+    using PTileType = ParticleTileType;
+    using PTDType = PTileType::ParticleTileDataType;
+    using IntModel = InteractionModel<PCType,PTileType,PTDType,PType>;
+
 public:
 
     /*! Constructor:
@@ -109,6 +66,8 @@ public:
                     const amrex::BoxArray            & a_ba     /*!< Box array */ )
         : amrex::ParticleContainer<0, 0, RealIdx::nattribs, IntIdx::nattribs>(a_geom, a_dmap, a_ba)
     {
+        BL_PROFILE("AgentContainer::AgentContainer");
+
         h_parm = new DiseaseParm{};
         d_parm = (DiseaseParm*)amrex::The_Arena()->alloc(sizeof(DiseaseParm));
 
@@ -126,6 +85,18 @@ public:
             pp.query("pWO", h_parm->pWO);
             pp.query("pFA", h_parm->pFA);
             pp.query("pBAR", h_parm->pBAR);
+        }
+
+        {
+            using namespace ExaEpi;
+
+            /* Create the interaction model objects and push to container */
+            m_interactions.clear();
+            m_interactions[InteractionNames::generic] = new InteractionModGeneric<PCType,PTileType,PTDType,PType>;
+            m_interactions[InteractionNames::home] = new InteractionModHome<PCType,PTileType,PTDType,PType>;
+            m_interactions[InteractionNames::work] = new InteractionModWork<PCType,PTileType,PTDType,PType>;
+            m_interactions[InteractionNames::school] = new InteractionModSchool<PCType,PTileType,PTDType,PType>;
+            m_interactions[InteractionNames::nborhood] = new InteractionModNborhood<PCType,PTileType,PTDType,PType>;
         }
 
         {
@@ -178,19 +149,21 @@ public:
                            amrex::iMultiFab& comm_mf,
                            DemographicData& demo);
 
+    void morningCommute(amrex::MultiFab&);
+
+    void eveningCommute(amrex::MultiFab&);
+
+    void interactDay(amrex::MultiFab&);
+
+    void interactEvening(amrex::MultiFab&);
+
+    void interactNight(amrex::MultiFab&);
+
     void moveAgentsRandomWalk ();
-
-    void moveAgentsToWork ();
-
-    void moveAgentsToHome ();
 
     void moveRandomTravel ();
 
     void updateStatus (amrex::MultiFab& ds);
-
-    void interactAgents ();
-
-    void interactAgentsHomeWork (amrex::MultiFab& mask, bool home);
 
     void infectAgents ();
 
@@ -202,11 +175,36 @@ public:
 
     std::array<amrex::Long, 9> getTotals ();
 
-    const DiseaseParm * getDiseaseParameters_h () const {
+    void moveAgentsToWork ();
+
+    void moveAgentsToHome ();
+
+    /*! \brief Return bin pointer at a given mfi, tile and model name */
+    inline amrex::DenseBins<PType>* getBins( const std::pair<int,int>& a_idx,
+                                             const std::string& a_mod_name )
+    {
+        BL_PROFILE("AgentContainer::getBins");
+        if (a_mod_name == ExaEpi::InteractionNames::home) {
+            return &m_bins_home[a_idx];
+        } else if (    (a_mod_name == ExaEpi::InteractionNames::work)
+                    || (a_mod_name == ExaEpi::InteractionNames::school) ) {
+            return &m_bins_work[a_idx];
+        } else if (a_mod_name == ExaEpi::InteractionNames::nborhood) {
+            if (m_at_work) { return &m_bins_work[a_idx]; }
+            else           { return &m_bins_home[a_idx]; }
+        } else {
+            amrex::Abort("Invalid a_mod_name!");
+            return nullptr;
+        }
+    }
+
+    /*! \brief Return disease parameters object pointer (host) */
+    inline const DiseaseParm* getDiseaseParameters_h () const {
         return h_parm;
     }
 
-    const DiseaseParm * getDiseaseParameters_d () const {
+    /*! \brief Return disease parameters object pointer (device) */
+    inline const DiseaseParm* getDiseaseParameters_d () const {
         return d_parm;
     }
 
@@ -221,10 +219,25 @@ protected:
 
     /*! Map of home bins (of agents) indexed by MultiFab iterator and tile index;
         see AgentContainer::interactAgentsHomeWork() */
-    std::map<std::pair<int, int>, amrex::DenseBins<AgentContainer::ParticleType> > m_bins_home;
+    std::map<std::pair<int, int>, amrex::DenseBins<PType> > m_bins_home;
     /*! Map of work bins (of agents) indexed by MultiFab iterator and tile index;
         see AgentContainer::interactAgentsHomeWork() */
-    std::map<std::pair<int, int>, amrex::DenseBins<AgentContainer::ParticleType> > m_bins_work;
+    std::map<std::pair<int, int>, amrex::DenseBins<PType> > m_bins_work;
+
+    std::map<std::string,IntModel*> m_interactions;
+
+    /*! Flag to indicate if agents are at work */
+    bool m_at_work;
+
+    /*! \brief queries if a given interaction type (model) is available */
+    inline bool haveInteractionModel( const std::string& a_mod_name ) const
+    {
+        BL_PROFILE("AgentContainer::haveInteractionModel");
+        std::map<std::string,IntModel*>::const_iterator it(m_interactions.find(a_mod_name));
+        return (it != m_interactions.end());
+    }
+
+
 };
 
 using AgentIterator = typename AgentContainer::ParIterType;

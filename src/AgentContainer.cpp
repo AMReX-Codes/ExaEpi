@@ -318,8 +318,6 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,    /*!< Number 
 {
     BL_PROFILE("initAgentsCensus");
 
-    using AgentType = ParticleType;
-
     const Box& domain = Geom(0).Domain();
 
     num_residents.setVal(0);
@@ -481,8 +479,8 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,    /*!< Number 
 #pragma omp critical (init_agents_nextid)
 #endif
         {
-            pid = AgentType::NextID();
-            AgentType::NextID(pid+nagents);
+            pid = PType::NextID();
+            PType::NextID(pid+nagents);
         }
         AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
             static_cast<Long>(pid + nagents) < LastParticleID,
@@ -676,6 +674,8 @@ void AgentContainer::moveAgentsToWork ()
             });
         }
     }
+
+    m_at_work = true;
 }
 
 /*! \brief Move agents to home
@@ -716,6 +716,8 @@ void AgentContainer::moveAgentsToHome ()
             });
         }
     }
+
+    m_at_work = false;
 }
 
 /*! \brief Move agents randomly
@@ -972,98 +974,7 @@ void AgentContainer::updateStatus (MultiFab& disease_stats /*!< Community-wise d
     }
 }
 
-/*! \brief Interaction between agents
-
-    Simulate the interactions between agents and compute the infection probability
-    for each agent based on the number of infected agents at the same location:
-
-    + Create bins of agents (see #amrex::GetParticleBin, #amrex::DenseBins) with
-      their current locations:
-      + The bin size is 1 cell
-      + #amrex::GetParticleBin maps a particle to its bin index
-      + amrex::DenseBins::build() creates the bin-sorted array of particle indices and
-        the offset array for each bin (where the offset of a bin is its starting location
-        in the bin-sorted array of particle indices).
-
-    + For each bin:
-      + Compute the total number of infected agents for each of the two strains.
-      + For each agent in the bin, if they are not already infected or immune, infect them
-        with a probability of 0.00001 and 0.00002 times the number of infections for each
-        strain respectively.
-*/
-void AgentContainer::interactAgents ()
-{
-    BL_PROFILE("AgentContainer::interactAgents");
-
-    IntVect bin_size = {AMREX_D_DECL(1, 1, 1)};
-    for (int lev = 0; lev < numLevels(); ++lev)
-    {
-        const Geometry& geom = Geom(lev);
-        const auto dxi = geom.InvCellSizeArray();
-        const auto plo = geom.ProbLoArray();
-        const auto domain = geom.Domain();
-
-#ifdef AMREX_USE_OMP
-#pragma omp parallel if (Gpu::notInLaunchRegion())
-#endif
-        for(MFIter mfi = MakeMFIter(lev, TilingIfNotGPU()); mfi.isValid(); ++mfi)
-        {
-            amrex::DenseBins<ParticleType> bins;
-            auto& ptile = ParticlesAt(lev, mfi);
-            auto& aos   = ptile.GetArrayOfStructs();
-            const size_t np = aos.numParticles();
-            auto pstruct_ptr = aos().dataPtr();
-
-            const Box& box = mfi.validbox();
-
-            int ntiles = numTilesInBox(box, true, bin_size);
-
-            bins.build(np, pstruct_ptr, ntiles, GetParticleBin{plo, dxi, domain, bin_size, box});
-            auto inds = bins.permutationPtr();
-            auto offsets = bins.offsetsPtr();
-
-            auto& soa   = ptile.GetStructOfArrays();
-            auto status_ptr = soa.GetIntData(IntIdx::status).data();
-            auto strain_ptr = soa.GetIntData(IntIdx::strain).data();
-            auto counter_ptr = soa.GetRealData(RealIdx::disease_counter).data();
-
-            amrex::ParallelForRNG( bins.numBins(),
-            [=] AMREX_GPU_DEVICE (int i_cell, amrex::RandomEngine const& engine) noexcept
-            {
-                auto cell_start = offsets[i_cell];
-                auto cell_stop  = offsets[i_cell+1];
-
-                // compute the number of infected in this cell
-                int num_infected[2] = {0, 0};
-                for (unsigned int i = cell_start; i < cell_stop; ++i) {
-                    auto pindex = inds[i];
-                    if (status_ptr[pindex] == 1) {
-                        ++num_infected[strain_ptr[pindex]];
-                    }
-                }
-
-                // second pass - infection prob is propto num_infected
-                for (unsigned int i = cell_start; i < cell_stop; ++i) {
-                    auto pindex = inds[i];
-                    if ( status_ptr[pindex] != Status::infected &&
-                         status_ptr[pindex] != Status::immune) {
-                        if (amrex::Random(engine) < 0.0001*num_infected[0]) {
-                            strain_ptr[pindex] = 0;
-                            status_ptr[pindex] = Status::infected;
-                            counter_ptr[pindex] = 0;
-                        } else if (amrex::Random(engine) < 0.0002*num_infected[1]) {
-                            strain_ptr[pindex] = 1;
-                            status_ptr[pindex] = Status::infected;
-                            counter_ptr[pindex] = 0;
-                        }
-                    }
-                }
-            });
-            amrex::Gpu::synchronize();
-        }
-    }
-}
-
+/*! \brief Start shelter-in-place */
 void AgentContainer::shelterStart ()
 {
     BL_PROFILE("AgentContainer::shelterStart");
@@ -1098,6 +1009,7 @@ void AgentContainer::shelterStart ()
     }
 }
 
+/*! \brief Stop shelter-in-place */
 void AgentContainer::shelterStop ()
 {
     BL_PROFILE("AgentContainer::shelterStop");
@@ -1130,8 +1042,7 @@ void AgentContainer::shelterStop ()
 
 /*! \brief Infect agents based on their current status and the computed probability of infection.
     The infection probability is computed in AgentContainer::interactAgentsHomeWork() or
-    AgentContainer::interactAgents()
-*/
+    AgentContainer::interactAgents() */
 void AgentContainer::infectAgents ()
 {
     BL_PROFILE("AgentContainer::infectAgents");
@@ -1175,259 +1086,6 @@ void AgentContainer::infectAgents ()
                     }
                 }
             });
-        }
-    }
-}
-
-/*! \brief Interaction between agents at home and workplace
-
-    Simulate the interactions between agents at home and workplace and compute
-    the infection probability for each agent:
-
-    + For home and workplace, create bins of agents if not already created (see
-      #amrex::GetParticleBin, #amrex::DenseBins):
-      + The bin size is 1 cell
-      + #amrex::GetParticleBin maps a particle to its bin index
-      + amrex::DenseBins::build() creates the bin-sorted array of particle indices and
-        the offset array for each bin (where the offset of a bin is its starting location
-        in the bin-sorted array of particle indices).
-
-    + For each agent *i* in the bin-sorted array of agents:
-      + Find its bin and the range of indices in the bin-sorted array for agents in its bin
-      + If the agent is #Status::immune, do nothing.
-      + If the agent is #Status::infected with the number of days infected (RealIdx::disease_counter)
-        less than the #DiseaseParm::incubation_length, do nothing.
-      + Else, for each agent *j* in the same bin:
-        + If the agent is #Status::immune, do nothing.
-        + If the agent is #Status::infected with the number of days infected (RealIdx::disease_counter)
-          less than the #DiseaseParm::incubation_length, do nothing.
-        + If *i* is not infected and *j* is infected, compute probability of *i* getting infected
-          from *j* (see below).
-
-    Summary of how the probability of agent A getting infected from agent B is computed:
-    + Compute infection probability reduction factor from vaccine efficacy (#DiseaseParm::vac_eff)
-    + Within family - if their IntIdx::nborhood and IntIdx::family indices are same,
-      and the agents are at home:
-      + If B is a child, use the appropriate transmission probability (#DiseaseParm::xmit_child_SC or
-        #DiseaseParm::xmit_child) depending on whether B goes to school or not (#IntIdx::school)
-      + If B is an adult, use the appropriate transmission probability (#DiseaseParm::xmit_adult_SC or
-        #DiseaseParm::xmit_adult) depending on whether B works at a school or not (#IntIdx::school)
-    + Within neighborhood - if their IntIdx::nborhood are same, the agents are not under
-      quarrantine (#IntIdx::withdrawn), and the agents are not at work:
-      + If B is a child, use the appropriate transmission probability (#DiseaseParm::xmit_nc_child_SC or
-        #DiseaseParm::xmit_nc_child) depending on whether B goes to school or not (#IntIdx::school)
-      + If B is an adult, use the appropriate transmission probability (#DiseaseParm::xmit_nc_adult_SC or
-        #DiseaseParm::xmit_nc_adult) depending on whether B works at a school or not (#IntIdx::school)
-    + At workplace - if agents are at work, and B has a workgroup and work location assigned: If A
-      and B have the same workgroup and work location, use the workplace transmission
-      probability (#DiseaseParm::xmit_work).
-    + At school - if A and B are in the same school (#IntIdx::school) in the same neighborhood,
-      and they are at school:
-      + If both A and B are children: use #DiseaseParm::xmit_school
-      + If B is a child, and A is an adult, use #DiseaseParm::xmit_sch_c2a
-      + If A is a child, and B is an adult, use #DiseaseParm::xmit_sch_a2c
-*/
-void AgentContainer::interactAgentsHomeWork ( MultiFab& /*mask_behavior*/ /*!< Masking behavior */,
-                                              bool home /*!< At home (true) or at work (false) */ )
-{
-    BL_PROFILE("AgentContainer::interactAgentsHomeWork");
-
-    const bool DAYTIME = !home;
-    IntVect bin_size = {AMREX_D_DECL(1, 1, 1)};
-    for (int lev = 0; lev < numLevels(); ++lev)
-    {
-        const Geometry& geom = Geom(lev);
-        const auto dxi = geom.InvCellSizeArray();
-        const auto plo = geom.ProbLoArray();
-        const auto domain = geom.Domain();
-
-        for(MFIter mfi = MakeMFIter(lev, TilingIfNotGPU()); mfi.isValid(); ++mfi)
-        {
-            auto pair_ind = std::make_pair(mfi.index(), mfi.LocalTileIndex());
-            auto bins_ptr (home ? &m_bins_home[pair_ind] : &m_bins_work[pair_ind]);
-
-            auto& ptile = ParticlesAt(lev, mfi);
-            auto& aos   = ptile.GetArrayOfStructs();
-            const auto np = aos.numParticles();
-            auto pstruct_ptr = aos().dataPtr();
-
-            const Box& box = mfi.validbox();
-            int ntiles = numTilesInBox(box, true, bin_size);
-
-            auto binner = GetParticleBin{plo, dxi, domain, bin_size, box};
-            if (bins_ptr->numBins() < 0) {
-                bins_ptr->build(BinPolicy::Serial, np, pstruct_ptr, ntiles, binner);
-            }
-            AMREX_ALWAYS_ASSERT(np == bins_ptr->numItems());
-            amrex::Gpu::synchronize();
-        }
-
-#ifdef AMREX_USE_OMP
-#pragma omp parallel if (Gpu::notInLaunchRegion())
-#endif
-        for(MFIter mfi = MakeMFIter(lev, TilingIfNotGPU()); mfi.isValid(); ++mfi)
-        {
-            auto pair_ind = std::make_pair(mfi.index(), mfi.LocalTileIndex());
-            auto bins_ptr (home ? &m_bins_home[pair_ind] : &m_bins_work[pair_ind]);
-
-            auto& ptile = ParticlesAt(lev, mfi);
-            auto& aos   = ptile.GetArrayOfStructs();
-            const auto np = aos.numParticles();
-            auto pstruct_ptr = aos().dataPtr();
-
-            auto binner = GetParticleBin{plo, dxi, domain, bin_size, mfi.validbox()};
-            AMREX_ALWAYS_ASSERT(bins_ptr->numBins() >= 0);
-            auto inds = bins_ptr->permutationPtr();
-            auto offsets = bins_ptr->offsetsPtr();
-
-            auto& soa   = ptile.GetStructOfArrays();
-            auto status_ptr = soa.GetIntData(IntIdx::status).data();
-            auto age_group_ptr = soa.GetIntData(IntIdx::age_group).data();
-
-            //auto home_i_ptr = soa.GetIntData(IntIdx::home_i).data();
-            //auto home_j_ptr = soa.GetIntData(IntIdx::home_j).data();
-            auto work_i_ptr = soa.GetIntData(IntIdx::work_i).data();
-            //auto work_j_ptr = soa.GetIntData(IntIdx::work_j).data();
-
-            //auto mask_arr = mask_behavior[mfi].array();
-
-            //auto strain_ptr = soa.GetIntData(IntIdx::strain).data();
-            //auto timer_ptr = soa.GetRealData(RealIdx::timer).data();
-            auto family_ptr = soa.GetIntData(IntIdx::family).data();
-            auto nborhood_ptr = soa.GetIntData(IntIdx::nborhood).data();
-            auto school_ptr = soa.GetIntData(IntIdx::school).data();
-            auto withdrawn_ptr = soa.GetIntData(IntIdx::withdrawn).data();
-            auto workgroup_ptr = soa.GetIntData(IntIdx::workgroup).data();
-            auto prob_ptr = soa.GetRealData(RealIdx::prob).data();
-            auto counter_ptr = soa.GetRealData(RealIdx::disease_counter).data();
-            auto incubation_period_ptr = soa.GetRealData(RealIdx::incubation_period).data();
-            //auto symptomdev_period_ptr = soa.GetRealData(RealIdx::symptomdev_period).data();
-
-            auto* lparm = d_parm;
-            amrex::ParallelFor( bins_ptr->numItems(), [=] AMREX_GPU_DEVICE (int ii) noexcept
-            {
-                auto i = inds[ii];
-                int i_cell = binner(pstruct_ptr[i]);
-                auto cell_start = offsets[i_cell];
-                auto cell_stop  = offsets[i_cell+1];
-
-                AMREX_ALWAYS_ASSERT( (Long) i < np);
-                if (status_ptr[i] == Status::immune) { return; }
-                if (status_ptr[i] == Status::dead) { return; }
-                if ((status_ptr[i] == Status::infected) && (counter_ptr[i] < incubation_period_ptr[i])) { return; }  // incubation stage
-                //amrex::Real i_mask = mask_arr(home_i_ptr[i], home_j_ptr[i], 0);
-                for (unsigned int jj = cell_start; jj < cell_stop; ++jj) {
-                    auto j = inds[jj];
-                    if (i == j) {continue;}
-                    AMREX_ALWAYS_ASSERT( (Long) j < np);
-                    //amrex::Real j_mask = mask_arr(home_i_ptr[j], home_j_ptr[j], 0);
-                    if (status_ptr[j] == Status::immune) {continue;}
-                    if (status_ptr[j] == Status::dead) {continue;}
-                    if ((status_ptr[j] == Status::infected) && (counter_ptr[j] < incubation_period_ptr[j])) { continue; }  // incubation stage
-
-                    if (status_ptr[j] == Status::infected &&
-                        (status_ptr[i] != Status::infected && status_ptr[i] != Status::dead)) {
-                        if (counter_ptr[j] < incubation_period_ptr[j]) { continue; }
-                        // j can infect i
-                        amrex::Real infect = lparm->infect;
-                        infect *= lparm->vac_eff;
-                        //infect *= i_mask;
-                        //infect *= j_mask;
-
-                        amrex::Real social_scale = 1.0;  // TODO this should vary based on cell
-                        amrex::Real work_scale = 1.0;  // TODO this should vary based on cell
-
-                        amrex::ParticleReal prob = 1.0;
-                        /* Determine what connections these individuals have */
-                        if ((nborhood_ptr[i] == nborhood_ptr[j]) && (family_ptr[i] == family_ptr[j]) && (! DAYTIME)) {
-                            if (age_group_ptr[j] <= 1) {  /* Transmitter j is a child */
-                                if (school_ptr[j] < 0) { // not attending school, use _SC contacts
-                                    prob *= 1.0 - infect * lparm->xmit_child_SC[age_group_ptr[i]];
-                                } else {
-                                    prob *= 1.0 - infect * lparm->xmit_child[age_group_ptr[i]];
-                                }
-                            } else {
-                                if (school_ptr[j] < 0) {  // not attending school, use _SC contacts
-                                    prob *= 1.0 - infect * lparm->xmit_adult_SC[age_group_ptr[i]];
-                                } else {
-                                    prob *= 1.0 - infect * lparm->xmit_adult[age_group_ptr[i]];
-                                }
-                            }
-                        }
-
-                        /* check for common neighborhood cluster: */
-                        else if ((nborhood_ptr[i] == nborhood_ptr[j]) && (!withdrawn_ptr[i]) && (!withdrawn_ptr[j]) && ((family_ptr[i] / 4) == (family_ptr[j] / 4)) && (!DAYTIME)) {
-                            if (age_group_ptr[j] <= 1) {  /* Transmitter i is a child */
-                                if (school_ptr[j] < 0) { // not attending school, use _SC contacts
-                                    prob *= 1.0 - infect * lparm->xmit_nc_child_SC[age_group_ptr[i]] * social_scale;
-                                } else {
-                                    prob *= 1.0 - infect * lparm->xmit_nc_child[age_group_ptr[i]] * social_scale;
-                                }
-                            } else {
-                                if (school_ptr[j] < 0) {  // not attending school, use _SC contacts
-                                    prob *= 1.0 - infect * lparm->xmit_nc_adult_SC[age_group_ptr[i]] * social_scale;
-                                } else {
-                                    prob *= 1.0 - infect * lparm->xmit_nc_adult[age_group_ptr[i]] * social_scale;
-                                }
-                            }
-                        }
-
-                        /* Home isolation or household quarantine? */  // TODO - be careful about withdrawn versus at home...
-                        if ( (!withdrawn_ptr[i]) && (!withdrawn_ptr[j]) ) {
-
-                            // school < 0 means a child normally attends school, but not today
-                            /* Should always be in the same community = same cell */
-                            if (school_ptr[j] < 0) {  // not attending school, use _SC contacts
-                                prob *= 1.0 - infect * lparm->xmit_comm_SC[age_group_ptr[i]] * social_scale;
-                            } else {
-                                prob *= 1.0 - infect * lparm->xmit_comm[age_group_ptr[i]] * social_scale;
-                            }
-
-                            /* Workgroup transmission */
-                            if (DAYTIME && workgroup_ptr[j] && (work_i_ptr[j] >= 0)) { // transmitter j at work
-                                if ((work_i_ptr[i] >= 0) && (workgroup_ptr[i] == workgroup_ptr[j])) {  // coworker
-                                    prob *= 1.0 - infect * lparm->xmit_work * work_scale;
-                                }
-                            }
-
-                            /* Neighborhood? */
-                            if (nborhood_ptr[i] == nborhood_ptr[j]) {
-                                if (school_ptr[j] < 0) { // not attending school, use _SC contacts
-                                    prob *= 1.0 - infect * lparm->xmit_hood_SC[age_group_ptr[i]] * social_scale;
-                                } else {
-                                    prob *= 1.0 - infect * lparm->xmit_hood[age_group_ptr[i]] * social_scale;
-                                }
-
-                                if ((school_ptr[i] == school_ptr[j]) && DAYTIME) {
-                                    if (school_ptr[i] > 5) {
-                                        /* Playgroup */
-                                        prob *= 1.0 - infect * lparm->xmit_school[6] * social_scale;
-                                    } else if (school_ptr[i] == 5) {
-                                        /* Day care */
-                                        prob *= 1.0 - infect * lparm->xmit_school[5] * social_scale;
-                                    }
-                                }
-                            }  /* same neighborhood */
-
-                            /* Elementary/middle/high school in common */
-                            if ((school_ptr[i] == school_ptr[j]) && DAYTIME &&
-                                (school_ptr[i] > 0) && (school_ptr[i] < 5)) {
-                                if (age_group_ptr[i] <= 1) {  /* Receiver i is a child */
-                                    if (age_group_ptr[j] <= 1) {  /* Transmitter j is a child */
-                                        prob *= 1.0 - infect * lparm->xmit_school[school_ptr[i]] * social_scale;
-                                    } else {   // Adult teacher/staff -> child student transmission
-                                        prob *= 1.0 - infect * lparm->xmit_sch_a2c[school_ptr[i]] * social_scale;
-                                    }
-                                } else if (age_group_ptr[j] <= 1) {  // Child student -> adult teacher/staff
-                                    prob *= 1.0 - infect * lparm->xmit_sch_c2a[school_ptr[i]] * social_scale;
-                                }
-                            }
-                        }  /* within society */
-                        Gpu::Atomic::Multiply(&prob_ptr[i], prob);
-                    }
-                }
-            });
-            amrex::Gpu::synchronize();
         }
     }
 }
@@ -1520,4 +1178,69 @@ std::array<Long, 9> AgentContainer::getTotals () {
                                   amrex::get<8>(r)};
     ParallelDescriptor::ReduceLongSum(&counts[0], 9, ParallelDescriptor::IOProcessorNumber());
     return counts;
+}
+
+/*! \brief Interaction and movement of agents during morning commute
+ *
+ * + Move agents to work
+ * + Simulate interactions during morning commute (public transit/carpool/etc ?)
+*/
+void AgentContainer::morningCommute ( MultiFab& /*a_mask_behavior*/ /*!< Masking behavior */ )
+{
+    BL_PROFILE("AgentContainer::morningCommute");
+    //if (haveInteractionModel(ExaEpi::InteractionNames::transit)) {
+    //    m_interactions[ExaEpi::InteractionNames::transit]->interactAgents( *this, a_mask_behavior );
+    //}
+    moveAgentsToWork();
+}
+
+/*! \brief Interaction and movement of agents during evening commute
+ *
+ * + Simulate interactions during evening commute (public transit/carpool/etc ?)
+ * + Simulate interactions at locations agents may stop by on their way home
+ * + Move agents to home
+*/
+void AgentContainer::eveningCommute ( MultiFab& /*a_mask_behavior*/ /*!< Masking behavior */ )
+{
+    BL_PROFILE("AgentContainer::eveningCommute");
+    //if (haveInteractionModel(ExaEpi::InteractionNames::transit)) {
+    //    m_interactions[ExaEpi::InteractionNames::transit]->interactAgents( *this, a_mask_behavior );
+    //}
+    //if (haveInteractionModel(ExaEpi::InteractionNames::grocery_store)) {
+    //    m_interactions[ExaEpi::InteractionNames::grocery_store]->interactAgents( *this, a_mask_behavior );
+    //}
+    moveAgentsToHome();
+}
+
+/*! \brief Interaction of agents during day time - work and school */
+void AgentContainer::interactDay ( MultiFab& a_mask_behavior /*!< Masking behavior */ )
+{
+    BL_PROFILE("AgentContainer::interactDay");
+    if (haveInteractionModel(ExaEpi::InteractionNames::work)) {
+        m_interactions[ExaEpi::InteractionNames::work]->interactAgents( *this, a_mask_behavior );
+    }
+    if (haveInteractionModel(ExaEpi::InteractionNames::school)) {
+        m_interactions[ExaEpi::InteractionNames::school]->interactAgents( *this, a_mask_behavior );
+    }
+    if (haveInteractionModel(ExaEpi::InteractionNames::nborhood)) {
+        m_interactions[ExaEpi::InteractionNames::nborhood]->interactAgents( *this, a_mask_behavior );
+    }
+}
+
+/*! \brief Interaction of agents during evening (after work) - social stuff */
+void AgentContainer::interactEvening ( MultiFab& /*a_mask_behavior*/ /*!< Masking behavior */ )
+{
+    BL_PROFILE("AgentContainer::interactEvening");
+}
+
+/*! \brief Interaction of agents during nighttime time - at home */
+void AgentContainer::interactNight ( MultiFab& a_mask_behavior /*!< Masking behavior */ )
+{
+    BL_PROFILE("AgentContainer::interactNight");
+    if (haveInteractionModel(ExaEpi::InteractionNames::home)) {
+        m_interactions[ExaEpi::InteractionNames::home]->interactAgents( *this, a_mask_behavior );
+    }
+    if (haveInteractionModel(ExaEpi::InteractionNames::nborhood)) {
+        m_interactions[ExaEpi::InteractionNames::nborhood]->interactAgents( *this, a_mask_behavior );
+    }
 }

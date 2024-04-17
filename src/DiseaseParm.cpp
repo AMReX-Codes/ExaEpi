@@ -88,6 +88,7 @@ void DiseaseParm::Initialize ()
     infect = 1.0;
 }
 
+/*! \brief Print disease parameters */
 void DiseaseParm::printMatrix () {
     amrex::Print() << "xmit_comm: " << " ";
     for (int i = 0; i < 5; ++i) {
