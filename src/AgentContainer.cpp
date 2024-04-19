@@ -862,7 +862,7 @@ void AgentContainer::updateStatus (MultiFab& disease_stats /*!< Community-wise d
                         // incubation phase
                         return;
                     }
-                    if (counter_ptr[i] == amrex::Math::floor(incubation_period_ptr[i])) {
+                    if (counter_ptr[i] == amrex::Math::ceil(incubation_period_ptr[i])) {
                         // decide if hospitalized
                         Real p_hosp = CHR[age_group_ptr[i]];
                         if (amrex::Random(engine) < p_hosp) {
