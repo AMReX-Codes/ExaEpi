@@ -7,13 +7,28 @@
 
 #include <AMReX_Particles.H>
 
+namespace ExaEpi
+{
+    /*! Maximum number of diseases */
+    const int max_num_diseases = 10;
+}
+
 /*! \brief Real-type SoA attributes of agent */
 struct RealIdx
 {
     enum {
         /* Disease counter starts after infection. */
+        treatment_timer = 0,    /*!< Timer since hospital admission */
+        nattribs                /*!< number of real-type attribute*/
+    };
+};
+
+/*! \brief Disease-specific Real-type Runtime-SoA attributes of agent */
+struct RealIdxDisease
+{
+    enum {
+        /* Disease counter starts after infection. */
         disease_counter = 0,    /*!< Counter since start of infection */
-        treatment_timer,        /*!< Timer since hospital admission */
         prob,                   /*!< Probability of infection */
         incubation_period,      /*!< Time until infectious */
         infectious_period,      /*!< Length of time infectious */
@@ -26,9 +41,7 @@ struct RealIdx
 struct IntIdx
 {
     enum {
-        status = 0,     /*!< Disease status (#Status) */
-        strain,         /*!< virus strain */
-        age_group,      /*!< Age group (under 5, 5-17, 18-29, 30-64, 65+) */
+        age_group = 0,  /*!< Age group (under 5, 5-17, 18-29, 30-64, 65+) */
         family,         /*!< Family ID */
         home_i,         /*!< home location index */
         home_j          /*!< home location index */,
@@ -39,6 +52,16 @@ struct IntIdx
         workgroup,      /*!< workgroup ID */
         work_nborhood,  /*!< work neighborhood ID */
         withdrawn,      /*!< quarantine status */
+        nattribs        /*!< number of integer-type attribute */
+    };
+};
+
+/*! \brief Disease-specific Integer-type Runtime-SoA attributes of agent */
+struct IntIdxDisease
+{
+    enum {
+        status = 0,     /*!< Disease status (#Status) */
+        strain,         /*!< virus strain */
         symptomatic,    /*!< currently symptomatic? 0: no, but will be, 1: yes, 2: no, and will remain so until recovered */
         nattribs        /*!< number of integer-type attribute */
     };
@@ -56,46 +79,66 @@ struct Status
     };
 };
 
+/*! \brief Compute index offsets for runtime int-type disease attributes */
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+int i0 ( const int a_d /*!< Disease index */)
+{
+    return a_d*IntIdxDisease::nattribs;
+}
+
+/*! \brief Compute index offsets for runtime real-type disease attributes */
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+int r0 ( const int a_d /*!< Disease index */)
+{
+    return a_d*RealIdxDisease::nattribs;
+}
+
 /*! \brief Is an agent infected but not infectious? */
 template <typename PTDType>
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
 bool notInfectiousButInfected ( const int      a_idx, /*!< Agent index */
-                                const PTDType& a_ptd  /*!< Particle tile data */ )
+                                const PTDType& a_ptd, /*!< Particle tile data */
+                                const int      a_d    /*!< Disease index */ )
 {
-    return (    (a_ptd.m_idata[IntIdx::status][a_idx] == Status::infected)
-             && (a_ptd.m_rdata[RealIdx::disease_counter][a_idx] < a_ptd.m_rdata[RealIdx::incubation_period][a_idx]) );
+    return (    (a_ptd.m_runtime_idata[i0(a_d)+IntIdxDisease::status][a_idx] == Status::infected)
+             && (a_ptd.m_runtime_rdata[r0(a_d)+RealIdxDisease::disease_counter][a_idx]
+                 < a_ptd.m_runtime_rdata[r0(a_d)+RealIdxDisease::incubation_period][a_idx]) );
 }
 
 /*! \brief Is an agent infectious? */
 template <typename PTDType>
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
 bool isInfectious ( const int      a_idx, /*!< Agent index */
-                    const PTDType& a_ptd  /*!< Particle tile data */ )
+                    const PTDType& a_ptd, /*!< Particle tile data */
+                    const int      a_d    /*!< Disease index */ )
 {
-    return (   (a_ptd.m_idata[IntIdx::status][a_idx] == Status::infected)
-            && (a_ptd.m_rdata[RealIdx::disease_counter][a_idx] >= a_ptd.m_rdata[RealIdx::incubation_period][a_idx]) );
+    return (   (a_ptd.m_runtime_idata[i0(a_d)+IntIdxDisease::status][a_idx] == Status::infected)
+            && (a_ptd.m_runtime_rdata[r0(a_d)+RealIdxDisease::disease_counter][a_idx]
+                >= a_ptd.m_runtime_rdata[r0(a_d)+RealIdxDisease::incubation_period][a_idx]) );
 }
 
 /*! \brief Is an agent susceptible? */
 template <typename PTDType>
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
 bool isSusceptible ( const int      a_idx, /*!< Agent index */
-                     const PTDType& a_ptd  /*!< Particle tile data */ )
+                     const PTDType& a_ptd, /*!< Particle tile data */
+                     const int      a_d    /*!< Disease index */ )
 {
-    return (   (a_ptd.m_idata[IntIdx::status][a_idx] != Status::immune)
-            && (a_ptd.m_idata[IntIdx::status][a_idx] != Status::dead)
-            && (a_ptd.m_idata[IntIdx::status][a_idx] != Status::infected) );
+    return (   (a_ptd.m_runtime_idata[i0(a_d)+IntIdxDisease::status][a_idx] != Status::immune)
+            && (a_ptd.m_runtime_idata[i0(a_d)+IntIdxDisease::status][a_idx] != Status::dead)
+            && (a_ptd.m_runtime_idata[i0(a_d)+IntIdxDisease::status][a_idx] != Status::infected) );
 }
 
 /*! \brief Is an agent not susceptible (i.e., dead, immune, or already infected)? */
 template <typename PTDType>
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
 bool notSusceptible ( const int      a_idx, /*!< Agent index */
-                      const PTDType& a_ptd  /*!< Particle tile data */ )
+                      const PTDType& a_ptd, /*!< Particle tile data */
+                     const int       a_d    /*!< Disease index */ )
 {
-    return (   (a_ptd.m_idata[IntIdx::status][a_idx] == Status::immune)
-            || (a_ptd.m_idata[IntIdx::status][a_idx] == Status::dead)
-            || (a_ptd.m_idata[IntIdx::status][a_idx] == Status::infected) );
+    return (   (a_ptd.m_runtime_idata[i0(a_d)+IntIdxDisease::status][a_idx] == Status::immune)
+            || (a_ptd.m_runtime_idata[i0(a_d)+IntIdxDisease::status][a_idx] == Status::dead)
+            || (a_ptd.m_runtime_idata[i0(a_d)+IntIdxDisease::status][a_idx] == Status::infected) );
 }
 
 #endif

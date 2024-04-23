@@ -20,9 +20,10 @@ using namespace amrex;
 
     See CaseData::InitFromFile()
 */
-CaseData::CaseData (const::std::string& fname /*!< Filename to read case data from */)
+CaseData::CaseData (const std::string& dname, /*!< Disease name */
+                    const::std::string& fname /*!< Filename to read case data from */)
 {
-    InitFromFile(fname);
+    InitFromFile(dname, fname);
 }
 
 /*! \brief Read case data from a given file
@@ -52,9 +53,11 @@ CaseData::CaseData (const::std::string& fname /*!< Filename to read case data fr
     \b Note: The code runs even if the case data file lacks the 3rd column. In this case, the
     #CaseData::num_cases2date will contain junk values (or maybe zero).
 */
-void CaseData::InitFromFile (const std::string& fname /*!< Filename to read case data from */)
+void CaseData::InitFromFile (const std::string& a_disease_name, /*!< Name of disease */
+                             const std::string& fname /*!< Filename to read case data from */)
 {
     BL_PROFILE("CaseData::InitFromFile");
+    m_disease_name = a_disease_name;
 
     Vector<char> fileCharPtr;
     ParallelDescriptor::ReadAndBcastFile(fname, fileCharPtr);
@@ -98,7 +101,9 @@ void CaseData::InitFromFile (const std::string& fname /*!< Filename to read case
         }
     }
 
-    amrex::Print() << "Setting initial case counts in " << N_hubs << " disease hubs. \n";
+    amrex::Print() << "Setting initial case counts for "
+                   << m_disease_name
+                   << " in " << N_hubs << " disease hubs. \n";
 
     FIPS_hubs.resize(N_hubs, 0);
     Size_hubs.resize(N_hubs, 0);
@@ -121,6 +126,7 @@ void CaseData::InitFromFile (const std::string& fname /*!< Filename to read case
     and cumulative number of cases till date.
 */
 void CaseData::Print () const {
+    amrex::Print() << "Disease name: " << m_disease_name << "\n";
     for (amrex::Long i = 0; i < FIPS_hubs.size(); ++i) {
         amrex::Print() << FIPS_hubs[i] << " " << num_cases[i] << " " << num_cases2date[i] << "\n";
     }
