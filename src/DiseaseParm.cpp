@@ -13,28 +13,28 @@
 */
 void DiseaseParm::Initialize ()
 {
-    xmit_comm[0] = .0000125*pCO;
-    xmit_comm[1] = .0000375*pCO;
-    xmit_comm[2] = .00010*pCO;
-    xmit_comm[3] = .00010*pCO;
-    xmit_comm[4] = .00015*pCO;
+    xmit_comm[0] = .0000125_rt*pCO;
+    xmit_comm[1] = .0000375_rt*pCO;
+    xmit_comm[2] = .00010_rt*pCO;
+    xmit_comm[3] = .00010_rt*pCO;
+    xmit_comm[4] = .00015_rt*pCO;
 
-    xmit_hood[0] = .00005*pNH;
-    xmit_hood[1] = .00015*pNH;
-    xmit_hood[2] = xmit_hood[3] = .00040*pNH;
-    xmit_hood[4] = .00060*pNH;
+    xmit_hood[0] = .00005_rt*pNH;
+    xmit_hood[1] = .00015_rt*pNH;
+    xmit_hood[2] = xmit_hood[3] = .00040_rt*pNH;
+    xmit_hood[4] = .00060_rt*pNH;
 
-    xmit_nc_adult[0] = xmit_nc_adult[1] = .08*pHC;
-    xmit_nc_adult[2] = xmit_nc_adult[3] = xmit_nc_adult[4] = .1*pHC;
+    xmit_nc_adult[0] = xmit_nc_adult[1] = .08_rt*pHC;
+    xmit_nc_adult[2] = xmit_nc_adult[3] = xmit_nc_adult[4] = .1_rt*pHC;
 
-    xmit_nc_child[0] = xmit_nc_child[1] = .15*pHC;
-    xmit_nc_child[2] = xmit_nc_child[3] = xmit_nc_child[4] = .08*pHC;
+    xmit_nc_child[0] = xmit_nc_child[1] = .15_rt*pHC;
+    xmit_nc_child[2] = xmit_nc_child[3] = xmit_nc_child[4] = .08_rt*pHC;
 
-    xmit_work = 0.115*pWO;
+    xmit_work = 0.115_rt*pWO;
 
     // Optimistic scenario: 50% reduction in external child contacts during school dismissal
     //   or remote learning, and no change in household contacts
-    Child_compliance=0.5; Child_HH_closure=1.0;
+    Child_compliance=0.5_rt; Child_HH_closure=1.0_rt;
     // Pessimistic scenario: 30% reduction in external child contacts during school dismissal
     //   or remote learning, and 2x increase in household contacts
     //  sch_compliance=0.3; sch_effect=2.0;
@@ -46,13 +46,13 @@ void DiseaseParm::Initialize ()
     */
     for (int i = 0; i < 5; i++) {
         xmit_child_SC[i] = xmit_child[i] * Child_HH_closure;
-        xmit_nc_child_SC[i] = xmit_nc_child[i] * (1.0 - Child_compliance);
+        xmit_nc_child_SC[i] = xmit_nc_child[i] * (1.0_rt - Child_compliance);
     }
     for (int i = 0; i < 2; i++) {
         xmit_adult_SC[i] = xmit_adult[i] * Child_HH_closure;
-        xmit_nc_adult_SC[i] = xmit_nc_adult[i] * (1.0 - Child_compliance);
-        xmit_comm_SC[i] = xmit_comm[i] * (1.0 - Child_compliance);
-        xmit_hood_SC[i] = xmit_hood[i] * (1.0 - Child_compliance);
+        xmit_nc_adult_SC[i] = xmit_nc_adult[i] * (1.0_rt - Child_compliance);
+        xmit_comm_SC[i] = xmit_comm[i] * (1.0_rt - Child_compliance);
+        xmit_hood_SC[i] = xmit_hood[i] * (1.0_rt - Child_compliance);
     }
     for (int i = 2; i < 5; i++) {
         xmit_adult_SC[i] = xmit_adult[i];
@@ -85,7 +85,7 @@ void DiseaseParm::Initialize ()
         xmit_sch_a2c[i] *= p_trans[0];
     }
 
-    infect = 1.0;
+    infect = 1.0_rt;
 }
 
 /*! \brief Print disease parameters */
