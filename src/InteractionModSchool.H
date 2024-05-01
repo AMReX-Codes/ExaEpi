@@ -35,15 +35,15 @@ static void binaryInteractionSchool ( const int a_i, /*!< Index of infectious ag
 
     //infect *= i_mask;
     //infect *= j_mask;
-    ParticleReal prob = 1.0;
+    ParticleReal prob = 1.0_prt;
     if (nborhood_ptr[a_i] == nborhood_ptr[a_j]) {
         if (school_ptr[a_i] == school_ptr[a_j]) {
             if (school_ptr[a_i] > 5) {
                 /* Playgroup */
-                prob *= 1.0 - infect * a_lparm->xmit_school[6] * a_social_scale;
+                prob *= 1.0_prt - infect * a_lparm->xmit_school[6] * a_social_scale;
             } else if (school_ptr[a_i] == 5) {
                 /* Day care */
-                prob *= 1.0 - infect * a_lparm->xmit_school[5] * a_social_scale;
+                prob *= 1.0_prt - infect * a_lparm->xmit_school[5] * a_social_scale;
             }
         }
     }
@@ -53,12 +53,12 @@ static void binaryInteractionSchool ( const int a_i, /*!< Index of infectious ag
          && (school_ptr[a_i] < 5) ) {
         if (age_group_ptr[a_i] <= 1) {  /* Transmitter i is a child */
             if (age_group_ptr[a_j] <= 1) {  /* Receiver j is a child */
-                prob *= 1.0 - infect * a_lparm->xmit_school[school_ptr[a_i]] * a_social_scale;
+                prob *= 1.0_prt - infect * a_lparm->xmit_school[school_ptr[a_i]] * a_social_scale;
             } else {  // Child student -> adult teacher/staff transmission
-                prob  *= 1.0 - infect * a_lparm->xmit_sch_c2a[school_ptr[a_i]] * a_social_scale;
+                prob  *= 1.0_prt - infect * a_lparm->xmit_sch_c2a[school_ptr[a_i]] * a_social_scale;
             }
         } else if (age_group_ptr[a_j] <= 1) {  // Adult teacher/staff -> child student
-            prob *= 1.0 - infect * a_lparm->xmit_sch_a2c[school_ptr[a_i]] * a_social_scale;
+            prob *= 1.0_prt - infect * a_lparm->xmit_sch_a2c[school_ptr[a_i]] * a_social_scale;
         }
     }
     Gpu::Atomic::Multiply(&a_prob_ptr[a_j], prob);
@@ -175,7 +175,7 @@ void InteractionModSchool<AC,ACT,ACTD,A>::interactAgents(AC& a_agents, /*!< Agen
                     if (i == j) continue;
 
                     if ( isInfectious<ACTD>(j, ptd) ) {
-                        Real social_scale = 1.0;  // TODO this should vary based on cell
+                        Real social_scale = 1.0_prt;  // TODO this should vary based on cell
                         binaryInteractionSchool<ACTD>(  j, i, ptd, lparm, social_scale, prob_ptr );
 
                     }

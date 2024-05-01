@@ -836,7 +836,7 @@ void AgentContainer::updateStatus (MultiFab& disease_stats /*!< Community-wise d
             amrex::ParallelForRNG( np,
                                    [=] AMREX_GPU_DEVICE (int i, amrex::RandomEngine const& engine) noexcept
             {
-                prob_ptr[i] = 1.0;
+                prob_ptr[i] = 1.0_rt;
                 if ( status_ptr[i] == Status::never ||
                      status_ptr[i] == Status::susceptible ) {
                     return;
@@ -897,12 +897,12 @@ void AgentContainer::updateStatus (MultiFab& disease_stats /*!< Community-wise d
                             }
                         }
                     } else {
-                        if (timer_ptr[i] > 0.0) {
+                        if (timer_ptr[i] > 0.0_rt) {
                             // do hospital things
-                            timer_ptr[i] -= 1.0;
+                            timer_ptr[i] -= 1.0_rt;
                             if (timer_ptr[i] == 0) {
-                                if (CVF[age_group_ptr[i]] > 2.0) {
-                                    if (amrex::Random(engine) < (CVF[age_group_ptr[i]] - 2.0)) {
+                                if (CVF[age_group_ptr[i]] > 2.0_rt) {
+                                    if (amrex::Random(engine) < (CVF[age_group_ptr[i]] - 2.0_rt)) {
                                         amrex::Gpu::Atomic::AddNoRet(
                                             &ds_arr(home_i_ptr[i], home_j_ptr[i], 0,
                                                     DiseaseStats::death), 1.0_rt);
@@ -918,8 +918,8 @@ void AgentContainer::updateStatus (MultiFab& disease_stats /*!< Community-wise d
                                 }
                             }
                             if (timer_ptr[i] == 10) {
-                                if (CVF[age_group_ptr[i]] > 1.0) {
-                                    if (amrex::Random(engine) < (CVF[age_group_ptr[i]] - 1.0)) {
+                                if (CVF[age_group_ptr[i]] > 1.0_rt) {
+                                    if (amrex::Random(engine) < (CVF[age_group_ptr[i]] - 1.0_rt)) {
                                         amrex::Gpu::Atomic::AddNoRet(
                                             &ds_arr(home_i_ptr[i], home_j_ptr[i], 0,
                                                     DiseaseStats::death), 1.0_rt);
@@ -962,7 +962,7 @@ void AgentContainer::updateStatus (MultiFab& disease_stats /*!< Community-wise d
                         else { // not hospitalized, recover once not infectious
                             if (counter_ptr[i] >= (incubation_period_ptr[i] + infectious_period_ptr[i])) {
                                 status_ptr[i] = Status::immune;
-                                counter_ptr[i] = 0.0;
+                                counter_ptr[i] = 0.0_rt;
                                 symptomatic_ptr[i] = 0;
                                 withdrawn_ptr[i] = 0;
                             }
@@ -1073,12 +1073,12 @@ void AgentContainer::infectAgents ()
             amrex::ParallelForRNG( np,
             [=] AMREX_GPU_DEVICE (int i, amrex::RandomEngine const& engine) noexcept
             {
-                prob_ptr[i] = 1.0 - prob_ptr[i];
+                prob_ptr[i] = 1.0_rt - prob_ptr[i];
                 if ( status_ptr[i] == Status::never ||
                      status_ptr[i] == Status::susceptible ) {
                     if (amrex::Random(engine) < prob_ptr[i]) {
                         status_ptr[i] = Status::infected;
-                        counter_ptr[i] = 0.0;
+                        counter_ptr[i] = 0.0_rt;
                         incubation_period_ptr[i] = amrex::RandomNormal(lparm->incubation_length_mean, lparm->incubation_length_std, engine);
                         infectious_period_ptr[i] = amrex::RandomNormal(lparm->infectious_length_mean, lparm->infectious_length_std, engine);
                         symptomdev_period_ptr[i] = amrex::RandomNormal(lparm->symptomdev_length_mean, lparm->symptomdev_length_std, engine);
