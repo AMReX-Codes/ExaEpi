@@ -140,7 +140,7 @@ void InteractionModNborhood<AC,ACT,ACTD,A>::interactAgents( AC& a_agents, /*!< A
             auto inds = bins_ptr->permutationPtr();
             auto offsets = bins_ptr->offsetsPtr();
 
-            auto prob_ptr( this->getAgentProbPtr(a_agents,lev,mfi) );
+            auto prob_ptr = this->getAgentProbPtr(a_agents,lev,mfi);
             //auto mask_arr = a_mask[mfi].array();
             auto lparm = a_agents.getDiseaseParameters_d();
 
