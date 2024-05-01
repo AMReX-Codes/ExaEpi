@@ -34,12 +34,12 @@ static void binaryInteractionWork ( const int a_i, /*!< Index of infectious agen
 
     //infect *= i_mask;
     //infect *= j_mask;
-    ParticleReal prob = 1.0;
+    ParticleReal prob = 1.0_prt;
 
     /* Workgroup transmission */
     if (workgroup_ptr[a_i] && (work_i_ptr[a_i] >= 0)) { // transmitter i at work
         if ((work_i_ptr[a_j] >= 0) && (workgroup_ptr[a_i] == workgroup_ptr[a_j])) {  // coworker
-            prob *= 1.0 - infect * a_lparm->xmit_work * a_work_scale;
+            prob *= 1.0_prt - infect * a_lparm->xmit_work * a_work_scale;
         }
     }
 

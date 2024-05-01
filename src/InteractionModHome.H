@@ -35,21 +35,21 @@ static void binaryInteractionHome ( const int a_i, /*!< Index of infectious agen
 
     //infect *= i_mask;
     //infect *= j_mask;
-    ParticleReal prob = 1.0;
+    ParticleReal prob = 1.0_prt;
     if (     (nborhood_ptr[a_i] == nborhood_ptr[a_j])
           && (family_ptr[a_i] == family_ptr[a_j]) ) {
         /* at home, within a family */
         if (age_group_ptr[a_i] <= 1) {  /* Transmitter i is a child */
             if (school_ptr[a_i] < 0) { // not attending school, use _SC contacts
-                prob *= 1.0 - infect * a_lparm->xmit_child_SC[age_group_ptr[a_j]];
+                prob *= 1.0_prt - infect * a_lparm->xmit_child_SC[age_group_ptr[a_j]];
             } else {
-                prob *= 1.0 - infect * a_lparm->xmit_child[age_group_ptr[a_j]];
+                prob *= 1.0_prt - infect * a_lparm->xmit_child[age_group_ptr[a_j]];
             }
         } else {
             if (school_ptr[a_i] < 0) { // not attending school, use _SC contacts
-                prob *= 1.0 - infect * a_lparm->xmit_adult_SC[age_group_ptr[a_j]];
+                prob *= 1.0_prt - infect * a_lparm->xmit_adult_SC[age_group_ptr[a_j]];
             } else {
-                prob *= 1.0 - infect * a_lparm->xmit_adult[age_group_ptr[a_j]];
+                prob *= 1.0_prt - infect * a_lparm->xmit_adult[age_group_ptr[a_j]];
             }
         }
     } else if (    (nborhood_ptr[a_i] == nborhood_ptr[a_j])
@@ -58,15 +58,15 @@ static void binaryInteractionHome ( const int a_i, /*!< Index of infectious agen
         /* check for common neighborhood cluster: */
         if (age_group_ptr[a_i] <= 1) {  /* Transmitter i is a child */
             if (school_ptr[a_i] < 0)  // not attending school, use _SC contacts
-                prob *= 1.0 - infect * a_lparm->xmit_nc_child_SC[age_group_ptr[a_j]] * a_social_scale;
+                prob *= 1.0_prt - infect * a_lparm->xmit_nc_child_SC[age_group_ptr[a_j]] * a_social_scale;
             else
-                prob *= 1.0 - infect * a_lparm->xmit_nc_child[age_group_ptr[a_j]] * a_social_scale;
+                prob *= 1.0_prt - infect * a_lparm->xmit_nc_child[age_group_ptr[a_j]] * a_social_scale;
         } else {
             if (school_ptr[a_i] < 0)  {
                 // not attending school, use _SC contacts
-                prob *= 1.0 - infect * a_lparm->xmit_nc_adult_SC[age_group_ptr[a_j]] * a_social_scale;
+                prob *= 1.0_prt - infect * a_lparm->xmit_nc_adult_SC[age_group_ptr[a_j]] * a_social_scale;
             } else {
-                prob *= 1.0 - infect * a_lparm->xmit_nc_adult[age_group_ptr[a_j]] * a_social_scale;
+                prob *= 1.0_prt - infect * a_lparm->xmit_nc_adult[age_group_ptr[a_j]] * a_social_scale;
             }
         }
     }
