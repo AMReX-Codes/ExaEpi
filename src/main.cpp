@@ -300,7 +300,7 @@ void runAgent ()
             //            }
             //            pc.Redistribute();
 
-            cur_time += 1.0; // time step is one day
+            cur_time += 1.0_rt; // time step is one day
         }
     }
 
