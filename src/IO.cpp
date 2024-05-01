@@ -57,13 +57,25 @@ void writePlotFile (const AgentContainer& pc,   /*!< Agent (particle) container 
     amrex::Copy(output_mf, FIPS_mf, 0, 6, 2, 0);
     amrex::Copy(output_mf, comm_mf, 0, 8, 1, 0);
 
+    amrex::Vector<int> write_real_comp;
+    amrex::Vector<int> write_int_comp;
+    amrex::Vector<std::string> real_comp_names = {"disease_counter", "treatment_timer", "infection_prob", "incubation_period", "infectious_period", "symptomdev_period"};
+    amrex::Vector<std::string> int_comp_names = {"status", "strain", "age_group", "family", "home_i", "home_j", "work_i", "work_j", "nborhood", "school", "workgroup", "work_nborhood", "withdrawn", "symptomatic"};
+
+    if (step == 0) {
+        write_real_comp = {1, 1, 1, 1, 1, 1};
+        write_int_comp = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
+    } else {
+        write_real_comp = {1, 1, 1, 0, 0, 0};
+        write_int_comp = {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1};
+    }
+
     WriteSingleLevelPlotfile(amrex::Concatenate("plt", step, 5), output_mf,
                              {"total", "never_infected", "infected", "immune", "susceptible", "unit", "FIPS", "Tract", "comm"},
                              pc.ParticleGeom(0), cur_time, step);
 
     pc.WritePlotFile(amrex::Concatenate("plt", step, 5), "agents",
-                     {"disease_counter", "treatment_timer", "infection_prob", "incubation_period", "infectious_period", "symptomdev_period"},
-                     {"status", "strain", "age_group", "family", "home_i", "home_j", "work_i", "work_j", "nborhood", "school", "workgroup", "work_nborhood", "withdrawn", "symptomatic"});
+                     write_real_comp, write_int_comp, real_comp_names, int_comp_names);
 }
 
 /*! \brief Writes diagnostic data by FIPS code
