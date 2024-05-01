@@ -33,18 +33,18 @@ namespace {
         if (ParallelDescriptor::IOProcessor())
         {
             int num_pop_bins = 1000;
-            amrex::Real log_min_pop = 1.062;
-            amrex::Real log_max_pop = 4.0;
+            amrex::Real log_min_pop = 1.062_rt;
+            amrex::Real log_max_pop = 4.0_rt;
             amrex::Vector<amrex::Real> cell_pop_bins_r(num_pop_bins);
             amrex::Vector<amrex::Real> num_cells_per_bin_r(num_pop_bins);
 
             for (int i = 0; i < cell_pop_bins_r.size(); ++i) {
-                cell_pop_bins_r[i] = std::pow(10.0,
+                cell_pop_bins_r[i] = std::pow(10.0_rt,
                     log_min_pop + i*(log_max_pop - log_min_pop)/(num_pop_bins-1));
-                num_cells_per_bin_r[i] = std::pow(cell_pop_bins_r[i], -1.5);
+                num_cells_per_bin_r[i] = std::pow(cell_pop_bins_r[i], -1.5_rt);
             }
 
-            amrex::Real norm = 0;
+            amrex::Real norm = 0_rt;
             for (int i = 0; i < num_cells_per_bin_r.size(); ++i) {
                 norm += num_cells_per_bin_r[i];
             }
@@ -94,7 +94,7 @@ namespace {
 
             // First we sort the vector of cell pops
             std::sort(cell_pops.begin(), cell_pops.end());
-            amrex::Real border_pop = 0;
+            amrex::Real border_pop = 0_rt;
             int i = cell_pops.size()-1;
             std::vector<int> border_ids;
             std::vector<int> interior_ids;
@@ -237,12 +237,12 @@ void AgentContainer::initAgentsDemo (iMultiFab& /*num_residents*/,
 
         for (int i = cell_start; i < cell_stop; ++i) {
             auto& p = pstruct_ptr[i];
-            p.pos(0) = idx + 0.5;
-            p.pos(1) = idy + 0.5;
+            p.pos(0) = idx + 0.5_rt;
+            p.pos(1) = idy + 0.5_rt;
             p.id() = i;
             p.cpu() = 0;
 
-            counter_ptr[i] = 0.0;
+            counter_ptr[i] = 0.0_rt;
             strain_ptr[i] = 0;
 
             if (amrex::Random(engine) < 1e-6) {
@@ -568,13 +568,13 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,    /*!< Number 
                     }
                 }
 
-                agent.pos(0) = (i + 0.5)*dx[0];
-                agent.pos(1) = (j + 0.5)*dx[1];
+                agent.pos(0) = (i + 0.5_rt)*dx[0];
+                agent.pos(1) = (j + 0.5_rt)*dx[1];
                 agent.id()  = pid+ip;
                 agent.cpu() = my_proc;
 
                 status_ptr[ip] = 0;
-                counter_ptr[ip] = 0.0;
+                counter_ptr[ip] = 0.0_rt;
                 age_group_ptr[ip] = age_group;
                 family_ptr[ip] = family_id++;
                 home_i_ptr[ip] = i;
@@ -829,10 +829,10 @@ void AgentContainer::updateStatus (MultiFab& disease_stats /*!< Community-wise d
             auto symptomatic_withdraw = m_symptomatic_withdraw;
 
             // Track hospitalization, ICU, ventilator, and fatalities
-            Real CHR[] = {.0104, .0104, .070, .28, 1.0};  // sick -> hospital probabilities
-            Real CIC[] = {.24, .24, .24, .36, .35};      // hospital -> ICU probabilities
-            Real CVE[] = {.12, .12, .12, .22, .22};      // ICU -> ventilator probabilities
-            Real CVF[] = {.20, .20, .20, 0.45, 1.26};    // ventilator -> dead probilities
+            Real CHR[] = {.0104_rt, .0104_rt, .070_rt, .28_rt, 1.0_rt};  // sick -> hospital probabilities
+            Real CIC[] = {.24_rt, .24_rt, .24_rt, .36_rt, .35_rt};      // hospital -> ICU probabilities
+            Real CVE[] = {.12_rt, .12_rt, .12_rt, .22_rt, .22_rt};      // ICU -> ventilator probabilities
+            Real CVF[] = {.20_rt, .20_rt, .20_rt, 0.45_rt, 1.26_rt};    // ventilator -> dead probilities
             amrex::ParallelForRNG( np,
                                    [=] AMREX_GPU_DEVICE (int i, amrex::RandomEngine const& engine) noexcept
             {

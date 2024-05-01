@@ -212,7 +212,7 @@ protected:
 
     int m_symptomatic_withdraw = 0;
 
-    amrex::Real m_shelter_compliance = 0.95;
+    amrex::Real m_shelter_compliance = 0.95_rt;
 
     DiseaseParm* h_parm;    /*!< Disease parameters */
     DiseaseParm* d_parm;    /*!< Disease parameters (GPU device) */
