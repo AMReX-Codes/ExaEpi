@@ -669,8 +669,8 @@ void AgentContainer::moveAgentsToWork ()
             [=] AMREX_GPU_DEVICE (int ip) noexcept
             {
                 ParticleType& p = pstruct[ip];
-                p.pos(0) = (work_i_ptr[ip] + 0.5)*dx[0];
-                p.pos(1) = (work_j_ptr[ip] + 0.5)*dx[1];
+                p.pos(0) = (work_i_ptr[ip] + 0.5_prt)*dx[0];
+                p.pos(1) = (work_j_ptr[ip] + 0.5_prt)*dx[1];
             });
         }
     }
@@ -711,8 +711,8 @@ void AgentContainer::moveAgentsToHome ()
             [=] AMREX_GPU_DEVICE (int ip) noexcept
             {
                 ParticleType& p = pstruct[ip];
-                p.pos(0) = (home_i_ptr[ip] + 0.5)*dx[0];
-                p.pos(1) = (home_j_ptr[ip] + 0.5)*dx[1];
+                p.pos(0) = (home_i_ptr[ip] + 0.5_prt)*dx[0];
+                p.pos(1) = (home_j_ptr[ip] + 0.5_prt)*dx[1];
             });
         }
     }
