@@ -6,6 +6,8 @@
 
 #include "AMReX_Print.H"
 
+using namespace amrex::literals;
+
 /*! \brief Initialize disease parameters
 
     Compute transmission probabilities for various situations based on disease
