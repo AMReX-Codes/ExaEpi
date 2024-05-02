@@ -115,7 +115,10 @@ void runAgent ()
     amrex::Print() << "Max grid size is: " << params.max_grid_size << "\n";
     amrex::Print() << "Number of boxes is: " << ba.size() << " over " << ParallelDescriptor::NProcs() << " ranks. \n";
 
+    // The default output filename is output.dat
     std::string output_filename = "output.dat";
+    ParmParse pp("diag");
+    pp.query("output_filename",output_filename);
     if (ParallelDescriptor::IOProcessor())
     {
         std::ofstream File;
