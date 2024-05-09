@@ -102,7 +102,7 @@ bool notInfectiousButInfected ( const int      a_idx, /*!< Agent index */
 {
     return (    (a_ptd.m_runtime_idata[i0(a_d)+IntIdxDisease::status][a_idx] == Status::infected)
              && (a_ptd.m_runtime_rdata[r0(a_d)+RealIdxDisease::disease_counter][a_idx]
-                 < a_ptd.m_runtime_rdata[r0(a_d)+RealIdxDisease::incubation_period][a_idx]) );
+                 <= a_ptd.m_runtime_rdata[r0(a_d)+RealIdxDisease::incubation_period][a_idx]) );
 }
 
 /*! \brief Is an agent infectious? */
