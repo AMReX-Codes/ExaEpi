@@ -35,22 +35,22 @@ static void binaryInteractionNborhood ( const int a_i, /*!< Index of infectious 
 
     //infect *= i_mask;
     //infect *= j_mask;
-    ParticleReal prob = 1.0;
+    ParticleReal prob = 1.0_prt;
 
     // school < 0 means a child normally attends school, but not today
     /* Should always be in the same community = same cell */
     if (school_ptr[a_i] < 0) {  // not attending school, use _SC contacts
-        prob *= 1.0 - infect * a_lparm->xmit_comm_SC[age_group_ptr[a_j]] * a_social_scale;
+        prob *= 1.0_prt - infect * a_lparm->xmit_comm_SC[age_group_ptr[a_j]] * a_social_scale;
     } else {
-        prob *= 1.0 - infect * a_lparm->xmit_comm[age_group_ptr[a_j]] * a_social_scale;
+        prob *= 1.0_prt - infect * a_lparm->xmit_comm[age_group_ptr[a_j]] * a_social_scale;
     }
     // /* Neighborhood? */
     if (nborhood_ptr[a_i] == nborhood_ptr[a_j]) {
         if (school_ptr[a_i] < 0)  {
             // not attending school, use _SC contacts
-            prob *= 1.0 - infect * a_lparm->xmit_hood_SC[age_group_ptr[a_j]] * a_social_scale;
+            prob *= 1.0_prt - infect * a_lparm->xmit_hood_SC[age_group_ptr[a_j]] * a_social_scale;
         } else {
-            prob *= 1.0 - infect * a_lparm->xmit_hood[age_group_ptr[a_j]] * a_social_scale;
+            prob *= 1.0_prt - infect * a_lparm->xmit_hood[age_group_ptr[a_j]] * a_social_scale;
         }
     }
 
@@ -142,7 +142,7 @@ void InteractionModNborhood<AC,ACT,ACTD,A>::interactAgents( AC& a_agents, /*!< A
             auto offsets = bins_ptr->offsetsPtr();
 
             for (int d = 0; d < n_disease; d++) {
-                auto prob_ptr( this->getAgentProbPtr(a_agents,lev,mfi,d) );
+                auto prob_ptr = this->getAgentProbPtr(a_agents,lev,mfi,d);
                 //auto mask_arr = a_mask[mfi].array();
                 auto lparm = a_agents.getDiseaseParameters_d(d);
 
@@ -168,7 +168,7 @@ void InteractionModNborhood<AC,ACT,ACTD,A>::interactAgents( AC& a_agents, /*!< A
                         if (i == j) continue;
 
                         if ( isInfectious<ACTD>(j, ptd, d) ) {
-                            Real social_scale = 1.0;  // TODO this should vary based on cell
+                            Real social_scale = 1.0_prt;  // TODO this should vary based on cell
                             binaryInteractionNborhood<ACTD>( j, i, ptd, lparm, social_scale, prob_ptr );
                         }
                     }

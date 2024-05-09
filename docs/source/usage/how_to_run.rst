@@ -50,8 +50,7 @@ In addition to the ExaEpi inputs, there are also a number of runtime options tha
 * ``agent.num_initial_cases`` (int)
     The number of initial cases to seed. Must be provided if ``initial_case_type`` is ``"random"``.
 * ``agent.nsteps`` (`integer`)
-    The number of time steps to simulate. Currently, time steps are fixed at 12 hours, so to
-    run for 30 days, input `60`.
+    The number of days to simulate.
 * ``agent.plot_int`` (`integer`)
     The number of time steps between successive plot file writes.
 * ``agent.random_travel_int`` (`integer`)
@@ -118,6 +117,8 @@ In addition to the ExaEpi inputs, there are also a number of runtime options tha
     This option sets the maximum grid size used for MPI domain decomposition. If set to
     ``16``, for example, the domain will be broken up into grids of `16^2` communities, and
     these grids will be assigned to different MPI ranks / GPUs.
+* ``diag.output_filename`` (`string`, default: ``output.dat``)
+    Filename for the output data.
 
 
 In addition to the ExaEpi inputs, there are also a number of runtime options that can be configured for AMReX itself. Please see <https://amrex-codes.github.io/amrex/docs_html/GPU.html#inputs-parameters>`__ for more information on these options.

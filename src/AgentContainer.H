@@ -303,7 +303,7 @@ protected:
 
     int m_symptomatic_withdraw = 0;
 
-    amrex::Real m_shelter_compliance = 0.95;
+    amrex::Real m_shelter_compliance = 0.95_rt;
 
     std::vector<DiseaseParm*> h_parm;    /*!< Disease parameters */
     std::vector<DiseaseParm*> d_parm;    /*!< Disease parameters (GPU device) */

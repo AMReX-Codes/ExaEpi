@@ -123,6 +123,9 @@ void runAgent ()
     amrex::Print() << "Max grid size is: " << params.max_grid_size << "\n";
     amrex::Print() << "Number of boxes is: " << ba.size() << " over " << ParallelDescriptor::NProcs() << " ranks. \n";
 
+    // The default output filename is:
+    // output.dat for a single disease
+    // output_<disease_name>.dat for multiple diseases
     std::vector<std::string> output_filename;
     output_filename.resize(params.num_diseases);
     if (params.num_diseases == 1) {
@@ -132,6 +135,8 @@ void runAgent ()
             output_filename[d] = "output_" + params.disease_names[d] + ".dat";
         }
     }
+    ParmParse pp("diag");
+    pp.queryarr("output_filename",output_filename,0,params.num_diseases);
 
     for (int d = 0; d < params.num_diseases; d++) {
         if (ParallelDescriptor::IOProcessor())
@@ -375,7 +380,7 @@ void runAgent ()
             //            }
             //            pc.Redistribute();
 
-            cur_time += 1.0; // time step is one day
+            cur_time += 1.0_rt; // time step is one day
         }
     }
 

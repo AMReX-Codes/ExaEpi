@@ -97,45 +97,48 @@ void writePlotFile (const AgentContainer& pc, /*!< Agent (particle) container */
     }
 
     {
+        Vector<int> write_real_comp = {}, write_int_comp = {};
         Vector<std::string> real_varnames = {}, int_varnames = {};
         // non-disease-specific attributes
-        real_varnames.push_back("treatment_timer");
-        int_varnames.push_back ("age_group");
-        int_varnames.push_back ("family");
-        int_varnames.push_back ("home_i");
-        int_varnames.push_back ("home_j");
-        int_varnames.push_back ("work_i");
-        int_varnames.push_back ("work_j");
-        int_varnames.push_back ("nborhood");
-        int_varnames.push_back ("school");
-        int_varnames.push_back ("workgroup");
-        int_varnames.push_back ("work_nborhood");
-        int_varnames.push_back ("withdrawn");
+        real_varnames.push_back("treatment_timer"); write_real_comp.push_back(1);
+        int_varnames.push_back ("age_group"); write_int_comp.push_back(static_cast<int>(step==0));
+        int_varnames.push_back ("family"); write_int_comp.push_back(static_cast<int>(step==0));
+        int_varnames.push_back ("home_i"); write_int_comp.push_back(static_cast<int>(step==0));
+        int_varnames.push_back ("home_j"); write_int_comp.push_back(static_cast<int>(step==0));
+        int_varnames.push_back ("work_i"); write_int_comp.push_back(static_cast<int>(step==0));
+        int_varnames.push_back ("work_j"); write_int_comp.push_back(static_cast<int>(step==0));
+        int_varnames.push_back ("nborhood"); write_int_comp.push_back(static_cast<int>(step==0));
+        int_varnames.push_back ("school"); write_int_comp.push_back(static_cast<int>(step==0));
+        int_varnames.push_back ("workgroup"); write_int_comp.push_back(static_cast<int>(step==0));
+        int_varnames.push_back ("work_nborhood"); write_int_comp.push_back(static_cast<int>(step==0));
+        int_varnames.push_back ("withdrawn"); write_int_comp.push_back(1);
         // disease-specific (runtime-added) attributes
         if (num_diseases == 1) {
-            real_varnames.push_back("disease_counter");
-            real_varnames.push_back("infection_prob");
-            real_varnames.push_back("incubation_period");
-            real_varnames.push_back("infectious_period");
-            real_varnames.push_back("symptomdev_period");
-            int_varnames.push_back ("status");
-            int_varnames.push_back ("strain");
-            int_varnames.push_back ("symptomatic");
+            real_varnames.push_back("disease_counter"); write_real_comp.push_back(1);
+            real_varnames.push_back("infection_prob"); write_real_comp.push_back(1);
+            real_varnames.push_back("incubation_period"); write_real_comp.push_back(static_cast<int>(step==0));
+            real_varnames.push_back("infectious_period"); write_real_comp.push_back(static_cast<int>(step==0));
+            real_varnames.push_back("symptomdev_period"); write_real_comp.push_back(static_cast<int>(step==0));
+            int_varnames.push_back ("status"); write_int_comp.push_back(1);
+            int_varnames.push_back ("strain"); write_int_comp.push_back(static_cast<int>(step==0));
+            int_varnames.push_back ("symptomatic"); write_int_comp.push_back(1);
         } else {
             for (int d = 0; d < num_diseases; d++) {
-                real_varnames.push_back(disease_names[d]+"_disease_counter");
-                real_varnames.push_back(disease_names[d]+"_infection_prob");
-                real_varnames.push_back(disease_names[d]+"_incubation_period");
-                real_varnames.push_back(disease_names[d]+"_infectious_period");
-                real_varnames.push_back(disease_names[d]+"_symptomdev_period");
-                int_varnames.push_back (disease_names[d]+"_status");
-                int_varnames.push_back (disease_names[d]+"_strain");
-                int_varnames.push_back (disease_names[d]+"_symptomatic");
+                real_varnames.push_back(disease_names[d]+"_disease_counter"); write_real_comp.push_back(1);
+                real_varnames.push_back(disease_names[d]+"_infection_prob"); write_real_comp.push_back(1);
+                real_varnames.push_back(disease_names[d]+"_incubation_period"); write_real_comp.push_back(static_cast<int>(step==0));
+                real_varnames.push_back(disease_names[d]+"_infectious_period"); write_real_comp.push_back(static_cast<int>(step==0));
+                real_varnames.push_back(disease_names[d]+"_symptomdev_period"); write_real_comp.push_back(static_cast<int>(step==0));
+                int_varnames.push_back (disease_names[d]+"_status"); write_int_comp.push_back(1);
+                int_varnames.push_back (disease_names[d]+"_strain"); write_int_comp.push_back(static_cast<int>(step==0));
+                int_varnames.push_back (disease_names[d]+"_symptomatic"); write_int_comp.push_back(1);
             }
         }
 
         pc.WritePlotFile(   amrex::Concatenate("plt", step, 5),
                             "agents",
+                            write_real_comp,
+                            write_int_comp,
                             real_varnames,
                             int_varnames );
     }

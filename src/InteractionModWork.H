@@ -34,12 +34,12 @@ static void binaryInteractionWork ( const int a_i, /*!< Index of infectious agen
 
     //infect *= i_mask;
     //infect *= j_mask;
-    ParticleReal prob = 1.0;
+    ParticleReal prob = 1.0_prt;
 
     /* Workgroup transmission */
     if (workgroup_ptr[a_i] && (work_i_ptr[a_i] >= 0)) { // transmitter i at work
         if ((work_i_ptr[a_j] >= 0) && (workgroup_ptr[a_i] == workgroup_ptr[a_j])) {  // coworker
-            prob *= 1.0 - infect * a_lparm->xmit_work * a_work_scale;
+            prob *= 1.0_prt - infect * a_lparm->xmit_work * a_work_scale;
         }
     }
 
@@ -133,7 +133,7 @@ void InteractionModWork<AC,ACT,ACTD,A>::interactAgents(AC& a_agents, /*!< Agent 
 
             for (int d = 0; d < n_disease; d++) {
 
-                auto prob_ptr( this->getAgentProbPtr(a_agents,lev,mfi,d) );
+                auto prob_ptr = this->getAgentProbPtr(a_agents,lev,mfi,d);
                 //auto mask_arr = a_mask[mfi].array();
                 auto lparm = a_agents.getDiseaseParameters_d(d);
 
@@ -159,7 +159,7 @@ void InteractionModWork<AC,ACT,ACTD,A>::interactAgents(AC& a_agents, /*!< Agent 
                         if (i == j) continue;
 
                         if ( isInfectious<ACTD>(j, ptd, d) ) {
-                            Real work_scale = 1.0;  // TODO this should vary based on cell
+                            Real work_scale = 1.0_prt;  // TODO this should vary based on cell
                             binaryInteractionWork<ACTD>( j, i, ptd, lparm, work_scale, prob_ptr );
                         }
                     }

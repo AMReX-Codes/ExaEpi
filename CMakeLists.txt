@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.14)
 
-project( AMReX_Agent_Demo
-   DESCRIPTION "An Agent-based simuilation demo using the AMReX adaptive mesh refinement framework"
+project( ExaEpi
+   DESCRIPTION "An agent-based simulation code for epidemiology modeling using the AMReX adaptive mesh refinement framework"
    #VERSION  ${AMREX_PKG_VERSION}
    )
 
@@ -13,6 +13,8 @@ set(AMReX_LINEAR_SOLVERS OFF)
 set(AMReX_AMRLEVEL       OFF)
 set(AMReX_TINY_PROFILE    ON)
 set(AMReX_SPACEDIM 2 CACHE INTERNAL "")
+set(AMReX_PRECISION SINGLE CACHE INTERNAL "")
+set(AMReX_PARTICLES_PRECISION SINGLE CACHE INTERNAL "")
 
 #
 # Fetch amrex repo
