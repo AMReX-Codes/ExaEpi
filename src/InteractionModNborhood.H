@@ -92,11 +92,11 @@ class InteractionModNborhood : public InteractionModel<AC,ACT,ACTD,A>
       + Find its bin and the range of indices in the bin-sorted array for agents in its bin
       + If the agent is #Status::immune, do nothing.
       + If the agent is #Status::infected with the number of days infected (RealIdxDisease::disease_counter)
-        less than the #DiseaseParm::incubation_length, do nothing.
+        less than the incubation length, do nothing.
       + Else, for each agent *j* in the same bin:
         + If the agent is #Status::immune, do nothing.
         + If the agent is #Status::infected with the number of days infected (RealIdxDisease::disease_counter)
-          less than the #DiseaseParm::incubation_length, do nothing.
+          less than the incubation length, do nothing.
         + Else if *i* is not infected and *j* is infected, compute probability of *i* getting infected
           from *j* (see below).
 

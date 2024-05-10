@@ -811,8 +811,8 @@ void AgentContainer::moveRandomTravel ()
     + If agent status is #Status::never or #Status::susceptible, do nothing
     + If agent status is #Status::infected, then
       + Increment its counter by 1 day
-      + If counter is within incubation period (#DiseaseParm::incubation_length days), do nothing more
-      + Else on day #DiseaseParm::incubation_length, use hospitalization probabilities (by age group)
+      + If counter is within incubation period, do nothing more
+      + Else, use hospitalization probabilities (by age group)
         to decide if agent is hospitalized. If yes, use age group to set hospital timer. Also, use
         age-group-wise probabilities to move agent to ICU and then to ventilator. Adjust timer
         accordingly.
@@ -820,8 +820,7 @@ void AgentContainer::moveRandomTravel ()
         status (using the agent's home community)
       + Else (beyond 3 days), count down hospital timer if agent is hospitalized. At end of hospital
         stay, determine if agent is #Status dead or #Status::immune. For non-hospitalized agents,
-        set them to #Status::immune after #DiseaseParm::incubation_length +
-        #DiseaseParm::infectious_length days.
+        set them to #Status::immune after incubation length + infection length days.
 
     The input argument is a MultiFab with 4 components corresponding to "hospitalizations", "ICU",
     "ventilator", and "death". It contains the cumulative totals of these quantities for each
