@@ -118,16 +118,6 @@ public:
                 pp.query("pFA", h_parm[d]->pFA);
                 pp.query("pBAR", h_parm[d]->pBAR);
             }
-            {
-                std::string key = "contact_" + m_disease_names[d];
-                amrex::ParmParse pp(key);
-                pp.query("pSC", h_parm[d]->pSC);
-                pp.query("pCO", h_parm[d]->pCO);
-                pp.query("pNH", h_parm[d]->pNH);
-                pp.query("pWO", h_parm[d]->pWO);
-                pp.query("pFA", h_parm[d]->pFA);
-                pp.query("pBAR", h_parm[d]->pBAR);
-            }
 
             {
                 amrex::ParmParse pp("disease");
