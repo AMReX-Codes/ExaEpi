@@ -48,8 +48,8 @@ gdf1.set_index('fips',inplace=True)
 
 #use cmap with a norm to convert a number to RGB
 #two slope norm
-#set center to 0, adjust the negative vmin to control how fast color changes from 0 to vmax 
-vmin = -10.0 
+#set center to 0, adjust the negative vmin to control how fast color changes from 0 to vmax
+vmin = -10.0
 vmax = 6.0
 norm = colors.TwoSlopeNorm(vmin=vmin, vcenter=0.000, vmax=vmax)
 cmap = cm.cool
