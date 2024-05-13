@@ -21,7 +21,7 @@ if len(argList)>= 2: CensusDir  = argList[1]+"/"
 if len(argList)>= 3: inputMetric  = argList[2]
 if len(argList)>= 3: outputMetric  = argList[3]
 
-gdf = geopd.GeoDataFrame(columns=["STATEFP00", "COUNTYFP00", "TRACTCE00", "CTIDFP00", "NAME00", "NAMELSAD00", "MTFCC00", 
+gdf = geopd.GeoDataFrame(columns=["STATEFP00", "COUNTYFP00", "TRACTCE00", "CTIDFP00", "NAME00", "NAMELSAD00", "MTFCC00",
                                   "FUNCSTAT00", "ALAND00", "AWATER00", "INTPTLAT00", "INTPTLON00", "geometry"])
 
 infCasesFiles= [os.path.join(infCasesDir, f) for f in os.listdir(infCasesDir) if f.endswith(".csv")]
@@ -33,10 +33,10 @@ for file in os.listdir(CensusDir):
     myprj = open(filename+".prj", "rb")
     r = shapefile.Reader(shp=myshp, dbf=mydbf, prj=myprj)
     attributes, geometry = [], []
-    field_names = [field[0] for field in r.fields[1:]]    
-    for row in r.shapeRecords():  
-            geometry.append(shape(row.shape.__geo_interface__))  
-            attributes.append(dict(zip(field_names, row.record)))      
+    field_names = [field[0] for field in r.fields[1:]]
+    for row in r.shapeRecords():
+            geometry.append(shape(row.shape.__geo_interface__))
+            attributes.append(dict(zip(field_names, row.record)))
     df = geopd.GeoDataFrame(data = attributes, geometry = geometry)
     gdf= gdf._append(df)
     r.close()
