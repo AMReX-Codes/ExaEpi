@@ -105,7 +105,7 @@ The following are inputs for the overall simulation:
     in ``agent.disease_names`` (or the default values).
 
 
-The following inputs specify the disease and transmission parameters:
+The following inputs specify the transmission parameters:
 
 * ``contact.pSC`` (`float`, default: 0.2)
     This is contact matrix scaling factor for schools.
@@ -120,6 +120,9 @@ The following inputs specify the disease and transmission parameters:
 * ``contact.pBAR`` (`float`, default: -1.0)
     This is contact matrix scaling factor for bars or other large social gatherings.
     Setting this to < 0 turns this transmission off.
+
+The following inputs specify the disease parameters:
+
 * ``disease.nstrain`` (`integer`)
     The number of disease strains we're modeling.
 * ``disease.p_trans`` (`list of float`, example: ``0.2 0.3``)
@@ -146,11 +149,10 @@ The following inputs specify the disease and transmission parameters:
 * ``disease.symptomdev_length_std`` (`float`, default: ``1.0``)
     Standard deviation of the time until symptom development in days.
 
-`Note`: for ``agent.number_of_diseases > 1``, the disease/transmission parameters that are common
+`Note`: for ``agent.number_of_diseases > 1``, the disease parameters that are common
 to all the diseases can be specified as above. Any parameter that is `different for a specific disease`
 can be specified as follows:
 
-* ``contact_[disease name].[key] = [value]``
 * ``disease_[disease name].[key] = [value]``
 
 where ``[disease name]`` is any of the names specified in ``agent.disease_names`` (or the
