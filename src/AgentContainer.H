@@ -75,6 +75,7 @@ public:
             amrex::ParmParse pp("agent");
             pp.query("symptomatic_withdraw", m_symptomatic_withdraw);
             pp.query("shelter_compliance", m_shelter_compliance);
+            pp.query("symptomatic_withdraw_compliance", m_symptomatic_withdraw_compliance);
         }
 
         {
@@ -210,9 +211,10 @@ public:
 
 protected:
 
-    int m_symptomatic_withdraw = 0;
+    int m_symptomatic_withdraw = 1;
 
     amrex::Real m_shelter_compliance = 0.95_rt;
+    amrex::Real m_symptomatic_withdraw_compliance = 0.95_rt;
 
     DiseaseParm* h_parm;    /*!< Disease parameters */
     DiseaseParm* d_parm;    /*!< Disease parameters (GPU device) */
