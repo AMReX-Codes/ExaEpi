@@ -898,16 +898,17 @@ void AgentContainer::updateStatus (MFPtrVec& a_disease_stats /*!< Community-wise
                         counter_ptr[i] += 1;
                         if (counter_ptr[i] == 1) {
                             if (amrex::Random(engine) < lparm->p_asymp[0]) {
-                                symptomatic_ptr[i] = 2;
+                                symptomatic_ptr[i] = SymptomStatus::asymptomatic;
                             } else {
-                                symptomatic_ptr[i] = 0;
+                                symptomatic_ptr[i] = SymptomStatus::presymptomatic;
                             }
                         }
                         if (counter_ptr[i] == amrex::Math::floor(symptomdev_period_ptr[i])) {
-                            if (symptomatic_ptr[i] != 2) {
-                                symptomatic_ptr[i] = 1;
+                            if (symptomatic_ptr[i] != SymptomStatus::asymptomatic) {
+                                symptomatic_ptr[i] = SymptomStatus::symptomatic;
                             }
-                            if (symptomatic_ptr[i] && symptomatic_withdraw) {
+                            if (    (symptomatic_ptr[i] == SymptomStatus::symptomatic)
+                                &&  symptomatic_withdraw ) {
                                 withdrawn_ptr[i] = 1;
                             }
                         }
@@ -1016,7 +1017,7 @@ void AgentContainer::updateStatus (MFPtrVec& a_disease_stats /*!< Community-wise
                                 if (counter_ptr[i] >= (incubation_period_ptr[i] + infectious_period_ptr[i])) {
                                     status_ptr[i] = Status::immune;
                                     counter_ptr[i] = 0.0_rt;
-                                    symptomatic_ptr[i] = 0;
+                                    symptomatic_ptr[i] = SymptomStatus::presymptomatic;
                                     withdrawn_ptr[i] = 0;
                                 }
                             }
@@ -1223,13 +1224,13 @@ std::array<Long, 9> AgentContainer::getTotals (const int a_d /*!< disease index 
                       if (notInfectiousButInfected(i, ptd, a_d)) {
                           s[5] = 1;  // exposed, but not infectious
                       } else { // infectious
-                          if (ptd.m_runtime_idata[i0(a_d)+IntIdxDisease::symptomatic][i] == 2) {
+                          if (ptd.m_runtime_idata[i0(a_d)+IntIdxDisease::symptomatic][i] == SymptomStatus::asymptomatic) {
                               s[6] = 1;  // asymptomatic and will remain so
                           }
-                          else if (ptd.m_runtime_idata[i0(a_d)+IntIdxDisease::symptomatic][i] == 0) {
+                          else if (ptd.m_runtime_idata[i0(a_d)+IntIdxDisease::symptomatic][i] == SymptomStatus::presymptomatic) {
                               s[7] = 1;  // asymptomatic but will develop symptoms
                           }
-                          else if (ptd.m_runtime_idata[i0(a_d)+IntIdxDisease::symptomatic][i] == 1) {
+                          else if (ptd.m_runtime_idata[i0(a_d)+IntIdxDisease::symptomatic][i] == SymptomStatus::symptomatic) {
                               s[8] = 1;  // Infectious and symptomatic
                           } else {
                               amrex::Abort("how did I get here?");
