@@ -56,6 +56,16 @@ struct Status
     };
 };
 
+/*! \brief Disease status */
+struct SymptomStatus
+{
+    enum {
+        presymptomatic = 0, /*!< asymptomatic but will develop symptoms */
+        symptomatic,        /*!< Infectious and symptomatic */
+        asymptomatic        /*!< asymptomatic and will remain so */
+    };
+};
+
 /*! \brief Is an agent infected but not infectious? */
 template <typename PTDType>
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
