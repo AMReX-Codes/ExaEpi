@@ -880,6 +880,7 @@ void AgentContainer::updateStatus (MFPtrVec& a_disease_stats /*!< Community-wise
                 };
 
                 auto symptomatic_withdraw = m_symptomatic_withdraw;
+                auto symptomatic_withdraw_compliance = m_symptomatic_withdraw_compliance;
 
                 // Track hospitalization, ICU, ventilator, and fatalities
                 Real CHR[] = {.0104_rt, .0104_rt, .070_rt, .28_rt, 1.0_rt};  // sick -> hospital probabilities
@@ -908,7 +909,8 @@ void AgentContainer::updateStatus (MFPtrVec& a_disease_stats /*!< Community-wise
                                 symptomatic_ptr[i] = SymptomStatus::symptomatic;
                             }
                             if (    (symptomatic_ptr[i] == SymptomStatus::symptomatic)
-                                &&  symptomatic_withdraw ) {
+                                &&  (symptomatic_withdraw)
+                                &&  (amrex::Random(engine) < symptomatic_withdraw_compliance) ) {
                                 withdrawn_ptr[i] = 1;
                             }
                         }

@@ -88,8 +88,10 @@ The following are inputs for the overall simulation:
     Number of days shelter in-place-is in effect.
 * ``agent.shelter_compliance`` (`float`)
     Fraction of agents that comply with shelter-in-place order.
-* ``agent.symptomatic_withdraw`` (`integer`)
+* ``agent.symptomatic_withdraw`` (`integer`, default: 1)
     Whether or not to have symptomatic agents withdraw.
+* ``agent.symptomatic_withdraw_compliance`` (`float`, default: 0.95)
+    Compliance rate for agents withdrawing when they have symptoms. Should be 0.0 to 1.0.
 * ``agents.size`` (`tuple of 2 integers`: e.g. ``(1, 1)``, default: ``(1, 1)``)
     This option is deprecated and will removed in a future version of ExaEpi. It controls
     the number of cells in the domain when running in `demo` mode. During actual usage,
