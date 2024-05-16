@@ -1,5 +1,6 @@
 import numpy as np
 import yt
+from yt.frontends import boxlib
 from yt.frontends.boxlib.data_structures import AMReXDataset
 from collections import defaultdict
 import sys
