@@ -73,6 +73,12 @@ In addition to the ExaEpi inputs, there are also a number of runtime options tha
     Whether or not to have symptomatic agents withdraw.
 * ``agent.symptomatic_withdraw_compliance`` (`float`, default: 0.95)
     Compliance rate for agents withdrawing when they have symptoms. Should be 0.0 to 1.0.
+* ``agent.mean_immune_time`` (`float`, default: 180)
+    The mean amount of time *in days* agents are immune post-infection
+* ``agent.immune_time_spread`` (`float`, default: 60)
+    The spread associated with the above mean, each agent will draw uniformly from mean +/- spread
+* ``agent.shelter_compliance`` (`float`)
+    Fraction of agents that comply with shelter-in-place order.
 * ``contact.pSC`` (`float`, default: 0.2)
     This is contact matrix scaling factor for schools.
 * ``contact.pCO`` (`float`, default: 1.45)
