@@ -471,6 +471,7 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,    /*!< Number 
         auto work_nborhood_ptr = soa.GetIntData(IntIdx::work_nborhood).data();
 
         auto counter_ptr = soa.GetRealData(RealIdx::disease_counter).data();
+        auto timer_ptr = soa.GetRealData(RealIdx::treatment_timer).data();
         auto dx = ParticleGeom(0).CellSizeArray();
         auto my_proc = ParallelDescriptor::MyProc();
 
@@ -575,6 +576,7 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,    /*!< Number 
 
                 status_ptr[ip] = 0;
                 counter_ptr[ip] = 0.0_rt;
+                timer_ptr[ip] = 0.0_rt;
                 age_group_ptr[ip] = age_group;
                 family_ptr[ip] = family_id++;
                 home_i_ptr[ip] = i;
@@ -849,6 +851,7 @@ void AgentContainer::updateStatus (MultiFab& disease_stats /*!< Community-wise d
                     counter_ptr[i] -= 1.0_rt;
                     if (counter_ptr[i] < 0.0_rt) {
                         counter_ptr[i] = 0.0_rt;
+                        timer_ptr[i] = 0.0_rt;
                         status_ptr[i] = Status::susceptible;
                         return;
                     }
