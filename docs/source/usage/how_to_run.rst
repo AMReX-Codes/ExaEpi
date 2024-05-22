@@ -73,10 +73,6 @@ In addition to the ExaEpi inputs, there are also a number of runtime options tha
     Whether or not to have symptomatic agents withdraw.
 * ``agent.symptomatic_withdraw_compliance`` (`float`, default: 0.95)
     Compliance rate for agents withdrawing when they have symptoms. Should be 0.0 to 1.0.
-* ``agent.mean_immune_time`` (`float`, default: 180)
-    The mean amount of time *in days* agents are immune post-infection
-* ``agent.immune_time_spread`` (`float`, default: 60)
-    The spread associated with the above mean, each agent will draw uniformly from mean +/- spread
 * ``agent.shelter_compliance`` (`float`)
     Fraction of agents that comply with shelter-in-place order.
 * ``contact.pSC`` (`float`, default: 0.2)
@@ -105,6 +101,10 @@ In addition to the ExaEpi inputs, there are also a number of runtime options tha
     one entry for each disease strain.
 * ``disease.vac_eff`` (`float`, example: ``0.4``)
     The vaccine efficacy - the probability of transmission will be multiplied by this factor
+* ``disease.mean_immune_time`` (`float`, default: 180)
+    The mean amount of time *in days* agents are immune post-infection
+* ``disease.immune_time_spread`` (`float`, default: 60)
+    The spread associated with the above mean, each agent will draw uniformly from mean +/- spread
 * ``disease.incubation_length_mean`` (`float`, default: ``3.0``)
     Mean length of the incubation period in days. Before this, agents have no symptoms and are not infectious.
 * ``disease.infectious_length_mean`` (`float`, default: ``6.0``)
