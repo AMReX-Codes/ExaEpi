@@ -831,8 +831,8 @@ void AgentContainer::updateStatus (MultiFab& disease_stats /*!< Community-wise d
             auto symptomatic_withdraw = m_symptomatic_withdraw;
             auto symptomatic_withdraw_compliance = m_symptomatic_withdraw_compliance;
 
-            auto mean_immune_time = m_mean_immune_time;
-            auto immune_time_spread = m_immune_time_spread;
+            auto mean_immune_time = h_parm->mean_immune_time;
+            auto immune_time_spread = h_parm->immune_time_spread;
 
             // Track hospitalization, ICU, ventilator, and fatalities
             Real CHR[] = {.0104_rt, .0104_rt, .070_rt, .28_rt, 1.0_rt};  // sick -> hospital probabilities
