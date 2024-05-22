@@ -76,8 +76,6 @@ public:
             pp.query("symptomatic_withdraw", m_symptomatic_withdraw);
             pp.query("shelter_compliance", m_shelter_compliance);
             pp.query("symptomatic_withdraw_compliance", m_symptomatic_withdraw_compliance);
-            pp.query("mean_immune_time", m_mean_immune_time);
-            pp.query("immune_time_spread", m_immune_time_spread);
         }
 
         {
@@ -130,6 +128,9 @@ public:
             pp.query("incubation_length_std", h_parm->incubation_length_std);
             pp.query("infectious_length_std", h_parm->infectious_length_std);
             pp.query("symptomdev_length_std", h_parm->symptomdev_length_std);
+
+            pp.query("mean_immune_time", h_parm->mean_immune_time);
+            pp.query("immune_time_spread", h_parm->immune_time_spread);
         }
 
         h_parm->Initialize();
@@ -217,9 +218,6 @@ protected:
 
     amrex::Real m_shelter_compliance = 0.95_rt;
     amrex::Real m_symptomatic_withdraw_compliance = 0.95_rt;
-
-    amrex::Real m_mean_immune_time = 30*6;  /*! six months in days*/
-    amrex::Real m_immune_time_spread = 30*2;  /*! two months in days*/
 
     DiseaseParm* h_parm;    /*!< Disease parameters */
     DiseaseParm* d_parm;    /*!< Disease parameters (GPU device) */

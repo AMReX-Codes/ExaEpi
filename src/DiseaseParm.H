@@ -79,6 +79,9 @@ struct DiseaseParm
     amrex::Real infectious_length_std = 1.0;   /*!< std dev (in days) for the above */
     amrex::Real symptomdev_length_std = 1.0;   /*!< std dev (in days) for the above */
 
+    amrex::Real mean_immune_time = 30*6;  /*! mean immunity time in days*/
+    amrex::Real immune_time_spread = 30*2;  /*! spread in immunity time in days*/
+
     void Initialize ();
 
     void printMatrix ();
