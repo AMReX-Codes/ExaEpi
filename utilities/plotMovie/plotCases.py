@@ -156,7 +156,6 @@ for caseFile in sorted_infCasesFiles:
             xlim = ax.get_xlim()
             ax.set_xlim((xlim[0]+(xlim[1]-xlim[0])*zoomrate*(stopTime-shiftTime-startTime)/2, xlim[1]-(xlim[1]-xlim[0])*zoomrate*(stopTime-shiftTime-startTime)/2 ))
             ax.set_ylim((ylim[0]+(ylim[1]-ylim[0])*zoomrate*(stopTime-shiftTime-startTime)/2, ylim[1]-(ylim[1]-ylim[0])*zoomrate*(stopTime-shiftTime-startTime)/2 ))
-
     output= "casefile"+str(idx+1).zfill(5)+".png"
     plt.savefig(output)
     plt.close()
