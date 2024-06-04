@@ -1,0 +1,353 @@
+<?xml version="1.0" encoding="UTF-8"?><metadata>
+    <idinfo>
+        <citation>
+            <citeinfo>
+                <pubdate>20211202</pubdate>
+                <title>San Francisco Bay Region 2020 Census Tracts</title>
+                <geoform>vector digital data</geoform>
+                <othercit>Creation date is date the data was produced by the United States Census Bureau, Geography Division, Spatial Data Collection and Products Branch.
+
+Published date is the date data was posted by the Metropolitan Transportation Commission to its open data portal.</othercit>
+            </citeinfo>
+        </citation>
+        <descript>
+            <abstract>2020 Census tracts for the San Francisco Bay Region. Features were 
+extracted from California 2021 TIGER/Line shapefile by the Metropolitan 
+Transportation Commission.Census tracts are small, relatively permanent statistical subdivisions of a county or equivalent entity, and were defined by local participants as part of the 2020 Census Participant Statistical Areas Program. The Census Bureau delineated the census tracts in situations where no local participant existed or where all the potential participants declined to participate. The primary purpose of census tracts is to provide a stable set of geographic units for the presentation of census data and comparison back to previous decennial censuses.Census tracts generally have a population size between 1,200 and 8,000 people, with an optimum size of 4,000 people. When first delineated, census tracts were designed to be homogeneous with respect to population characteristics, economic status, and living conditions. The spatial size of census tracts varies widely depending on the density of settlement. Physical changes in street patterns caused by highway construction, new development, and so forth, may require boundary revisions. In addition, census tracts occasionally are split due to population growth, or combined as a result of substantial population decline.Census tract boundaries generally follow visible and identifiable features. They may follow legal boundaries such as minor civil division (MCD) or incorporated place boundaries in some States and situations to allow for census tract-to-governmental unit relationships where the governmental boundaries tend to remain unchanged between censuses. State and county boundaries always are census tract boundaries in the standard census geographic hierarchy.In a few rare instances, a census tract may consist of noncontiguous areas. These noncontiguous areas may occur where the census tracts are coextensive with all or parts of legal entities that are themselves noncontiguous.For the 2010 Census and beyond, the census tract code range of 9400 through 9499 was enforced for census tracts that include a majority American Indian population according to Census 2000 data and/or their area was primarily covered by federally recognized American Indian reservations and/or off-reservation trust lands; the code range 9800 through 9899 was enforced for those census tracts that contained little or no population and represented a relatively large special land use area such as a National Park, military installation, or a business/industrial park; and the code range 9900 through 9998 was enforced for those census tracts that contained only water area, no land area.The Census Bureau uses suffixes to help identify census tract changes 
+for comparison purposes. Local participants have an opportunity to 
+review the existing census tracts before each census. If local 
+participants split a census tract, the split parts usually retain the 
+basic number, but receive different suffixes. In a few counties, local 
+participants request major changes to, and renumbering of, the census 
+tracts. Changes to individual census tract boundaries usually do not 
+result in census tract numbering changes.Relationship to Other 
+Geographic Entities—Within the standard census geographic hierarchy, 
+census tracts never cross state or county boundaries, but may cross the 
+boundaries of county subdivisions, places, urban areas, voting 
+districts, congressional districts, and American Indian, Alaska Native, 
+and Native Hawaiian areas.</abstract>
+            <purpose>Provides 2020 Census tracts for the San Francisco Bay Region. Features were extracted from statewide feature set by the Metropolitan Transportation Commission.</purpose>
+        </descript>
+        <status>
+            <progress>Complete</progress>
+            <update>None planned</update>
+        </status>
+        <keywords>
+            <theme>
+                <themekt>ISO 19115 Topic Categories</themekt>
+                <themekey>boundaries</themekey>
+            </theme>
+            <theme>
+                <themekt>None</themekt>
+                <themekey>administrative</themekey>
+                <themekey>census</themekey>
+                <themekey>tract</themekey>
+                <themekey>united states census bureau</themekey>
+            </theme>
+        </keywords>
+        <accconst>Other Constraints</accconst>
+        <useconst>The TIGER/Line Shapefile products are not copyrighted however TIGER/Line and Census TIGER are registered trademarks of the U.S. Census Bureau.  These products are free to use in a product or publication, however acknowledgement must be given to the U.S. Census Bureau as the source.These products are free to use in a product or publication, however acknowledgement must be given to the U.S. Census Bureau as the source.The boundaries in the TIGER/Line Shapefiles are for statistical data collection and tabulation purposes only, their depiction and designation for statistical purposes does not constitute a determination of jurisdictional authority or rights of ownership or entitlement and they are not legal land descriptions. Coordinates in the TIGER/Line shapefiles have six implied decimal places, but the positional accuracy of these coordinates is not as great as the six decimal places suggest.</useconst>
+        <ptcontac>
+            <cntinfo>
+                <cntorgp>
+                    <cntorg>U.S. Department of Commerce, U.S. Census Bureau, Geography Division</cntorg>
+                    <cntper>Spatial Data Collection and Products Branch</cntper>
+                </cntorgp>
+                <cntaddr>
+                    <addrtype>mailing and physical</addrtype>
+                    <address>4600 Silver Hill Road, Stop 7400</address>
+                    <city>Washington</city>
+                    <state>District of Columbia</state>
+                    <postal>20233-7400</postal>
+                    <country>US</country>
+                </cntaddr>
+                <cntvoice>(301) 763-1128</cntvoice>
+                <cntfax>(301) 763-4710</cntfax>
+                <cntemail>geo.geography@census.gov</cntemail>
+            </cntinfo>
+        </ptcontac>
+        <datacred>United States Census Bureau, 2021</datacred>
+    </idinfo>
+    <spdoinfo>
+        <direct>Vector</direct>
+    </spdoinfo>
+    <eainfo>
+        <detailed>
+            <enttyp>
+                <enttypl>region_2020_censustract</enttypl>
+            </enttyp>
+            <attr>
+                <attrlabl>statefp</attrlabl>
+                <attrdef>Current state Federal Information Processing Series (FIPS) code. The only value in this column is 06 (California).</attrdef>
+            </attr>
+            <attr>
+                <attrlabl>countyfp</attrlabl>
+                <attrdef>Current county Federal Information Processing Series (FIPS) code.</attrdef>
+                <attrdomv>
+                                        					
+                    
+                    <edom>
+                                                						
+                        
+                        <edomv>001</edomv>
+                                                						
+                        
+                        <edomvd>Alameda County</edomvd>
+                                                					
+                    
+                    </edom>
+                                        				
+                
+                </attrdomv>
+                <attrdomv>
+                                        					
+                    
+                    <edom>
+                                                						
+                        
+                        <edomv>013</edomv>
+                                                						
+                        
+                        <edomvd>Contra Costa County</edomvd>
+                                                					
+                    
+                    </edom>
+                                        				
+                
+                </attrdomv>
+                <attrdomv>
+                                        					
+                    
+                    <edom>
+                                                						
+                        
+                        <edomv>041</edomv>
+                                                						
+                        
+                        <edomvd>Marin County</edomvd>
+                                                					
+                    
+                    </edom>
+                                        				
+                
+                </attrdomv>
+                <attrdomv>
+                                        					
+                    
+                    <edom>
+                                                						
+                        
+                        <edomv>055</edomv>
+                                                						
+                        
+                        <edomvd>Napa County</edomvd>
+                                                					
+                    
+                    </edom>
+                                        				
+                
+                </attrdomv>
+                <attrdomv>
+                                        					
+                    
+                    <edom>
+                                                						
+                        
+                        <edomv>075</edomv>
+                                                						
+                        
+                        <edomvd>San Francisco, City and County of</edomvd>
+                                                					
+                    
+                    </edom>
+                                        				
+                
+                </attrdomv>
+                <attrdomv>
+                                        					
+                    
+                    <edom>
+                                                						
+                        
+                        <edomv>081</edomv>
+                                                						
+                        
+                        <edomvd>San Mateo County</edomvd>
+                                                					
+                    
+                    </edom>
+                                        				
+                
+                </attrdomv>
+                <attrdomv>
+                                        					
+                    
+                    <edom>
+                                                						
+                        
+                        <edomv>085</edomv>
+                                                						
+                        
+                        <edomvd>Santa Clara County</edomvd>
+                                                					
+                    
+                    </edom>
+                                        				
+                
+                </attrdomv>
+                <attrdomv>
+                                        					
+                    
+                    <edom>
+                                                						
+                        
+                        <edomv>095</edomv>
+                                                						
+                        
+                        <edomvd>Solano County</edomvd>
+                                                					
+                    
+                    </edom>
+                                        				
+                
+                </attrdomv>
+                <attrdomv>
+                                        					
+                    
+                    <edom>
+                                                						
+                        
+                        <edomv>097</edomv>
+                                                						
+                        
+                        <edomvd>Sonoma County</edomvd>
+                                                					
+                    
+                    </edom>
+                                        				
+                
+                </attrdomv>
+            </attr>
+            <attr>
+                <attrlabl>trctce</attrlabl>
+                <attrdef>Current census tract code.</attrdef>
+                <attrdomv>
+                                        					
+                    
+                    <edom>
+                                                						
+                        
+                        <edomv>000100 to 998999</edomv>
+                                                						
+                        
+                        <edomvd>Census tract number</edomvd>
+                                                					
+                    
+                    </edom>
+                                        				
+                
+                </attrdomv>
+                <attrdomv>
+                                        					
+                    
+                    <edom>
+                                                						
+                        
+                        <edomv>990000 to 990099</edomv>
+                                                						
+                        
+                        <edomvd>Water tract (2010 and continuing)</edomvd>
+                                                					
+                    
+                    </edom>
+                                        				
+                
+                </attrdomv>
+                <attrdomv>
+                                        					
+                    
+                    <edom>
+                                                						
+                        
+                        <edomv>990100 to 998999</edomv>
+                                                						
+                        
+                        <edomvd>Census tract number</edomvd>
+                                                					
+                    
+                    </edom>
+                                        				
+                
+                </attrdomv>
+            </attr>
+            <attr>
+                <attrlabl>geoid</attrlabl>
+                <attrdef>Census block group identifier; a concatenation of the current state Federal Information Processing Series (FIPS) code, county FIPS code, census tract code, and block group number.</attrdef>
+                <attrdomv>
+                                        					
+                    
+                    <udom>The GEOID attribute is a concatenation of the state FIPS code, followed by the county FIPS code, followed by the census tract code, followed by the block group number. No spaces are allowed between the two codes. The State FIPS code is taken from "National Standard Codes (ANSI INCITS 38-2009), Federal Information Processing Series (FIPS) - States". The county FIPS code is taken from "National Standard Codes (ANSI INCITS 31-2009), Federal Information Processing Series (FIPS) - Counties/County Equivalents". The census tract code is taken from the "TRACTCE" attribute. The block group number is taken from the "BLKGRPCE" attribute.</udom>
+                                        				
+                
+                </attrdomv>
+            </attr>
+            <attr>
+                <attrlabl>name_</attrlabl>
+                <attrdef>Current census tract name, this is the census tract code converted to an integer or integer plus two-digit decimal if the last two characters of the code are not both zeros. Format is ####.##</attrdef>
+            </attr>
+            <attr>
+                <attrlabl>namelsad</attrlabl>
+                <attrdef>Current translated legal/statistical area description and the census tract name. Format is 'Census Tract ####.##' where ####.## is the census tract number from column NAME_.</attrdef>
+            </attr>
+            <attr>
+                <attrlabl>mtfcc</attrlabl>
+                <attrdef>MAF/TIGER feature class code. The only value in this column is G5020 (Census Tract).</attrdef>
+            </attr>
+            <attr>
+                <attrlabl>funcstat</attrlabl>
+                <attrdef>Current functional status. The only value in this column is S (Statistical Entity).</attrdef>
+            </attr>
+            <attr>
+                <attrlabl>aland</attrlabl>
+                <attrdef>Current land area (square meters).</attrdef>
+            </attr>
+            <attr>
+                <attrlabl>awater</attrlabl>
+                <attrdef>Current water area (square meters).</attrdef>
+            </attr>
+            <attr>
+                <attrlabl>intptlat</attrlabl>
+                <attrdef>Current latitude of the internal (center) point</attrdef>
+            </attr>
+            <attr>
+                <attrlabl>intptlon</attrlabl>
+                <attrdef>Current longitude of the internal (center) point.</attrdef>
+            </attr>
+        </detailed>
+    </eainfo>
+    <metainfo>
+        <metd>20211202</metd>
+        <metc>
+            <cntinfo>
+                <cntorgp>
+                    <cntorg>U.S. Department of Commerce, U.S. Census Bureau, Geography Division</cntorg>
+                    <cntper>Spatial Data Collection and Products Branch</cntper>
+                </cntorgp>
+                <cntaddr>
+                    <addrtype>mailing and physical</addrtype>
+                    <address>4600 Silver Hill Road, Stop 7400</address>
+                    <city>Washington</city>
+                    <state>District of Columbia</state>
+                    <postal>20233-7400</postal>
+                    <country>US</country>
+                </cntaddr>
+                <cntvoice>(301) 763-1128</cntvoice>
+                <cntfax>(301) 763-4710</cntfax>
+                <cntemail>geo.geography@census.gov</cntemail>
+            </cntinfo>
+        </metc>
+        <metstdn>FGDC Content Standard for Digital Geospatial Metadata</metstdn>
+        <metstdv>FGDC-STD-001-1998</metstdv>
+        <mettc>local time</mettc>
+    </metainfo>
+</metadata>
