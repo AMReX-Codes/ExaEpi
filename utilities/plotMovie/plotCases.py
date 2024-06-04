@@ -31,8 +31,7 @@ if len(argList)>= 6: group  = argList[5]
 if len(argList)>= 7: zoom  = argList[6] #format: "startTime, stopTime, target x, target y, zoomFactor"
 if len(argList)>= 8: BayAreaDataFormat= argList[7]
 
-gdf = geopd.GeoDataFrame(columns=["STATEFP00", "COUNTYFP00", "TRACTCE00", "CTIDFP00", "NAME00", "NAMELSAD00", "MTFCC00",
-                                  "FUNCSTAT00", "ALAND00", "AWATER00", "INTPTLAT00", "INTPTLON00", "geometry"])
+gdf = geopd.GeoDataFrame(columns=["STATEFP00", "COUNTYFP00", "TRACTCE00", "CTIDFP00", "NAME00", "NAMELSAD00", "MTFCC00", "FUNCSTAT00", "ALAND00", "AWATER00", "INTPTLAT00", "INTPTLON00", "geometry"])
 #for Bay Area dataset, use the following format:
 if(BayAreaDataFormat=="YES"): gdf = geopd.GeoDataFrame(columns=["geoid", "name_", "namelsad", "mtfcc", "funcstat", "aland", "awater", "intptlat", "intptlon", "SHAPE_Leng", "SHAPE_Area"])
 
