@@ -46,8 +46,8 @@ for file in os.listdir(CensusDir):
     attributes, geometry = [], []
     field_names = [field[0] for field in r.fields[1:]]
     for row in r.shapeRecords():
-            geometry.append(shape(row.shape.__geo_interface__))
-            attributes.append(dict(zip(field_names, row.record)))
+        geometry.append(shape(row.shape.__geo_interface__))
+        attributes.append(dict(zip(field_names, row.record)))
     df = geopd.GeoDataFrame(data = attributes, geometry = geometry)
     gdf= gdf._append(df)
     r.close()
