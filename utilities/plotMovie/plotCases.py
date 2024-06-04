@@ -95,9 +95,9 @@ for caseFile in sorted_infCasesFiles:
     #use cmap with a norm to convert a number to RGB
     #two slope norm
     #set center to 0, adjust the negative vmin to control how fast color changes from 0 to vmax
-    if(datanorm=="RAW"): 
+    if(datanorm=="RAW"):
         vmin = -1.0
-        vmax = 25 
+        vmax = 25
         norm = colors.TwoSlopeNorm(vmin=vmin, vcenter=0.000, vmax=vmax)
         cmap = cm.cool
         sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
@@ -112,7 +112,7 @@ for caseFile in sorted_infCasesFiles:
             cmap = cm.cool
             sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
             plt.colorbar(sm, ax=ax, ticks=np.linspace(0, 1, 11), label="Cumulative Cases per Population", orientation="vertical")
-        else: 
+        else:
             print("INPUT METRIC NOT PROVIDED", norm)
             exit
     ax.xaxis.set_ticks_position('top')
@@ -135,7 +135,7 @@ for caseFile in sorted_infCasesFiles:
 
         ylim = ax.get_ylim()
         xlim = ax.get_xlim()
-        if(idx>=startTime and idx<(startTime+shiftTime)): 
+        if(idx>=startTime and idx<(startTime+shiftTime)):
             #gradually shift to the interested local area
             ax.set_xlim((xlim[0]-(xlim[1]-xlim[0])*xrate*(idx-startTime), xlim[1]-(xlim[1]-xlim[0])*xrate*(idx-startTime)))
             ax.set_ylim((ylim[0]-(ylim[1]-ylim[0])*yrate*(idx-startTime), ylim[1]-(ylim[1]-ylim[0])*yrate*(idx-startTime)))
