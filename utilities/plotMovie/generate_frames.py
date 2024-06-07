@@ -10,6 +10,12 @@ python generate_frames.py [sim results dir] [.shp dir] [output dir (optional)]
 
 Endpoints of color range can be set in or passed into generate_plot,
 or in main function, as necessary.
+
+Since US census tracts include territories around the globe, if
+we use this data, some sort of cropping is necessary (i.e. 48-state mainland)
+The script crudely checks if "us" is in the shape file, but we can easily
+change the crop_usa variable in the main function or adjust the generate_plot
+function as desired.
 """
 
 import numpy as np
@@ -145,11 +151,12 @@ if __name__ == "__main__":
     
     prefix = sys.argv[2] if len(sys.argv()) > 2 else "../../data/tl_2020_us_county"
     gdf = get_gdf(prefix)
+    crop_usa = "us" in prefix
 
     output_dir = sys.argv[3] if len(sys.argv()) > 3 else "./frames_usa/"
     for i in range(len(data_names)):
         # vmin and vmax are endpoints for color range; 16 > log(population of LA) is a safe upper bound
         # for per-capita, endpoints should be set to much less
-        fig = generate_plot(get_raw_data(data_names[i]), gdf, vmin=0, vmax=16, crop_usa = True)
+        fig = generate_plot(get_raw_data(data_names[i]), gdf, vmin=0, vmax=16, crop_usa = crop_usa)
         fig.savefig(output_dir + "frame{:05d}".format(i))
         plt.close(fig)
