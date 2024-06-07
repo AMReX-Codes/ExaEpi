@@ -144,17 +144,17 @@ if __name__ == "__main__":
     yt.set_log_level(50)
 
     argc = len(sys.argv)
-    data_dir = sys.argv[1] if len(sys.argv) > 1 else "/global/cfs/projectdirs/m3623/test/output_usa/"
+    data_dir = sys.argv[1] if argc > 1 else "/global/cfs/projectdirs/m3623/test/output_usa/"
     data_names = sorted([os.path.join(data_dir, f) for f in os.listdir(data_dir) if f.startswith("plt")])
     
     # BA: data/San_Francisco_Bay_Region_2020_Census_Tracts/region_2020_censustract
     # CA: data/CA_2020_Census_Tracts/tl_2020_06_tract
     # US: data/US_2020_Census_Tracts/tl_2020_us_county
-    prefix = sys.argv[2] if len(sys.argv) > 2 else "../../data/tl_2020_us_county"
+    prefix = sys.argv[2] if argc > 2 else "../../data/tl_2020_us_county"
     gdf = get_gdf(prefix)
     crop_usa = "_us_" in prefix
 
-    output_dir = sys.argv[3] if len(sys.argv) > 3 else "./frames_usa/"
+    output_dir = sys.argv[3] if argc > 3 else "./frames_usa/"
     for i in range(len(data_names)):
         # vmin and vmax are endpoints for color range; 16 > log(population of LA) is a safe upper bound
         # for per-capita, endpoints should be set to much less
