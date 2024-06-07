@@ -13,7 +13,7 @@ or in main function, as necessary.
 
 Since US census tracts include territories around the globe, if
 we use this data, some sort of cropping is necessary (i.e. 48-state mainland)
-The script crudely checks if "us" is in the shape file, but we can easily
+The script crudely checks if "_us_" is in the shape file, but we can easily
 change the crop_usa variable in the main function or adjust the generate_plot
 function as desired.
 """
@@ -142,16 +142,16 @@ def generate_plot(per_df, gdf, vmin = None, vmax = None, crop_usa = False):
 if __name__ == "__main__":
     yt.set_log_level(50)
 
-    # CA: data/CA_2020_Census_Tracts/tl_2020_06_tract
-    # BA: data/San_Francisco_Bay_Region_2020_Census_Tracts/region_2020_censustract
-    # US: data/US_2020_Census_Tracts/tl_2020_us_county
     argc = len(sys.argv)
     data_dir = sys.argv[1] if len(sys.argv()) > 1 else "/global/cfs/projectdirs/m3623/test/output_usa/"
     data_names = sorted([os.path.join(data_dir, f) for f in os.listdir(data_dir) if f.startswith("plt")])
     
+    # BA: data/San_Francisco_Bay_Region_2020_Census_Tracts/region_2020_censustract
+    # CA: data/CA_2020_Census_Tracts/tl_2020_06_tract
+    # US: data/US_2020_Census_Tracts/tl_2020_us_county
     prefix = sys.argv[2] if len(sys.argv()) > 2 else "../../data/tl_2020_us_county"
     gdf = get_gdf(prefix)
-    crop_usa = "us" in prefix
+    crop_usa = "_us_" in prefix
 
     output_dir = sys.argv[3] if len(sys.argv()) > 3 else "./frames_usa/"
     for i in range(len(data_names)):
