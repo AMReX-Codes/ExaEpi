@@ -15,7 +15,6 @@ or in main function, as necessary.
 import numpy as np
 
 import yt
-from yt.frontends import boxlib
 from yt.frontends.boxlib.data_structures import AMReXDataset
 
 import matplotlib.pyplot as plt
