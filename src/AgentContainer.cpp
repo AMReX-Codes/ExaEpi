@@ -1,6 +1,11 @@
 /*! @file AgentContainer.cpp
     \brief Function implementations for #AgentContainer class
 */
+#include <stdio.h>
+#include <set>
+#include <vector>
+#include <iostream>
+
 
 #include "AgentContainer.H"
 
@@ -467,6 +472,8 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,    /*!< Number 
         auto work_j_ptr = soa.GetIntData(IntIdx::work_j).data();
         auto nborhood_ptr = soa.GetIntData(IntIdx::nborhood).data();
         auto school_ptr = soa.GetIntData(IntIdx::school).data();
+        // adding workplace, which will be divided into workgroup
+        auto workplace_ptr = soa.GetIntData(IntIdx::workplace).data();
         auto workgroup_ptr = soa.GetIntData(IntIdx::workgroup).data();
         auto work_nborhood_ptr = soa.GetIntData(IntIdx::work_nborhood).data();
 
@@ -585,6 +592,7 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,    /*!< Number 
                 work_j_ptr[ip] = j;
                 nborhood_ptr[ip] = nborhood;
                 work_nborhood_ptr[ip] = 5*nborhood;
+                workplace_ptr[ip] = 0; // initiliaze workplace to 0
                 workgroup_ptr[ip] = 0;
 
                 if (age_group == 0) {
@@ -1267,3 +1275,163 @@ void AgentContainer::interactNight ( MultiFab& a_mask_behavior /*!< Masking beha
         m_interactions[ExaEpi::InteractionNames::nborhood]->interactAgents( *this, a_mask_behavior );
     }
 }
+
+
+
+
+/* Print to see variables values*/
+
+
+void AgentContainer::print_var()
+{
+    BL_PROFILE("AgentContainer::print_var");
+
+    for (int lev = 0; lev <= finestLevel(); ++lev)
+    {
+        auto& plev = GetParticles(lev);
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (Gpu::notInLaunchRegion())
+#endif
+        for (MFIter mfi = MakeMFIter(lev, TilingIfNotGPU()); mfi.isValid(); ++mfi)
+        {
+            int gid = mfi.index();
+            int tid = mfi.LocalTileIndex();
+            auto& ptile = plev[std::make_pair(gid, tid)];
+            auto& soa = ptile.GetStructOfArrays();
+            const size_t np = ptile.numParticles();
+            auto status_ptr = soa.GetIntData(IntIdx::status).data();
+            auto age_group_ptr = soa.GetIntData(IntIdx::age_group).data();
+            auto home_i_ptr = soa.GetIntData(IntIdx::home_i).data();
+            auto home_j_ptr = soa.GetIntData(IntIdx::home_j).data();
+            auto work_i_ptr = soa.GetIntData(IntIdx::work_i).data();
+            auto work_j_ptr = soa.GetIntData(IntIdx::work_j).data();
+            auto school_ptr = soa.GetIntData(IntIdx::school).data();
+            auto nborhood_ptr = soa.GetIntData(IntIdx::nborhood).data();
+            auto workplace_ptr = soa.GetIntData(IntIdx::workplace).data();
+            auto workgroup_ptr = soa.GetIntData(IntIdx::workgroup).data();
+            for (size_t i = 0; i<np; ++i)
+            {
+               // if (age_group_ptr[i] == 1)
+               // if ( (home_i_ptr[i] != work_i_ptr[i]) && (home_j_ptr[i] != work_j_ptr[i]))
+                if (workgroup_ptr[i] > 24) 
+                {
+//                    std::printf("Agent %d:\n", i);
+//                    std::printf("  Status: %d\n", status_ptr[i]);
+//                    std::printf("  Age Group: %d\n", age_group_ptr[i]);
+//                    std::printf("  Home (i, j): (%d, %d)\n", home_i_ptr[i], home_j_ptr[i]);
+//                    std::printf("  Work (i, j): (%d, %d)\n", work_i_ptr[i], work_j_ptr[i]);
+//                    std::printf("  Workgroup: %d\n", workgroup_ptr[i]);
+//                    std::printf("  School: %d\n", school_ptr[i]);
+//                    std::printf("  Neighborhood: %d\n", nborhood_ptr[i]);
+                    std::printf(" WG: %d ,", workgroup_ptr[i]);
+                    
+                }
+            }
+        }
+    }
+}
+
+
+
+/*
+void AgentContainer::print_var()
+{
+    BL_PROFILE("AgentContainer::print_var");
+
+    std::set<int> unique_status;
+    std::set<int> unique_age_group;
+    std::set<std::pair<int, int>> unique_home;
+    std::set<std::pair<int, int>> unique_work;
+    std::set<int> unique_workgroup;
+    std::set<int> unique_school;
+    std::set<int> unique_neighborhood;
+
+    for (int lev = 0; lev <= finestLevel(); ++lev) {
+        auto& plev = GetParticles(lev);
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (Gpu::notInLaunchRegion())
+#endif
+        for (MFIter mfi = MakeMFIter(lev, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+            int gid = mfi.index();
+            int tid = mfi.LocalTileIndex();
+            auto& ptile = plev[std::make_pair(gid, tid)];
+            auto& soa = ptile.GetStructOfArrays();
+            const auto np = ptile.numParticles();
+            auto status_ptr = soa.GetIntData(IntIdx::status).data();
+            auto age_group_ptr = soa.GetIntData(IntIdx::age_group).data();
+            auto home_i_ptr = soa.GetIntData(IntIdx::home_i).data();
+            auto home_j_ptr = soa.GetIntData(IntIdx::home_j).data();
+            auto work_i_ptr = soa.GetIntData(IntIdx::work_i).data();
+            auto work_j_ptr = soa.GetIntData(IntIdx::work_j).data();
+            auto school_ptr = soa.GetIntData(IntIdx::school).data();
+            auto nborhood_ptr = soa.GetIntData(IntIdx::nborhood).data();
+
+            amrex::ParallelFor(np, [=, &unique_status, &unique_age_group, &unique_home, &unique_work, &unique_workgroup, &unique_school, &unique_neighborhood](int i) noexcept {
+                if ((home_i_ptr[i] != work_i_ptr[i]) && (home_j_ptr[i] != work_j_ptr[i])) {
+                    #pragma omp critical
+                    {
+                        unique_status.insert(status_ptr[i]);
+                        unique_age_group.insert(age_group_ptr[i]);
+                        unique_home.insert({home_i_ptr[i], home_j_ptr[i]});
+                        unique_work.insert({work_i_ptr[i], work_j_ptr[i]});
+                        unique_workgroup.insert(nborhood_ptr[i]);
+                        unique_school.insert(school_ptr[i]);
+                        unique_neighborhood.insert(nborhood_ptr[i]);
+                    }
+                }
+            });
+        }
+    }
+
+    std::cout << "Unique Status: ";
+    for (const auto& status : unique_status) {
+        std::cout << status << " ";
+    }
+    std::cout << "\n";
+
+    std::cout << "Unique Age Groups: ";
+    for (const auto& age_group : unique_age_group) {
+        std::cout << age_group << " ";
+    }
+    std::cout << "\n";
+
+    std::cout << "Unique Home (i, j): ";
+    for (const auto& home : unique_home) {
+        std::cout << "(" << home.first << ", " << home.second << ") ";
+    }
+    std::cout << "\n";
+
+    std::cout << "Unique Work (i, j): ";
+    for (const auto& work : unique_work) {
+        std::cout << "(" << work.first << ", " << work.second << ") ";
+    }
+    std::cout << "\n";
+
+    std::cout << "Unique Workgroups: ";
+    for (const auto& workgroup : unique_workgroup) {
+        std::cout << workgroup << " ";
+    }
+    std::cout << "\n";
+
+    std::cout << "Unique Schools: ";
+    for (const auto& school : unique_school) {
+        std::cout << school << " ";
+    }
+    std::cout << "\n";
+
+    std::cout << "Unique Neighborhoods: ";
+    for (const auto& neighborhood : unique_neighborhood) {
+        std::cout << neighborhood << " ";
+    }
+    std::cout << "\n";
+}
+
+*/
+
+
+
+
+
+

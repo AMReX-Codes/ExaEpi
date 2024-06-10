@@ -146,6 +146,8 @@ namespace Initialization
         auto work_i_ptr = soa.GetIntData(IntIdx::work_i).data();
         auto work_j_ptr = soa.GetIntData(IntIdx::work_j).data();
         auto nborhood_ptr = soa.GetIntData(IntIdx::nborhood).data();
+        // adding workplace, which will be divided into workgroup
+        auto workplace_ptr = soa.GetIntData(IntIdx::workplace).data();
         auto workgroup_ptr = soa.GetIntData(IntIdx::workgroup).data();
         auto work_nborhood_ptr = soa.GetIntData(IntIdx::work_nborhood).data();
         auto np = soa.numParticles();
@@ -194,14 +196,35 @@ namespace Initialization
                     work_i_ptr[ip] = comm_to_iv[0];
                     work_j_ptr[ip] = comm_to_iv[1];
 
-                    constexpr int WG_size = 20;
-                    number = (unsigned int) rint( ((Real) Ndaywork[to]) /
-                             ((Real) WG_size * (Start[to+1] - Start[to])) );
+                    // adding workplace creation first, which will be divided into workgroup
+                    constexpr int WP_size = 100; // workplace size
+                    constexpr int WG_size = 20; // workgroup size
 
+                    
+                    // max numbers of workplace needed
+                    unsigned int num_workplaces = (unsigned int) rint( ((Real) Ndaywork[to]) / ((Real) WP_size * (Start[to+1] - Start[to])) );
+
+
+                    // Randomly assign agent to a workplace
+                    // add workplace pointers
+                    if (num_workplaces > 0) {
+                        workplace_ptr[ip] = 1 + amrex::Random_int(num_workplaces, engine);
+                    } else {
+                        workplace_ptr[ip] = 1;
+                    }
+
+                    // work_nborhood_ptr -- NOT USED ANYWHERE
                     work_nborhood_ptr[ip]=4*(amrex::Random_int(4, engine))+nborhood_ptr[ip];
 
-                    if (number) {
-                        workgroup_ptr[ip] = 1 + amrex::Random_int(number, engine);
+                    // max numbers of workgroup needed within a workplace
+                    // = total number of workers in a unit / num of comm / num of workplace / WG_size
+                    unsigned int num_workgroup = (unsigned int) rint( ((Real) Ndaywork[to]) / ((Real) num_workplaces * WG_size * (Start[to+1] - Start[to])) );
+
+                    if (num_workgroup) {
+                        workgroup_ptr[ip] = 1 + amrex::Random_int(num_workgroup, engine);
+                    }
+                    else {
+                        workplace_ptr[ip] = 1;
                     }
                 }
             });

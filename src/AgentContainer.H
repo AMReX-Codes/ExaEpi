@@ -15,6 +15,8 @@
 #include <AMReX_iMultiFab.H>
 #include <AMReX_Vector.H>
 
+#include <AMReX_Print.H>
+
 #include "AgentDefinitions.H"
 #include "DemographicData.H"
 #include "DiseaseParm.H"
@@ -182,6 +184,10 @@ public:
     void moveAgentsToWork ();
 
     void moveAgentsToHome ();
+
+    void print_var (); // sanity check;
+
+
 
     /*! \brief Return bin pointer at a given mfi, tile and model name */
     inline amrex::DenseBins<PType>* getBins( const std::pair<int,int>& a_idx,

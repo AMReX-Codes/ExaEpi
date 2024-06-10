@@ -36,15 +36,25 @@ struct DiseaseParm
     // these are computed from the above
     /*! Community transmission probabilities for each age group (<5, 5-17, 18-29, 30-64, 65+) */
     amrex::Real xmit_comm[5] = {amrex::Real(.0000125*pCO), amrex::Real(.0000375*pCO), amrex::Real(.00010*pCO), amrex::Real(.00010*pCO), amrex::Real(.00015*pCO)};
+    
     /*! Neighborhood transmission probabilities for each age group (<5, 5-17, 18-29, 30-64, 65+) */
     amrex::Real xmit_hood[5] = {amrex::Real(.00005*pNH), amrex::Real(.00015*pNH), amrex::Real(.00040*pNH), amrex::Real(.00040*pNH), amrex::Real(.00060*pNH)};
+    
     /*! Transmission probabilities of adults for each age group (<5, 5-17, 18-29, 30-64, 65+) for neighborhood cluster */
     amrex::Real xmit_nc_adult[5] = {amrex::Real(.08*pHC),  amrex::Real(.08*pHC), amrex::Real(.1*pHC), amrex::Real(.1*pHC), amrex::Real(.1*pHC)};
+    
     /*! Transmission probabilities of children for each age group (<5, 5-17, 18-29, 30-64, 65+) for neighborhood cluster */
     amrex::Real xmit_nc_child[5] = {amrex::Real(.15*pHCC0), amrex::Real(.15*pHCC1), amrex::Real(.08*pHC), amrex::Real(.08*pHC), amrex::Real(.08*pHC)};
+    
     /*! Work transmission probabilities for each age group (<5, 5-17, 18-29, 30-64, 65+) */
+    /* adding hypothetical transmission for now for work interaction */
+    // what if a_j is older, will transmission be higher? -- add this later 
     amrex::Real xmit_work = amrex::Real(0.115*pWO);
-    /*! School transmission probabilities for each age group (<5, 5-17, 18-29, 30-64, 65+) */
+    amrex::Real xmit_work_diff_age = amrex::Real(0.090*pWO);
+    amrex::Real xmit_work_diff_group = amrex::Real(0.075*pWO);
+    amrex::Real xmit_work_diff_group_diff_age = amrex::Real(0.060*pWO);
+
+    /*! School transmission probabilities for each age group (<5, 5-17, 18-29, 30-64, 65+) -- WHY [7] and not [5] ?????*/
     amrex::Real xmit_school[7] = {amrex::Real(0.), amrex::Real(.105*pHSC), amrex::Real(.125*pMSC), amrex::Real(.145*pESC), amrex::Real(.145*pESC), amrex::Real(.15), amrex::Real(.35)};
 
     /* Within family, from child or adult, for 5 age groups (here Thai paper, US:0.6->0.8)*/
@@ -87,3 +97,4 @@ struct DiseaseParm
     void printMatrix ();
 };
 #endif
+
