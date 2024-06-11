@@ -1,5 +1,5 @@
 """
-Generates movie frames based on given .shp files and 
+Generates movie frames based on given .shp files and
 plotxxxxx/ data results directly from simulation.
 These frames will generally lie in ./frames/, and can be converted
 to movie using ffmpeg, e.g.
@@ -92,25 +92,25 @@ def get_gdf(prefix: str):
     # open(prefix + ".prj", "rb") as prj:
     #     r = shapefile.Reader(shp=shp, dbf=dbf, prj=prj)
     #     attributes, geometry = [], []
-    #     field_names = [field[0] for field in r.fields[1:]]  
-    #     for row in r.shapeRecords():  
-    #         geometry.append(shape(row.shape.__geo_interface__))  
-    #         attributes.append(dict(zip(field_names, row.record)))  
+    #     field_names = [field[0] for field in r.fields[1:]]
+    #     for row in r.shapeRecords():
+    #         geometry.append(shape(row.shape.__geo_interface__))
+    #         attributes.append(dict(zip(field_names, row.record)))
     #     r.close()
     # gdf = gpd.GeoDataFrame(data = attributes, geometry = geometry)
-    
+
     # Below code requires a .shx file but seems to be much faster than above
     # building .shx file can easily be done for you by running code inside a
     # with fiona.Env(SHAPE_RESTORE_SHX = "YES"):
     # block (remember to import fiona explicitly)
     gdf = gpd.read_file(prefix + ".shp", driver="esri")
-    
+
     cols = list(gdf.columns)
 
     # Try to find county code columns. CAPS for CA/US state data, lowercase for BA data
     if "STATEFP" in cols and "COUNTYFP" in cols:
         gdf["FIPS"] = (gdf["STATEFP"] + gdf["COUNTYFP"]).astype("int")
-    elif "statefp" in cols and "countyfp" in cols: 
+    elif "statefp" in cols and "countyfp" in cols:
         gdf["FIPS"] = (gdf["statefp"] + gdf["countyfp"]).astype("int")
     else:
         print("FIPS columns not recognized!")
@@ -129,7 +129,7 @@ def generate_plot(per_df, gdf, vmin = None, vmax = None, crop_usa = False):
         per_gdf.plot(column= 'per', ax = ax, cmap = "Purples", legend=True)
     else:
         per_gdf.plot(column= 'per', ax = ax, cmap = "Purples", legend=True, vmin=vmin, vmax=vmax)
-    
+
     # If using tl_2020_us_county, crop to contiguous US states
     if crop_usa:
         # including Alaska + Hawaii:
@@ -146,7 +146,7 @@ if __name__ == "__main__":
     argc = len(sys.argv)
     data_dir = sys.argv[1] if argc > 1 else "/global/cfs/projectdirs/m3623/test/output_usa/"
     data_names = sorted([os.path.join(data_dir, f) for f in os.listdir(data_dir) if f.startswith("plt")])
-    
+
     # BA: data/San_Francisco_Bay_Region_2020_Census_Tracts/region_2020_censustract
     # CA: data/CA_2020_Census_Tracts/tl_2020_06_tract
     # US: data/US_2020_Census_Tracts/tl_2020_us_county
