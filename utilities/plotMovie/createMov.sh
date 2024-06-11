@@ -53,8 +53,8 @@ echo "CASES METRIC: ${INPUT_METRIC}"
 echo "METRIC TO PLOT: ${OUTPUT_METRIC}"
 echo "NORMALIZE TO: ${NORM}"
 echo "GROUP TO (DEFAULT: FIPS): ${GROUP}"
-echo "ZOOM IN (DEFAULT: NO): ${ZOOM}" 
-echo "BAY AREA DATA FORMAT (DEFAULT: NO): ${BAYAREA}" 
+echo "ZOOM IN (DEFAULT: NO): ${ZOOM}"
+echo "BAY AREA DATA FORMAT (DEFAULT: NO): ${BAYAREA}"
 
 #plot everyday's cases on a cencus map
 python3 plotCases.py ${INFECTION} ${CENSUS} ${INPUT_METRIC} ${OUTPUT_METRIC} ${NORM} ${GROUP} ${ZOOM} ${BAYAREA}

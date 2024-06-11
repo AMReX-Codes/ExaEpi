@@ -54,7 +54,7 @@ for file in os.listdir(CensusDir):
 
 if(BayAreaDataFormat=="NO"): gdf['fips'] = gdf["CTIDFP00"].astype(int)
 else: gdf['fips'] = gdf["geoid"].astype(int)
-gdf["county"]= gdf["fips"]//1000000 
+gdf["county"]= gdf["fips"]//1000000
 gdf0= gdf.copy()
 gdf1= gdf.copy()
 gdf0['per'] = 0.0
@@ -71,7 +71,7 @@ for caseFile in sorted_infCasesFiles:
     gdf_join = pd.merge(gdf,df000, left_on="fips", right_on="fips", how='inner')
     if(group=="COUNTY"):
         if(datanorm=="RAW"):
-            df000["county"]= df000["fips"]//1000000 
+            df000["county"]= df000["fips"]//1000000
             df000.drop("fips", inplace=True, axis=1)
             df000= df000.groupby("county").sum()
             gdf_join = pd.merge(gdf,df000, left_on='county', right_on='county', how='inner')
