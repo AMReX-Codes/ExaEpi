@@ -158,6 +158,9 @@ public:
                 pp.query("incubation_length_std", h_parm[d]->incubation_length_std);
                 pp.query("infectious_length_std", h_parm[d]->infectious_length_std);
                 pp.query("symptomdev_length_std", h_parm[d]->symptomdev_length_std);
+
+                pp.query("mean_immune_time", h_parm[d]->mean_immune_time);
+                pp.query("immune_time_spread", h_parm[d]->immune_time_spread);
             }
             {
                 std::string key = "disease_" + m_disease_names[d];
@@ -200,6 +203,9 @@ public:
                 pp.query("incubation_length_std", h_parm[d]->incubation_length_std);
                 pp.query("infectious_length_std", h_parm[d]->infectious_length_std);
                 pp.query("symptomdev_length_std", h_parm[d]->symptomdev_length_std);
+
+                pp.query("mean_immune_time", h_parm[d]->mean_immune_time);
+                pp.query("immune_time_spread", h_parm[d]->immune_time_spread);
             }
 
             h_parm[d]->Initialize();

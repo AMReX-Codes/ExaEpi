@@ -514,6 +514,7 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,    /*!< Number 
             counter_ptrs[d] = soa.GetRealData(r_RT+r0(d)+RealIdxDisease::disease_counter).data();
         }
 
+        auto timer_ptr = soa.GetRealData(RealIdx::treatment_timer).data();
         auto dx = ParticleGeom(0).CellSizeArray();
         auto my_proc = ParallelDescriptor::MyProc();
 
@@ -536,7 +537,7 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,    /*!< Number 
 
             int unit = unit_arr(i, j, k);
             int community = comm_arr(i, j, k);
-            int family_id = fam_id_arr(i, j, k, n);
+            int family_id_start = fam_id_arr(i, j, k, n);
             int family_size = n + 1;
             int num_to_add = family_size * nf;
 
@@ -559,10 +560,14 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,    /*!< Number 
             }
 
             int start = offset_arr(i, j, k, n);
-            for (int ip = start; ip < start + num_to_add; ++ip) {
+            int nborhood = 0;
+            for (int ii = 0; ii < num_to_add; ++ii) {
+                int ip = start + ii;
                 auto& agent = aos[ip];
                 int il2 = amrex::Random_int(100, engine);
-                int nborhood = amrex::Random_int(4, engine);
+                if (ii % family_size == 0) {
+                    nborhood = amrex::Random_int(4, engine);
+                }
                 int age_group = -1;
 
                 if (family_size == 1) {
@@ -616,8 +621,13 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,    /*!< Number 
                 agent.id()  = pid+ip;
                 agent.cpu() = my_proc;
 
+                for (int d = 0; d < n_disease; d++) {
+                    status_ptrs[d][ip] = 0;
+                    counter_ptrs[d][ip] = 0.0_rt;
+                }
+                timer_ptr[ip] = 0.0_rt;
                 age_group_ptr[ip] = age_group;
-                family_ptr[ip] = family_id++;
+                family_ptr[ip] = family_id_start + (ii / family_size);
                 home_i_ptr[ip] = i;
                 home_j_ptr[ip] = j;
                 work_i_ptr[ip] = i;
@@ -634,10 +644,6 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,    /*!< Number 
                     school_ptr[ip] = -1;
                 }
 
-                for (int d = 0; d < n_disease; d++) {
-                    status_ptrs[d][ip] = 0;
-                    counter_ptrs[d][ip] = 0.0_rt;
-                }
             }
         });
     }
@@ -882,6 +888,9 @@ void AgentContainer::updateStatus (MFPtrVec& a_disease_stats /*!< Community-wise
                 auto symptomatic_withdraw = m_symptomatic_withdraw;
                 auto symptomatic_withdraw_compliance = m_symptomatic_withdraw_compliance;
 
+                auto mean_immune_time = h_parm[d]->mean_immune_time;
+                auto immune_time_spread = h_parm[d]->immune_time_spread;
+
                 // Track hospitalization, ICU, ventilator, and fatalities
                 Real CHR[] = {.0104_rt, .0104_rt, .070_rt, .28_rt, 1.0_rt};  // sick -> hospital probabilities
                 Real CIC[] = {.24_rt, .24_rt, .24_rt, .36_rt, .35_rt};      // hospital -> ICU probabilities
@@ -894,6 +903,15 @@ void AgentContainer::updateStatus (MFPtrVec& a_disease_stats /*!< Community-wise
                     if ( status_ptr[i] == Status::never ||
                          status_ptr[i] == Status::susceptible ) {
                         return;
+                    }
+                    else if (status_ptr[i] == Status::immune) {
+                        counter_ptr[i] -= 1.0_rt;
+                        if (counter_ptr[i] < 0.0_rt) {
+                            counter_ptr[i] = 0.0_rt;
+                            timer_ptr[i] = 0.0_rt;
+                            status_ptr[i] = Status::susceptible;
+                            return;
+                        }
                     }
                     else if (status_ptr[i] == Status::infected) {
                         counter_ptr[i] += 1;
@@ -910,7 +928,7 @@ void AgentContainer::updateStatus (MFPtrVec& a_disease_stats /*!< Community-wise
                             }
                             if (    (symptomatic_ptr[i] == SymptomStatus::symptomatic)
                                 &&  (symptomatic_withdraw)
-                                &&  (amrex::Random(engine) < symptomatic_withdraw_compliance) ) {
+                                &&  (amrex::Random(engine) < symptomatic_withdraw_compliance)) {
                                 withdrawn_ptr[i] = 1;
                             }
                         }
@@ -963,7 +981,6 @@ void AgentContainer::updateStatus (MFPtrVec& a_disease_stats /*!< Community-wise
                                                 &ds_arr(home_i_ptr[i], home_j_ptr[i], 0,
                                                         DiseaseStats::death), 1.0_rt);
                                             status_ptr[i] = Status::dead;
-                                            //pstruct_ptr[i].id() = -pstruct_ptr[i].id();
                                         }
                                     }
                                     amrex::Gpu::Atomic::AddNoRet(
@@ -971,6 +988,9 @@ void AgentContainer::updateStatus (MFPtrVec& a_disease_stats /*!< Community-wise
                                                                          DiseaseStats::hospitalization), -1.0_rt);
                                     if (status_ptr[i] != Status::dead) {
                                         status_ptr[i] = Status::immune;  // If alive, hospitalized patient recovers
+                                        counter_ptr[i] = (mean_immune_time - immune_time_spread) + 2.0_rt*immune_time_spread*amrex::Random(engine);
+                                        symptomatic_ptr[i] = SymptomStatus::presymptomatic;
+                                        withdrawn_ptr[i] = 0;
                                     }
                                 }
                                 if (timer_ptr[i] == 10) {
@@ -980,7 +1000,6 @@ void AgentContainer::updateStatus (MFPtrVec& a_disease_stats /*!< Community-wise
                                                 &ds_arr(home_i_ptr[i], home_j_ptr[i], 0,
                                                         DiseaseStats::death), 1.0_rt);
                                             status_ptr[i] = Status::dead;
-                                            //pstruct_ptr[i].id() = -pstruct_ptr[i].id();
                                         }
                                     }
                                     amrex::Gpu::Atomic::AddNoRet(
@@ -991,6 +1010,9 @@ void AgentContainer::updateStatus (MFPtrVec& a_disease_stats /*!< Community-wise
                                                                          DiseaseStats::ICU), -1.0_rt);
                                     if (status_ptr[i] != Status::dead) {
                                         status_ptr[i] = Status::immune;  // If alive, ICU patient recovers
+                                        counter_ptr[i] = (mean_immune_time - immune_time_spread) + 2.0_rt*immune_time_spread*amrex::Random(engine);
+                                        symptomatic_ptr[i] = SymptomStatus::presymptomatic;
+                                        withdrawn_ptr[i] = 0;
                                     }
                                 }
                                 if (timer_ptr[i] == 20) {
@@ -999,7 +1021,6 @@ void AgentContainer::updateStatus (MFPtrVec& a_disease_stats /*!< Community-wise
                                             &ds_arr(home_i_ptr[i], home_j_ptr[i], 0,
                                                     DiseaseStats::death), 1.0_rt);
                                         status_ptr[i] = Status::dead;
-                                        //pstruct_ptr[i].id() = -pstruct_ptr[i].id();
                                     }
                                     amrex::Gpu::Atomic::AddNoRet(
                                                                  &ds_arr(home_i_ptr[i], home_j_ptr[i], 0,
@@ -1012,13 +1033,16 @@ void AgentContainer::updateStatus (MFPtrVec& a_disease_stats /*!< Community-wise
                                                                          DiseaseStats::ventilator), -1.0_rt);
                                     if (status_ptr[i] != Status::dead) {
                                         status_ptr[i] = Status::immune;  // If alive, ventilated patient recovers
+                                    counter_ptr[i] = (mean_immune_time - immune_time_spread) + 2.0_rt*immune_time_spread*amrex::Random(engine);
+                                    symptomatic_ptr[i] = SymptomStatus::presymptomatic;
+                                    withdrawn_ptr[i] = 0;
                                     }
                                 }
                             }
                             else { // not hospitalized, recover once not infectious
                                 if (counter_ptr[i] >= (incubation_period_ptr[i] + infectious_period_ptr[i])) {
                                     status_ptr[i] = Status::immune;
-                                    counter_ptr[i] = 0.0_rt;
+                                    counter_ptr[i] = (mean_immune_time - immune_time_spread) + 2.0_rt*immune_time_spread*amrex::Random(engine);
                                     symptomatic_ptr[i] = SymptomStatus::presymptomatic;
                                     withdrawn_ptr[i] = 0;
                                 }
