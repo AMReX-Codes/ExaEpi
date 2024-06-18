@@ -5,6 +5,9 @@
 #ifndef INITIALIZATION_H_
 #define INITIALIZATION_H_
 
+#include <vector>
+#include <string>
+
 #include "AgentContainer.H"
 #include "CaseData.H"
 #include "DemographicData.H"
@@ -23,13 +26,21 @@ namespace Initialization
                           const amrex::iMultiFab& comm_mf,
                           AgentContainer& pc);
 
-    void setInitialCasesFromFile (AgentContainer& pc, const amrex::iMultiFab& unit_mf,
-                                  const amrex::iMultiFab& FIPS_mf, const amrex::iMultiFab& comm_mf,
-                                  const CaseData& cases, const DemographicData& demo);
+    void setInitialCasesFromFile (  AgentContainer& pc,
+                                    const amrex::iMultiFab& unit_mf,
+                                    const amrex::iMultiFab& FIPS_mf,
+                                    const amrex::iMultiFab& comm_mf,
+                                    const std::vector<CaseData>& cases,
+                                    const std::vector<std::string>& names,
+                                    const DemographicData& demo );
 
-    void setInitialCasesRandom (AgentContainer& pc, const amrex::iMultiFab& unit_mf,
-                                const amrex::iMultiFab& FIPS_mf, const amrex::iMultiFab& comm_mf,
-                                int num_cases, const DemographicData& demo);
+    void setInitialCasesRandom (    AgentContainer& pc,
+                                    const amrex::iMultiFab& unit_mf,
+                                    const amrex::iMultiFab& FIPS_mf,
+                                    const amrex::iMultiFab& comm_mf,
+                                    std::vector<int> num_cases,
+                                    const std::vector<std::string>& names,
+                                    const DemographicData& demo);
 }
 }
 

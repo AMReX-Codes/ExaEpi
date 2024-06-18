@@ -54,6 +54,7 @@ void InteractionModGeneric<AC,ACT,ACTD,A>::interactAgents( AC& a_agents, /*!< Ag
                                                            MultiFab& /* a_mask */ /*!< Masking behavior */)
 {
     BL_PROFILE("InteractionModGeneric::interactAgents");
+    int n_disease = a_agents.numDiseases();
 
     IntVect bin_size = {AMREX_D_DECL(1, 1, 1)};
     for (int lev = 0; lev < a_agents.numLevels(); ++lev)
@@ -83,43 +84,50 @@ void InteractionModGeneric<AC,ACT,ACTD,A>::interactAgents( AC& a_agents, /*!< Ag
             auto offsets = bins.offsetsPtr();
 
             auto& soa   = ptile.GetStructOfArrays();
-            auto status_ptr = soa.GetIntData(IntIdx::status).data();
-            auto strain_ptr = soa.GetIntData(IntIdx::strain).data();
-            auto counter_ptr = soa.GetRealData(RealIdx::disease_counter).data();
 
-            amrex::ParallelForRNG( bins.numBins(),
-            [=] AMREX_GPU_DEVICE (int i_cell, amrex::RandomEngine const& engine) noexcept
-            {
-                auto cell_start = offsets[i_cell];
-                auto cell_stop  = offsets[i_cell+1];
+            int i_RT = IntIdx::nattribs;
+            int r_RT = RealIdx::nattribs;
 
-                // compute the number of infected in this cell
-                int num_infected[2] = {0, 0};
-                for (unsigned int i = cell_start; i < cell_stop; ++i) {
-                    auto pindex = inds[i];
-                    if (status_ptr[pindex] == 1) {
-                        ++num_infected[strain_ptr[pindex]];
-                    }
-                }
+            for (int d = 0; d < n_disease; d++) {
 
-                // second pass - infection prob is propto num_infected
-                for (unsigned int i = cell_start; i < cell_stop; ++i) {
-                    auto pindex = inds[i];
-                    if ( status_ptr[pindex] != Status::infected &&
-                         status_ptr[pindex] != Status::immune) {
-                        if (amrex::Random(engine) < 0.0001*num_infected[0]) {
-                            strain_ptr[pindex] = 0;
-                            status_ptr[pindex] = Status::infected;
-                            counter_ptr[pindex] = 0;
-                        } else if (amrex::Random(engine) < 0.0002*num_infected[1]) {
-                            strain_ptr[pindex] = 1;
-                            status_ptr[pindex] = Status::infected;
-                            counter_ptr[pindex] = 0;
+                auto status_ptr = soa.GetIntData(i_RT+i0(d)+IntIdxDisease::status).data();
+                auto strain_ptr = soa.GetIntData(i_RT+i0(d)+IntIdxDisease::strain).data();
+                auto counter_ptr = soa.GetRealData(r_RT+r0(d)+RealIdxDisease::disease_counter).data();
+
+                amrex::ParallelForRNG( bins.numBins(),
+                [=] AMREX_GPU_DEVICE (int i_cell, amrex::RandomEngine const& engine) noexcept
+                {
+                    auto cell_start = offsets[i_cell];
+                    auto cell_stop  = offsets[i_cell+1];
+
+                    // compute the number of infected in this cell
+                    int num_infected[2] = {0, 0};
+                    for (unsigned int i = cell_start; i < cell_stop; ++i) {
+                        auto pindex = inds[i];
+                        if (status_ptr[pindex] == 1) {
+                            ++num_infected[strain_ptr[pindex]];
                         }
                     }
-                }
-            });
-            amrex::Gpu::synchronize();
+
+                    // second pass - infection prob is propto num_infected
+                    for (unsigned int i = cell_start; i < cell_stop; ++i) {
+                        auto pindex = inds[i];
+                        if ( status_ptr[pindex] != Status::infected &&
+                             status_ptr[pindex] != Status::immune) {
+                            if (amrex::Random(engine) < 0.0001*num_infected[0]) {
+                                strain_ptr[pindex] = 0;
+                                status_ptr[pindex] = Status::infected;
+                                counter_ptr[pindex] = 0;
+                            } else if (amrex::Random(engine) < 0.0002*num_infected[1]) {
+                                strain_ptr[pindex] = 1;
+                                status_ptr[pindex] = Status::infected;
+                                counter_ptr[pindex] = 0;
+                            }
+                        }
+                    }
+                });
+                amrex::Gpu::synchronize();
+            }
         }
     }
 }

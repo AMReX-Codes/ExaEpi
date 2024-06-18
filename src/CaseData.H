@@ -14,11 +14,11 @@
 struct CaseData
 {
     /*! \brief Null constructor */
-    CaseData () {}
+    CaseData () { m_disease_name = "noname"; }
 
-    CaseData (const::std::string& fname);
+    CaseData (const std::string& dname, const::std::string& fname);
 
-    void InitFromFile (const std::string& fname);
+    void InitFromFile (const std::string& dname, const std::string& fname);
 
     void Print () const;
 
@@ -27,6 +27,8 @@ struct CaseData
     void CopyToHostAsync (const amrex::Gpu::DeviceVector<int>& d_vec, amrex::Vector<int>& h_vec);
 
     void CopyDataToDevice ();
+
+    std::string m_disease_name; /*!< name of disease */
 
     int N_hubs;                           /*!< number of disease hubs */
     amrex::Vector<int> FIPS_hubs;         /*!< FIPS code of each hub */
