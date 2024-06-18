@@ -501,7 +501,7 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,    /*!< Number 
 
             int unit = unit_arr(i, j, k);
             int community = comm_arr(i, j, k);
-            int family_id = fam_id_arr(i, j, k, n);
+            int family_id_start = fam_id_arr(i, j, k, n);
             int family_size = n + 1;
             int num_to_add = family_size * nf;
 
@@ -524,10 +524,16 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,    /*!< Number 
             }
 
             int start = offset_arr(i, j, k, n);
-            for (int ip = start; ip < start + num_to_add; ++ip) {
+            int nborhood = 0;
+            for (int ii = 0; ii < num_to_add; ++ii) {
+                int ip = start + ii;
                 auto& agent = aos[ip];
                 int il2 = amrex::Random_int(100, engine);
-                int nborhood = amrex::Random_int(4, engine);
+                if (ii % family_size ==0)
+                {
+                    nborhood = amrex::Random_int(4, engine);
+                }
+
                 int age_group = -1;
 
                 if (family_size == 1) {
@@ -585,7 +591,7 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,    /*!< Number 
                 counter_ptr[ip] = 0.0_rt;
                 timer_ptr[ip] = 0.0_rt;
                 age_group_ptr[ip] = age_group;
-                family_ptr[ip] = family_id++;
+                family_ptr[ip] = family_id_start + (ii / family_size);
                 home_i_ptr[ip] = i;
                 home_j_ptr[ip] = j;
                 work_i_ptr[ip] = i;
