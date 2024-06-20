@@ -482,6 +482,8 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,    /*!< Number 
         auto dx = ParticleGeom(0).CellSizeArray();
         auto my_proc = ParallelDescriptor::MyProc();
 
+        auto student_counts_arr = student_counts[mfi].array();
+
         Long pid;
 #ifdef AMREX_USE_OMP
 #pragma omp critical (init_agents_nextid)
@@ -525,6 +527,9 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,    /*!< Number 
 
             int start = offset_arr(i, j, k, n);
             int nborhood = 0;
+            
+            // dont we NEED if !community_size?
+            //assign age_group
             for (int ii = 0; ii < num_to_add; ++ii) {
                 int ip = start + ii;
                 auto& agent = aos[ip];
@@ -601,13 +606,35 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,    /*!< Number 
                 workplace_ptr[ip] = 0; // initiliaze workplace to 0
                 workgroup_ptr[ip] = 0;
 
-                if (age_group == 0) {
-                    school_ptr[ip] = 5; // note - need to handle playgroups
-                } else if (age_group == 1) {
-                    school_ptr[ip] = assign_school(nborhood, engine);
-                } else{
+                
+                // should i add a if (community_size) ? just to take care of community size
+                if (community_size)
+                {
+                    if (age_group == 0) {
+                        school_ptr[ip] = 5; // note - need to handle playgroups
+                    } else if (age_group == 1) {
+                        school_ptr[ip] = assign_school(nborhood, engine);
+                    } else{
+                        school_ptr[ip] = -1;
+                    }
+                }
+                else { // no one goes to school in a worker-only community
                     school_ptr[ip] = -1;
                 }
+
+                // Increment the appropriate student counter based on the school assignment
+                if (school_ptr[ip] == 3) {
+                    amrex::Gpu::Atomic::AddNoRet(&student_counts_arr(i, j, 3), 1);  // Elementary school 3
+                } else if (school_ptr[ip] == 4) {
+                    amrex::Gpu::Atomic::AddNoRet(&student_counts_arr(i, j, 4), 1);  // Elementary school 4
+                } else if (school_ptr[ip] == 2) {
+                    amrex::Gpu::Atomic::AddNoRet(&student_counts_arr(i, j, 2), 1);  // Middle school
+                } else if (school_ptr[ip] == 1) {
+                    amrex::Gpu::Atomic::AddNoRet(&student_counts_arr(i, j, 1), 1);  // High school
+                } else if (school_ptr[ip] == 5) {
+                    amrex::Gpu::Atomic::AddNoRet(&student_counts_arr(i, j, 0), 1);  // Playgroups + Day care
+                }
+                
             }
         });
     }
@@ -1282,6 +1309,33 @@ void AgentContainer::interactNight ( MultiFab& a_mask_behavior /*!< Masking beha
     }
 }
 
+void AgentContainer::printStudentCounts() const
+{
+    for (amrex::MFIter mfi(student_counts); mfi.isValid(); ++mfi)
+    {
+        const auto& fab = student_counts[mfi];
+        const amrex::Box& bx = mfi.validbox();
+
+        for (amrex::IntVect iv = bx.smallEnd(); iv <= bx.bigEnd(); bx.next(iv))
+        {
+            int i = iv[0];
+            int j = iv[1];
+
+            int elementary_3_count = fab(iv, 3);
+            int elementary_4_count = fab(iv, 4);
+            int middle_count = fab(iv, 2);
+            int high_count = fab(iv, 1);
+            int daycare_count = fab(iv, 0);
+
+            amrex::Print() << "Student counts at grid cell (" << i << ", " << j << "):\n";
+            amrex::Print() << "  Elementary School 3 Students: " << elementary_3_count << "\n";
+            amrex::Print() << "  Elementary School 4 Students: " << elementary_4_count << "\n";
+            amrex::Print() << "  Middle School Students: " << middle_count << "\n";
+            amrex::Print() << "  High School Students: " << high_count << "\n";
+            amrex::Print() << "  Playgroups + Day care: " << daycare_count << "\n";
+        }
+    }
+}
 
 
 
@@ -1435,9 +1489,6 @@ void AgentContainer::print_var()
 }
 
 */
-
-
-
 
 
 

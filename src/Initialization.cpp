@@ -91,7 +91,7 @@ namespace Initialization
     ifs.seekg(CURPOS, std::ios::beg);
 
     for (int work = 0; work < num_work; ++work) {
-        unsigned int from, to, number;
+        unsigned int from, to, number; // number appears first here
         ifs.read((char*)&from, sizeof(from));
         ifs.read((char*)&to, sizeof(to));
         ifs.read((char*)&number, sizeof(number));
@@ -161,6 +161,10 @@ namespace Initialization
         auto Ncommunity = demo.Ncommunity;
         auto Nunit = demo.Nunit;
 
+        const auto& stdcount_arr = pc.getStudentCounts()[mfi].array();
+
+
+        // Adding workplace, then workgroup
         amrex::ParallelForRNG( np,
             [=] AMREX_GPU_DEVICE (int ip, RandomEngine const& engine) noexcept
             {
@@ -197,14 +201,15 @@ namespace Initialization
                     work_j_ptr[ip] = comm_to_iv[1];
 
                     // adding workplace creation first, which will be divided into workgroup
+
                     constexpr int WP_size = 100; // workplace size
                     constexpr int WG_size = 20; // workgroup size
-
                     
+
                     // max numbers of workplace needed
                     unsigned int num_workplaces = (unsigned int) rint( ((Real) Ndaywork[to]) / ((Real) WP_size * (Start[to+1] - Start[to])) );
-
-
+                    
+                    
                     // Randomly assign agent to a workplace
                     // add workplace pointers
                     if (num_workplaces > 0) {
@@ -226,6 +231,24 @@ namespace Initialization
                     else {
                         workplace_ptr[ip] = 1;
                     }
+
+                    int i = work_i_ptr[ip];
+                    int j = work_j_ptr[ip];
+                    int elementary_3_count = stdcount_arr(i, j, 3);
+                    int elementary_4_count = stdcount_arr(i, j, 4);
+                    int middle_school_count = stdcount_arr(i, j, 2);
+                    int high_school_count = stdcount_arr(i, j, 1);
+                    int daycare_count = stdcount_arr(i, j, 0);
+    
+                    /*
+                    // Print the student counts for this agent's workplace
+                    amrex::Print() << "Agent " << ip << " workplace (" << i << ", " << j << "):\n";
+                    amrex::Print() << "  Elementary School 3 Students: " << elementary_3_count << "\n";
+                    amrex::Print() << "  Elementary School 4 Students: " << elementary_4_count << "\n";
+                    amrex::Print() << "  Middle School Students: " << middle_school_count << "\n";
+                    amrex::Print() << "  High School Students: " << high_school_count << "\n";
+                    amrex::Print() << "  Playgroups + Day care: " << daycare_count << "\n";
+                    */
                 }
             });
         }
@@ -440,3 +463,4 @@ namespace Initialization
 
 }
 }
+

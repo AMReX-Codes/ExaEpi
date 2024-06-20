@@ -351,6 +351,7 @@ void runAgent ()
             cur_time += 1.0_rt; // time step is one day
 
             //pc.print_var();
+            pc.printStudentCounts();
         }
     }
 

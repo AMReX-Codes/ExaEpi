@@ -66,9 +66,12 @@ public:
     AgentContainer (const amrex::Geometry            & a_geom,  /*!< Physical domain */
                     const amrex::DistributionMapping & a_dmap,  /*!< Distribution mapping */
                     const amrex::BoxArray            & a_ba     /*!< Box array */ )
-        : amrex::ParticleContainer<0, 0, RealIdx::nattribs, IntIdx::nattribs>(a_geom, a_dmap, a_ba)
+        : amrex::ParticleContainer<0, 0, RealIdx::nattribs, IntIdx::nattribs>(a_geom, a_dmap, a_ba),
+        student_counts(a_ba, a_dmap, 5, 0)
     {
         BL_PROFILE("AgentContainer::AgentContainer");
+       
+        student_counts.setVal(0);  // Initialize the MultiFab to zero
 
         h_parm = new DiseaseParm{};
         d_parm = (DiseaseParm*)amrex::The_Arena()->alloc(sizeof(DiseaseParm));
@@ -218,7 +221,16 @@ public:
         return d_parm;
     }
 
+    /*! \brief Return student counts at a specific grid cell */    
+    inline const amrex::iMultiFab& getStudentCounts() const {
+        return student_counts;
+    }
+    
+    void printStudentCounts() const;
+
 protected:
+
+    amrex::iMultiFab student_counts;
 
     int m_symptomatic_withdraw = 1;
 
@@ -248,9 +260,11 @@ protected:
         return (it != m_interactions.end());
     }
 
-
 };
 
 using AgentIterator = typename AgentContainer::ParIterType;
 
 #endif
+
+
+
