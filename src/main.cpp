@@ -189,6 +189,8 @@ void runAgent ()
     iMultiFab FIPS_mf(ba, dm, 2, 0);
     iMultiFab comm_mf(ba, dm, 1, 0);
 
+    iMultiFab worker_counts(ba, dm, 1, 0); // keep track of workers in each community
+
     MultiFab disease_stats(ba, dm, 4, 0);
     disease_stats.setVal(0);
     MultiFab mask_behavior(ba, dm, 1, 0);
@@ -202,7 +204,8 @@ void runAgent ()
             pc.initAgentsDemo(num_residents, unit_mf, FIPS_mf, comm_mf, demo);
         } else if (params.ic_type == ICType::Census) {
             pc.initAgentsCensus(num_residents, unit_mf, FIPS_mf, comm_mf, demo);
-            ExaEpi::Initialization::read_workerflow(demo, params, unit_mf, comm_mf, pc);
+            ExaEpi::Initialization::read_workerflow(demo, params, unit_mf, comm_mf, pc, worker_counts);
+
             if (params.initial_case_type == "file") {
                 ExaEpi::Initialization::setInitialCasesFromFile(pc, unit_mf, FIPS_mf, comm_mf,
                                                         cases, demo);
@@ -351,7 +354,7 @@ void runAgent ()
             cur_time += 1.0_rt; // time step is one day
 
             //pc.print_var();
-            pc.printStudentCounts();
+            pc.printCounts(worker_counts, unit_mf, demo);
         }
     }
 

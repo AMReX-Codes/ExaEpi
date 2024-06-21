@@ -67,11 +67,12 @@ public:
                     const amrex::DistributionMapping & a_dmap,  /*!< Distribution mapping */
                     const amrex::BoxArray            & a_ba     /*!< Box array */ )
         : amrex::ParticleContainer<0, 0, RealIdx::nattribs, IntIdx::nattribs>(a_geom, a_dmap, a_ba),
-        student_counts(a_ba, a_dmap, 5, 0)
+        student_counts(a_ba, a_dmap, 5, 0), teacher_counts(a_ba, a_dmap, 6, 0)
     {
         BL_PROFILE("AgentContainer::AgentContainer");
        
         student_counts.setVal(0);  // Initialize the MultiFab to zero
+        teacher_counts.setVal(0);
 
         h_parm = new DiseaseParm{};
         d_parm = (DiseaseParm*)amrex::The_Arena()->alloc(sizeof(DiseaseParm));
@@ -225,12 +226,25 @@ public:
     inline const amrex::iMultiFab& getStudentCounts() const {
         return student_counts;
     }
-    
-    void printStudentCounts() const;
+    /*! \brief Return student counts at a specific grid cell */    
+    inline const amrex::iMultiFab& getTeacherCounts() const {
+        return teacher_counts;
+    }
 
+    void printCounts(const amrex::iMultiFab& worker_counts, const iMultiFab& unit_mf, const DemographicData& demo) const;
+    // void printCounts(const amrex::iMultiFab& worker_counts) const;
+    
 protected:
 
     amrex::iMultiFab student_counts;
+    amrex::iMultiFab teacher_counts;
+    amrex::Gpu::DeviceVector<int> Unit_total_teacher_counts;
+    amrex::Gpu::DeviceVector<int> Unit_elem3_teacher_counts;
+    amrex::Gpu::DeviceVector<int> Unit_elem4_teacher_counts;
+    amrex::Gpu::DeviceVector<int> Unit_midl_teacher_counts;
+    amrex::Gpu::DeviceVector<int> Unit_high_teacher_counts;
+    amrex::Gpu::DeviceVector<int> Unit_daycr_teacher_counts;
+
 
     int m_symptomatic_withdraw = 1;
 

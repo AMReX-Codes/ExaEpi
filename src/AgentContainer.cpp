@@ -1,3 +1,4 @@
+
 /*! @file AgentContainer.cpp
     \brief Function implementations for #AgentContainer class
 */
@@ -335,6 +336,21 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,    /*!< Number 
     iMultiFab fam_id (num_residents.boxArray(), num_residents.DistributionMap(), 7, 0);
     num_families.setVal(0);
 
+    auto Nunit = demo.Nunit;
+    Unit_total_teacher_counts.resize(Nunit, 0);
+    Unit_elem3_teacher_counts.resize(Nunit, 0);
+    Unit_elem4_teacher_counts.resize(Nunit, 0);
+    Unit_midl_teacher_counts.resize(Nunit, 0);
+    Unit_high_teacher_counts.resize(Nunit, 0);
+    Unit_daycr_teacher_counts.resize(Nunit, 0);
+
+    auto Unit_total_teacher_counts_ptr = Unit_total_teacher_counts.data();
+    auto Unit_elem3_teacher_counts_ptr = Unit_elem3_teacher_counts.data();
+    auto Unit_elem4_teacher_counts_ptr = Unit_elem4_teacher_counts.data();
+    auto Unit_midl_teacher_counts_ptr = Unit_midl_teacher_counts.data();
+    auto Unit_high_teacher_counts_ptr = Unit_high_teacher_counts.data();
+    auto Unit_daycr_teacher_counts_ptr = Unit_daycr_teacher_counts.data();
+
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
 #endif
@@ -483,6 +499,8 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,    /*!< Number 
         auto my_proc = ParallelDescriptor::MyProc();
 
         auto student_counts_arr = student_counts[mfi].array();
+        auto teacher_counts_arr = teacher_counts[mfi].array();
+ 
 
         Long pid;
 #ifdef AMREX_USE_OMP
@@ -637,6 +655,37 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,    /*!< Number 
                 
             }
         });
+
+        /*
+        Code number
+        0 = daycare for now -- Handle Preschool later
+        1 = high school
+        2 = middle
+        3 = elementary neighborhood 1
+        4 = elementary neighborhood 2
+        
+        */
+        amrex::ParallelFor(bx,
+            [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+        {
+            teacher_counts_arr(i, j, 0) = (student_counts_arr(i, j, 0) + 19)  / 20;
+            teacher_counts_arr(i, j, 1) = (student_counts_arr(i, j, 1) + 19)  / 20;
+            teacher_counts_arr(i, j, 2) = (student_counts_arr(i, j, 2) + 19)  / 20;
+            teacher_counts_arr(i, j, 3) = (student_counts_arr(i, j, 3) + 19)  / 20;
+            teacher_counts_arr(i, j, 4) = (student_counts_arr(i, j, 4) + 19)  / 20;
+            int total = teacher_counts_arr(i, j, 0) + teacher_counts_arr(i, j, 1) + teacher_counts_arr(i, j, 2) + teacher_counts_arr(i, j, 3) + teacher_counts_arr(i, j, 4);
+            teacher_counts_arr(i, j, 5) = total;
+
+            amrex::Gpu::Atomic::AddNoRet(&Unit_total_teacher_counts_ptr[unit_arr(i,j,0)], total);
+            amrex::Gpu::Atomic::AddNoRet(&Unit_elem3_teacher_counts_ptr[unit_arr(i,j,0)], teacher_counts_arr(i, j, 3));
+            amrex::Gpu::Atomic::AddNoRet(&Unit_elem4_teacher_counts_ptr[unit_arr(i,j,0)], teacher_counts_arr(i, j, 4));
+            amrex::Gpu::Atomic::AddNoRet(&Unit_midl_teacher_counts_ptr[unit_arr(i,j,0)] , teacher_counts_arr(i, j, 2));
+            amrex::Gpu::Atomic::AddNoRet(&Unit_high_teacher_counts_ptr[unit_arr(i,j,0)] , teacher_counts_arr(i, j, 1));
+            amrex::Gpu::Atomic::AddNoRet(&Unit_daycr_teacher_counts_ptr[unit_arr(i,j,0)]  , teacher_counts_arr(i, j, 0));
+
+        });
+
+
     }
 
     demo.CopyToHostAsync(demo.Unit_on_proc_d, demo.Unit_on_proc);
@@ -1309,30 +1358,75 @@ void AgentContainer::interactNight ( MultiFab& a_mask_behavior /*!< Masking beha
     }
 }
 
-void AgentContainer::printStudentCounts() const
-{
-    for (amrex::MFIter mfi(student_counts); mfi.isValid(); ++mfi)
+void AgentContainer::printCounts(const amrex::iMultiFab& worker_counts, const iMultiFab& unit_mf, const DemographicData& demo) const{
+    for (MFIter mfi(unit_mf, TilingIfNotGPU()); mfi.isValid(); ++mfi)
     {
-        const auto& fab = student_counts[mfi];
+        const auto& student_counts_arr = student_counts[mfi].array();
+        const auto& teacher_counts_arr = teacher_counts[mfi].array();
         const amrex::Box& bx = mfi.validbox();
+        const auto& worker_counts_arr = worker_counts[mfi].array();
+        auto unit_arr = unit_mf[mfi].array();
+        auto Ndaywork = demo.Ndaywork_d.data();
+        auto Unit_total_teacher_counts_ptr = Unit_total_teacher_counts.data();
+        auto Unit_elem3_teacher_counts_ptr = Unit_elem3_teacher_counts.data();
+        auto Unit_elem4_teacher_counts_ptr = Unit_elem4_teacher_counts.data();
+        auto Unit_midl_teacher_counts_ptr = Unit_midl_teacher_counts.data();
+        auto Unit_high_teacher_counts_ptr = Unit_high_teacher_counts.data();
+        auto Unit_daycr_teacher_counts_ptr = Unit_daycr_teacher_counts.data();
+
 
         for (amrex::IntVect iv = bx.smallEnd(); iv <= bx.bigEnd(); bx.next(iv))
         {
             int i = iv[0];
             int j = iv[1];
+            auto to = unit_arr(i, j, 0);
 
-            int elementary_3_count = fab(iv, 3);
-            int elementary_4_count = fab(iv, 4);
-            int middle_count = fab(iv, 2);
-            int high_count = fab(iv, 1);
-            int daycare_count = fab(iv, 0);
+            // Worker counts
+            int worker_count = worker_counts_arr(iv, 0);
+            int elementary_3_count = student_counts_arr(iv, 3);
+            int elementary_4_count = student_counts_arr(iv, 4);
+            int middle_count = student_counts_arr(iv, 2);
+            int high_count = student_counts_arr(iv, 1);
+            int daycare_count = student_counts_arr(iv, 0);
 
-            amrex::Print() << "Student counts at grid cell (" << i << ", " << j << "):\n";
+            int elementary_3_teacher_count = teacher_counts_arr(iv, 3);
+            int elementary_4_teacher_count = teacher_counts_arr(iv, 4);
+            int middle_teacher_count = teacher_counts_arr(iv, 2);
+            int high_teacher_count = teacher_counts_arr(iv, 1);
+            int daycare_teacher_count = teacher_counts_arr(iv, 0);   
+            int total_teacher_count =  teacher_counts_arr(iv, 5);         
+
+            /* 
+            if (worker_count>0)
+            {
+                amrex::Print() << "  Counts at grid cell ("      << i << ", " << j << "):\n";
+                amrex::Print() << "  Workers: " << worker_co     unt << "\n";
+                amrex::Print() << "  Workers: ndaywrok" <<       Ndaywork[to] << "\n"; 
+            }
+            */
+
+            amrex::Print() << "  Counts at grid cell (" << i << ", " << j << "):\n";
+            amrex::Print() << "  Unit " << to <<  "\n";  
+            amrex::Print() << "  Workers: " << worker_count << "\n";  
+            amrex::Print() << "  Workers: ndaywrok" <<  Ndaywork[to] << "\n";             
             amrex::Print() << "  Elementary School 3 Students: " << elementary_3_count << "\n";
+            amrex::Print() << "  Elementary School 3 Teachers: " << elementary_3_teacher_count << "\n";
             amrex::Print() << "  Elementary School 4 Students: " << elementary_4_count << "\n";
+            amrex::Print() << "  Elementary School 4 Teachers: " << elementary_4_teacher_count << "\n";
             amrex::Print() << "  Middle School Students: " << middle_count << "\n";
+            amrex::Print() << "  Middle School Teachers: " << middle_teacher_count << "\n";
             amrex::Print() << "  High School Students: " << high_count << "\n";
+            amrex::Print() << "  High School Teachers: " << high_teacher_count << "\n";
             amrex::Print() << "  Playgroups + Day care: " << daycare_count << "\n";
+            amrex::Print() << "  Playgroups + Day care Teachers: " << daycare_teacher_count << "\n";
+            amrex::Print() << "  Total Teachers: " << total_teacher_count << "\n";
+            amrex::Print() << "  Total Teachers UNITS:              " << to << " = " << Unit_total_teacher_counts_ptr[to] << "\n";
+            amrex::Print() << "  Total day care     Teachers UNITS: " << to << " = " << Unit_daycr_teacher_counts_ptr[to] << "\n";
+            amrex::Print() << "  Total elementary 3 Teachers UNITS: " << to << " = " << Unit_elem3_teacher_counts_ptr[to] << "\n";
+            amrex::Print() << "  Total elementary 4 Teachers UNITS: " << to << " = " << Unit_elem4_teacher_counts_ptr[to] << "\n";
+            amrex::Print() << "  Total midle school Teachers UNITS: " << to << " = " << Unit_midl_teacher_counts_ptr[to] << "\n";
+            amrex::Print() << "  Total high school  Teachers UNITS: " << to << " = " << Unit_high_teacher_counts_ptr[to] << "\n";
+ 
         }
     }
 }
@@ -1489,6 +1583,4 @@ void AgentContainer::print_var()
 }
 
 */
-
-
 
