@@ -222,15 +222,37 @@ public:
         return d_parm;
     }
 
-    /*! \brief Return student counts at a specific grid cell */    
+    /* 
+    Right now, don't really need counts at grid cell - community level, 
+    since read_workerflow is doing operations at the Unit level
+       
+    // !\brief Return student counts at a specific grid cell 
     inline const amrex::iMultiFab& getStudentCounts() const {
         return student_counts;
     }
-    /*! \brief Return student counts at a specific grid cell */    
-    inline const amrex::iMultiFab& getTeacherCounts() const {
-        return teacher_counts;
-    }
+    // !\brief Return student counts at a specific grid cell   
 
+
+    */
+
+    inline const amrex::Gpu::DeviceVector<int>& getUnitTotalTeacherCounts() const {
+        return Unit_total_teacher_counts;
+    }
+    inline const amrex::Gpu::DeviceVector<int>& getUnitElem3TeacherCounts() const {
+        return Unit_elem3_teacher_counts;
+    }
+    inline const amrex::Gpu::DeviceVector<int>& getUnitElem4TeacherCounts() const {
+        return Unit_elem4_teacher_counts;
+    }
+    inline const amrex::Gpu::DeviceVector<int>& getUnitMidlTeacherCounts() const {
+        return Unit_midl_teacher_counts;
+    }
+    inline const amrex::Gpu::DeviceVector<int>& getUnitHighTeacherCounts() const {
+        return Unit_high_teacher_counts;
+    }
+    inline const amrex::Gpu::DeviceVector<int>& getUnitDaycrTeacherCounts() const {
+        return Unit_daycr_teacher_counts;
+    }
     void printCounts(const amrex::iMultiFab& worker_counts, const iMultiFab& unit_mf, const DemographicData& demo) const;
     // void printCounts(const amrex::iMultiFab& worker_counts) const;
     

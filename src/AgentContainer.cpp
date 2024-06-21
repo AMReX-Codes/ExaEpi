@@ -1408,7 +1408,7 @@ void AgentContainer::printCounts(const amrex::iMultiFab& worker_counts, const iM
             amrex::Print() << "  Counts at grid cell (" << i << ", " << j << "):\n";
             amrex::Print() << "  Unit " << to <<  "\n";  
             amrex::Print() << "  Workers: " << worker_count << "\n";  
-            amrex::Print() << "  Workers: ndaywrok" <<  Ndaywork[to] << "\n";             
+            amrex::Print() << "  Workers: of workers using Ndaywork" <<  Ndaywork[to] << "\n";             
             amrex::Print() << "  Elementary School 3 Students: " << elementary_3_count << "\n";
             amrex::Print() << "  Elementary School 3 Teachers: " << elementary_3_teacher_count << "\n";
             amrex::Print() << "  Elementary School 4 Students: " << elementary_4_count << "\n";

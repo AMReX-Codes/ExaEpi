@@ -21,7 +21,8 @@ namespace Initialization
                           const TestParams& params,
                           const amrex::iMultiFab& unit_mf,
                           const amrex::iMultiFab& comm_mf,
-                          AgentContainer& pc);
+                          AgentContainer& pc,
+                          amrex::iMultiFab& worker_counts);
 
     void setInitialCasesFromFile (AgentContainer& pc, const amrex::iMultiFab& unit_mf,
                                   const amrex::iMultiFab& FIPS_mf, const amrex::iMultiFab& comm_mf,

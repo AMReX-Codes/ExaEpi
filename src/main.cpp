@@ -354,7 +354,10 @@ void runAgent ()
             cur_time += 1.0_rt; // time step is one day
 
             //pc.print_var();
-            pc.printCounts(worker_counts, unit_mf, demo);
+            if ( i==0 ) //|| i ==  params.nsteps -1)
+            {
+                pc.printCounts(worker_counts, unit_mf, demo);
+            }
         }
     }
 
