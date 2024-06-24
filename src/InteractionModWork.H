@@ -41,21 +41,21 @@ static void binaryInteractionWork ( const int a_i, /*!< Index of infectious agen
     ParticleReal prob = 1.0_prt;
 
     //  Original Code
-    
-    //  Workgroup transmission 
-    
+
+    //  Workgroup transmission
+
     if (workgroup_ptr[a_i] && (work_i_ptr[a_i] >= 0)) { // transmitter i at work
         if ((work_i_ptr[a_j] >= 0) && (workgroup_ptr[a_i] == workgroup_ptr[a_j])) {  // coworker
             prob *= 1.0_prt - infect * a_lparm->xmit_work * a_work_scale;
         }
     }
-   
+
 
     //  Tried this initially, but realized, this would lead to interaction between all workers within the same work community
    /*
    if (workgroup_ptr[a_i] && workgroup_ptr[a_j] && (work_i_ptr[a_i] == work_i_ptr[a_j]) && (work_j_ptr[a_i] == work_j_ptr[a_j])) // can i replace the two last boolean by work_i_ptr[a_i] >= 0 && work_i_ptr[a_j] >= 0 ?
    {
-        if (workgroup_ptr[a_i] == workgroup_ptr[a_j]) 
+        if (workgroup_ptr[a_i] == workgroup_ptr[a_j])
         {
             if (age_group_ptr[a_i]==age_group_ptr[a_j])
             {
@@ -66,14 +66,14 @@ static void binaryInteractionWork ( const int a_i, /*!< Index of infectious agen
                 prob *= 1.0_prt - infect * a_lparm->xmit_work_diff_age * 1.2_prt * a_work_scale;
             }
             else// same group different age -- but j is younger so less susceptible ? If age gap doesn't matter, comment the previous else if statement -- same for below
-            { 
+            {
                 prob *= 1.0_prt - infect * a_lparm->xmit_work_diff_age            * a_work_scale;
-            } 
+            }
         }
         else // diff group
         {
             if (age_group_ptr[a_i] == age_group_ptr[a_j])
-            { 
+            {
                 prob *= 1.0_prt - infect * a_lparm->xmit_work_diff_group          * a_work_scale;
             }
             else if (age_group_ptr[a_i] < age_group_ptr[a_j])
@@ -84,12 +84,12 @@ static void binaryInteractionWork ( const int a_i, /*!< Index of infectious agen
             {
                 prob *= 1.0_prt - infect * a_lparm->xmit_work_diff_group_diff_age * a_work_scale;
             }
-        } 
+        }
    }
   */
 
     // Adding workplaces interaction as well as workgroup interaction - with infeection susceptibilty different between ages
-  /* 
+  /*
     if (workplace_ptr[a_i] && (work_i_ptr[a_i] >= 0)) { // transmitter i at work
     // the first condition is inportant because its zero for people without work
     // the second one, is it necessary? since its initialze to home i,j which is always >=0? unless its -1 somewhere i cant find!
@@ -128,7 +128,7 @@ static void binaryInteractionWork ( const int a_i, /*!< Index of infectious agen
         }
    }
    */
-   
+
     Gpu::Atomic::Multiply(&a_prob_ptr[a_j], prob);
 }
 

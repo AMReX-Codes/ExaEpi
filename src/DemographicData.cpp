@@ -130,8 +130,7 @@ void DemographicData::InitFromFile (const std::string& fname /*!< Name of file c
             ncomm = Ndaywork[i] / 1000;
             //amrex::Print() << "myID " << myID[i] << ": " << ncomm << " communities to accommodate " << Ndaywork[i] << " daytime workers\n";
         }
-
-        // added this since there might be a community with Pop < 2000, and num_work < 20
+        /* added this since there might be a community with Pop < 2000, and num_work < 20 -- remove if we ignore this type of community*/
         if (!ncomm)
         {
             ncomm = 1;

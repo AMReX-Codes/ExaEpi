@@ -36,8 +36,7 @@ struct IntIdx
         work_j          /*!< work location index */,
         nborhood,       /*!< home neighborhood ID */
         school,         /*!< school type (elementary, middle, high, none) */
-        // adding workplace, which will be divided into workgroup
-        workplace,      /*!< workplace ID */
+        workplace,      /*!< workplace ID -- adding workplace, which will be divided into workgroup */
         workgroup,      /*!< workgroup ID */
         work_nborhood,  /*!< work neighborhood ID */
         withdrawn,      /*!< quarantine status */

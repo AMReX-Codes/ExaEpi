@@ -1,12 +1,6 @@
-
 /*! @file AgentContainer.cpp
     \brief Function implementations for #AgentContainer class
 */
-#include <stdio.h>
-#include <set>
-#include <vector>
-#include <iostream>
-
 
 #include "AgentContainer.H"
 
@@ -336,6 +330,7 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,    /*!< Number 
     iMultiFab fam_id (num_residents.boxArray(), num_residents.DistributionMap(), 7, 0);
     num_families.setVal(0);
 
+    // Initialize teachers variables
     auto Nunit = demo.Nunit;
     Unit_total_teacher_counts.resize(Nunit, 0);
     Unit_elem3_teacher_counts.resize(Nunit, 0);
@@ -488,7 +483,6 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,    /*!< Number 
         auto work_j_ptr = soa.GetIntData(IntIdx::work_j).data();
         auto nborhood_ptr = soa.GetIntData(IntIdx::nborhood).data();
         auto school_ptr = soa.GetIntData(IntIdx::school).data();
-        // adding workplace, which will be divided into workgroup
         auto workplace_ptr = soa.GetIntData(IntIdx::workplace).data();
         auto workgroup_ptr = soa.GetIntData(IntIdx::workgroup).data();
         auto work_nborhood_ptr = soa.GetIntData(IntIdx::work_nborhood).data();
@@ -500,7 +494,7 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,    /*!< Number 
 
         auto student_counts_arr = student_counts[mfi].array();
         auto teacher_counts_arr = teacher_counts[mfi].array();
- 
+
 
         Long pid;
 #ifdef AMREX_USE_OMP
@@ -545,9 +539,8 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,    /*!< Number 
 
             int start = offset_arr(i, j, k, n);
             int nborhood = 0;
-            
+
             // dont we NEED if !community_size?
-            //assign age_group
             for (int ii = 0; ii < num_to_add; ++ii) {
                 int ip = start + ii;
                 auto& agent = aos[ip];
@@ -621,11 +614,11 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,    /*!< Number 
                 work_j_ptr[ip] = j;
                 nborhood_ptr[ip] = nborhood;
                 work_nborhood_ptr[ip] = 5*nborhood;
-                workplace_ptr[ip] = 0; // initiliaze workplace to 0
+                workplace_ptr[ip] = 0;
                 workgroup_ptr[ip] = 0;
 
-                
-                // should i add a if (community_size) ? just to take care of community size
+
+                // shouldn't we add if (community_size) ? otherwise, we are assigning kids to school in a worker only community
                 if (community_size)
                 {
                     if (age_group == 0) {
@@ -652,7 +645,7 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,    /*!< Number 
                 } else if (school_ptr[ip] == 5) {
                     amrex::Gpu::Atomic::AddNoRet(&student_counts_arr(i, j, 0), 1);  // Playgroups + Day care
                 }
-                
+
             }
         });
 
@@ -663,7 +656,6 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,    /*!< Number 
         2 = middle
         3 = elementary neighborhood 1
         4 = elementary neighborhood 2
-        
         */
         amrex::ParallelFor(bx,
             [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
@@ -684,8 +676,6 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,    /*!< Number 
             amrex::Gpu::Atomic::AddNoRet(&Unit_daycr_teacher_counts_ptr[unit_arr(i,j,0)]  , teacher_counts_arr(i, j, 0));
 
         });
-
-
     }
 
     demo.CopyToHostAsync(demo.Unit_on_proc_d, demo.Unit_on_proc);
@@ -1358,13 +1348,12 @@ void AgentContainer::interactNight ( MultiFab& a_mask_behavior /*!< Masking beha
     }
 }
 
-void AgentContainer::printCounts(const amrex::iMultiFab& worker_counts, const iMultiFab& unit_mf, const DemographicData& demo) const{
+void AgentContainer::printCounts(const iMultiFab& unit_mf, const DemographicData& demo) const{
     for (MFIter mfi(unit_mf, TilingIfNotGPU()); mfi.isValid(); ++mfi)
     {
         const auto& student_counts_arr = student_counts[mfi].array();
         const auto& teacher_counts_arr = teacher_counts[mfi].array();
         const amrex::Box& bx = mfi.validbox();
-        const auto& worker_counts_arr = worker_counts[mfi].array();
         auto unit_arr = unit_mf[mfi].array();
         auto Ndaywork = demo.Ndaywork_d.data();
         auto Unit_total_teacher_counts_ptr = Unit_total_teacher_counts.data();
@@ -1381,8 +1370,6 @@ void AgentContainer::printCounts(const amrex::iMultiFab& worker_counts, const iM
             int j = iv[1];
             auto to = unit_arr(i, j, 0);
 
-            // Worker counts
-            int worker_count = worker_counts_arr(iv, 0);
             int elementary_3_count = student_counts_arr(iv, 3);
             int elementary_4_count = student_counts_arr(iv, 4);
             int middle_count = student_counts_arr(iv, 2);
@@ -1393,22 +1380,12 @@ void AgentContainer::printCounts(const amrex::iMultiFab& worker_counts, const iM
             int elementary_4_teacher_count = teacher_counts_arr(iv, 4);
             int middle_teacher_count = teacher_counts_arr(iv, 2);
             int high_teacher_count = teacher_counts_arr(iv, 1);
-            int daycare_teacher_count = teacher_counts_arr(iv, 0);   
-            int total_teacher_count =  teacher_counts_arr(iv, 5);         
-
-            /* 
-            if (worker_count>0)
-            {
-                amrex::Print() << "  Counts at grid cell ("      << i << ", " << j << "):\n";
-                amrex::Print() << "  Workers: " << worker_co     unt << "\n";
-                amrex::Print() << "  Workers: ndaywrok" <<       Ndaywork[to] << "\n"; 
-            }
-            */
+            int daycare_teacher_count = teacher_counts_arr(iv, 0);
+            int total_teacher_count =  teacher_counts_arr(iv, 5);
 
             amrex::Print() << "  Counts at grid cell (" << i << ", " << j << "):\n";
-            amrex::Print() << "  Unit " << to <<  "\n";  
-            amrex::Print() << "  Workers: " << worker_count << "\n";  
-            amrex::Print() << "  Workers: of workers using Ndaywork" <<  Ndaywork[to] << "\n";             
+            amrex::Print() << "  Unit " << to <<  "\n";
+            amrex::Print() << "  Workers: of workers using Ndaywork" <<  Ndaywork[to] << "\n";
             amrex::Print() << "  Elementary School 3 Students: " << elementary_3_count << "\n";
             amrex::Print() << "  Elementary School 3 Teachers: " << elementary_3_teacher_count << "\n";
             amrex::Print() << "  Elementary School 4 Students: " << elementary_4_count << "\n";
@@ -1426,80 +1403,31 @@ void AgentContainer::printCounts(const amrex::iMultiFab& worker_counts, const iM
             amrex::Print() << "  Total elementary 4 Teachers UNITS: " << to << " = " << Unit_elem4_teacher_counts_ptr[to] << "\n";
             amrex::Print() << "  Total midle school Teachers UNITS: " << to << " = " << Unit_midl_teacher_counts_ptr[to] << "\n";
             amrex::Print() << "  Total high school  Teachers UNITS: " << to << " = " << Unit_high_teacher_counts_ptr[to] << "\n";
- 
+
         }
     }
 }
+void AgentContainer::printWorkersAndTeachers(const DemographicData& demo) const {
+    BL_PROFILE("AgentContainer::printWorkersAndTeachers");
 
+    // Variables for total counts
+    int total_pop = 0;
+    int total_ag0 = 0;
+    int total_ag1 = 0;
+    int total_ag2 = 0;
+    int total_ag3 = 0;
+    int total_ag4 = 0;
+    int total_workers = 0;
+    int total_teachers = 0;
+    int error_count = 0;
 
+    // Variables for total counts from data
+    int total_workers_data = 0;
+    int total_teachers_data = 0;
 
-/* Print to see variables values*/
-
-
-void AgentContainer::print_var()
-{
-    BL_PROFILE("AgentContainer::print_var");
-
-    for (int lev = 0; lev <= finestLevel(); ++lev)
-    {
-        auto& plev = GetParticles(lev);
-
-#ifdef AMREX_USE_OMP
-#pragma omp parallel if (Gpu::notInLaunchRegion())
-#endif
-        for (MFIter mfi = MakeMFIter(lev, TilingIfNotGPU()); mfi.isValid(); ++mfi)
-        {
-            int gid = mfi.index();
-            int tid = mfi.LocalTileIndex();
-            auto& ptile = plev[std::make_pair(gid, tid)];
-            auto& soa = ptile.GetStructOfArrays();
-            const size_t np = ptile.numParticles();
-            auto status_ptr = soa.GetIntData(IntIdx::status).data();
-            auto age_group_ptr = soa.GetIntData(IntIdx::age_group).data();
-            auto home_i_ptr = soa.GetIntData(IntIdx::home_i).data();
-            auto home_j_ptr = soa.GetIntData(IntIdx::home_j).data();
-            auto work_i_ptr = soa.GetIntData(IntIdx::work_i).data();
-            auto work_j_ptr = soa.GetIntData(IntIdx::work_j).data();
-            auto school_ptr = soa.GetIntData(IntIdx::school).data();
-            auto nborhood_ptr = soa.GetIntData(IntIdx::nborhood).data();
-            auto workplace_ptr = soa.GetIntData(IntIdx::workplace).data();
-            auto workgroup_ptr = soa.GetIntData(IntIdx::workgroup).data();
-            for (size_t i = 0; i<np; ++i)
-            {
-               // if (age_group_ptr[i] == 1)
-               // if ( (home_i_ptr[i] != work_i_ptr[i]) && (home_j_ptr[i] != work_j_ptr[i]))
-                if (workgroup_ptr[i] > 24) 
-                {
-//                    std::printf("Agent %d:\n", i);
-//                    std::printf("  Status: %d\n", status_ptr[i]);
-//                    std::printf("  Age Group: %d\n", age_group_ptr[i]);
-//                    std::printf("  Home (i, j): (%d, %d)\n", home_i_ptr[i], home_j_ptr[i]);
-//                    std::printf("  Work (i, j): (%d, %d)\n", work_i_ptr[i], work_j_ptr[i]);
-//                    std::printf("  Workgroup: %d\n", workgroup_ptr[i]);
-//                    std::printf("  School: %d\n", school_ptr[i]);
-//                    std::printf("  Neighborhood: %d\n", nborhood_ptr[i]);
-                    std::printf(" WG: %d ,", workgroup_ptr[i]);
-                    
-                }
-            }
-        }
-    }
-}
-
-
-
-/*
-void AgentContainer::print_var()
-{
-    BL_PROFILE("AgentContainer::print_var");
-
-    std::set<int> unique_status;
-    std::set<int> unique_age_group;
-    std::set<std::pair<int, int>> unique_home;
-    std::set<std::pair<int, int>> unique_work;
-    std::set<int> unique_workgroup;
-    std::set<int> unique_school;
-    std::set<int> unique_neighborhood;
+    // Pointers to demographic data
+    auto Ndaywork = demo.Ndaywork_d.data();
+    auto Unit_total_teacher_counts_ptr = Unit_total_teacher_counts.data();
 
     for (int lev = 0; lev <= finestLevel(); ++lev) {
         auto& plev = GetParticles(lev);
@@ -1507,80 +1435,107 @@ void AgentContainer::print_var()
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
 #endif
-        for (MFIter mfi = MakeMFIter(lev, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
-            int gid = mfi.index();
-            int tid = mfi.LocalTileIndex();
-            auto& ptile = plev[std::make_pair(gid, tid)];
-            auto& soa = ptile.GetStructOfArrays();
-            const auto np = ptile.numParticles();
-            auto status_ptr = soa.GetIntData(IntIdx::status).data();
-            auto age_group_ptr = soa.GetIntData(IntIdx::age_group).data();
-            auto home_i_ptr = soa.GetIntData(IntIdx::home_i).data();
-            auto home_j_ptr = soa.GetIntData(IntIdx::home_j).data();
-            auto work_i_ptr = soa.GetIntData(IntIdx::work_i).data();
-            auto work_j_ptr = soa.GetIntData(IntIdx::work_j).data();
-            auto school_ptr = soa.GetIntData(IntIdx::school).data();
-            auto nborhood_ptr = soa.GetIntData(IntIdx::nborhood).data();
+        {
+            // Private variables for parallel regions
+            int total_pop_private = 0;
+            int total_ag0_private = 0;
+            int total_ag1_private = 0;
+            int total_ag2_private = 0;
+            int total_ag3_private = 0;
+            int total_ag4_private = 0;
+            int total_workers_private = 0;
+            int total_teachers_private = 0;
+            int error_count_private = 0;
 
-            amrex::ParallelFor(np, [=, &unique_status, &unique_age_group, &unique_home, &unique_work, &unique_workgroup, &unique_school, &unique_neighborhood](int i) noexcept {
-                if ((home_i_ptr[i] != work_i_ptr[i]) && (home_j_ptr[i] != work_j_ptr[i])) {
-                    #pragma omp critical
-                    {
-                        unique_status.insert(status_ptr[i]);
-                        unique_age_group.insert(age_group_ptr[i]);
-                        unique_home.insert({home_i_ptr[i], home_j_ptr[i]});
-                        unique_work.insert({work_i_ptr[i], work_j_ptr[i]});
-                        unique_workgroup.insert(nborhood_ptr[i]);
-                        unique_school.insert(school_ptr[i]);
-                        unique_neighborhood.insert(nborhood_ptr[i]);
+            for (MFIter mfi = MakeMFIter(lev, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+                int gid = mfi.index();
+                int tid = mfi.LocalTileIndex();
+                auto& ptile = plev.at(std::make_pair(gid, tid));
+                auto& soa = ptile.GetStructOfArrays();
+                const size_t np = ptile.numParticles();
+                auto age_group_ptr = soa.GetIntData(IntIdx::age_group).data();
+                auto work_i_ptr = soa.GetIntData(IntIdx::work_i).data();
+                auto work_j_ptr = soa.GetIntData(IntIdx::work_j).data();
+                auto school_ptr = soa.GetIntData(IntIdx::school).data();
+                auto workplace_ptr = soa.GetIntData(IntIdx::workplace).data();
+                auto workgroup_ptr = soa.GetIntData(IntIdx::workgroup).data();
+
+                for (size_t i = 0; i < np; ++i) {
+                    ++total_pop_private;
+                    if (age_group_ptr[i] == 0) { ++total_ag0_private; }
+                    else if (age_group_ptr[i] == 1) { ++total_ag1_private; }
+                    else if (age_group_ptr[i] == 2) { ++total_ag2_private; }
+                    else if (age_group_ptr[i] == 3) { ++total_ag3_private; }
+                    else { ++total_ag4_private; }
+
+                    if ((age_group_ptr[i] == 2 || age_group_ptr[i] == 3) && (workplace_ptr[i] > 0 || workgroup_ptr[i] > 0)) {
+                        ++total_workers_private;
+
+                        if (school_ptr[i] > 0) {
+                            ++total_teachers_private;
+                        } else {
+                            ++error_count_private;
+                        }
                     }
                 }
-            });
+            }
+
+#ifdef AMREX_USE_OMP
+#pragma omp atomic
+#endif
+            total_pop += total_pop_private;
+#ifdef AMREX_USE_OMP
+#pragma omp atomic
+#endif
+            total_ag0 += total_ag0_private;
+#ifdef AMREX_USE_OMP
+#pragma omp atomic
+#endif
+            total_ag1 += total_ag1_private;
+#ifdef AMREX_USE_OMP
+#pragma omp atomic
+#endif
+            total_ag2 += total_ag2_private;
+#ifdef AMREX_USE_OMP
+#pragma omp atomic
+#endif
+            total_ag3 += total_ag3_private;
+#ifdef AMREX_USE_OMP
+#pragma omp atomic
+#endif
+            total_ag4 += total_ag4_private;
+#ifdef AMREX_USE_OMP
+#pragma omp atomic
+#endif
+            total_workers += total_workers_private;
+#ifdef AMREX_USE_OMP
+#pragma omp atomic
+#endif
+            total_teachers += total_teachers_private;
+#ifdef AMREX_USE_OMP
+#pragma omp atomic
+#endif
+            error_count += error_count_private;
+
         }
     }
 
-    std::cout << "Unique Status: ";
-    for (const auto& status : unique_status) {
-        std::cout << status << " ";
+    // Add from demographic data and AgentContainer
+    for (int u = 0; u < demo.Nunit; ++u) {
+        total_workers_data += Ndaywork[u];
+        total_teachers_data += Unit_total_teacher_counts_ptr[u];
     }
-    std::cout << "\n";
 
-    std::cout << "Unique Age Groups: ";
-    for (const auto& age_group : unique_age_group) {
-        std::cout << age_group << " ";
-    }
-    std::cout << "\n";
-
-    std::cout << "Unique Home (i, j): ";
-    for (const auto& home : unique_home) {
-        std::cout << "(" << home.first << ", " << home.second << ") ";
-    }
-    std::cout << "\n";
-
-    std::cout << "Unique Work (i, j): ";
-    for (const auto& work : unique_work) {
-        std::cout << "(" << work.first << ", " << work.second << ") ";
-    }
-    std::cout << "\n";
-
-    std::cout << "Unique Workgroups: ";
-    for (const auto& workgroup : unique_workgroup) {
-        std::cout << workgroup << " ";
-    }
-    std::cout << "\n";
-
-    std::cout << "Unique Schools: ";
-    for (const auto& school : unique_school) {
-        std::cout << school << " ";
-    }
-    std::cout << "\n";
-
-    std::cout << "Unique Neighborhoods: ";
-    for (const auto& neighborhood : unique_neighborhood) {
-        std::cout << neighborhood << " ";
-    }
-    std::cout << "\n";
+    // Print the results
+    std::cout << "Total Population from sim: " << total_pop << std::endl;
+    std::cout << "Total Age Group 0 from sim: " << total_ag0 << std::endl;
+    std::cout << "Total Age Group 1 from sim: " << total_ag1 << std::endl;
+    std::cout << "Total Age Group 2 from sim: " << total_ag2 << std::endl;
+    std::cout << "Total Age Group 3 from sim: " << total_ag3 << std::endl;
+    std::cout << "Total Age Group 4 from sim: " << total_ag4 << std::endl;
+    std::cout << "Total Workers from sim: " << total_workers << std::endl;
+    std::cout << "Total Teachers from sim: " << total_teachers << std::endl;
+    std::cout << "Total Workers from data: " << total_workers_data << std::endl;
+    std::cout << "Total Teachers from data: " << total_teachers_data << std::endl;
+    std::cout << "Error count: " << error_count << std::endl;
 }
-
-*/
-

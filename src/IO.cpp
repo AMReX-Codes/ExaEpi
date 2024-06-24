@@ -60,10 +60,8 @@ void writePlotFile (const AgentContainer& pc,   /*!< Agent (particle) container 
     amrex::Vector<int> write_real_comp;
     amrex::Vector<int> write_int_comp;
     amrex::Vector<std::string> real_comp_names = {"disease_counter", "treatment_timer", "infection_prob", "incubation_period", "infectious_period", "symptomdev_period"};
-    // adding workplace
     amrex::Vector<std::string> int_comp_names = {"status", "strain", "age_group", "family", "home_i", "home_j", "work_i", "work_j", "nborhood", "school","workplace", "workgroup", "work_nborhood", "withdrawn", "symptomatic"};
 
-    // adding workplace values in print as well
     if (step == 0) {
         write_real_comp = {1, 1, 1, 1, 1, 1};
         write_int_comp = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};

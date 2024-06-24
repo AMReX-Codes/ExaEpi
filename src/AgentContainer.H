@@ -15,8 +15,6 @@
 #include <AMReX_iMultiFab.H>
 #include <AMReX_Vector.H>
 
-#include <AMReX_Print.H>
-
 #include "AgentDefinitions.H"
 #include "DemographicData.H"
 #include "DiseaseParm.H"
@@ -70,7 +68,7 @@ public:
         student_counts(a_ba, a_dmap, 5, 0), teacher_counts(a_ba, a_dmap, 6, 0)
     {
         BL_PROFILE("AgentContainer::AgentContainer");
-       
+
         student_counts.setVal(0);  // Initialize the MultiFab to zero
         teacher_counts.setVal(0);
 
@@ -189,10 +187,6 @@ public:
 
     void moveAgentsToHome ();
 
-    void print_var (); // sanity check;
-
-
-
     /*! \brief Return bin pointer at a given mfi, tile and model name */
     inline amrex::DenseBins<PType>* getBins( const std::pair<int,int>& a_idx,
                                              const std::string& a_mod_name )
@@ -222,19 +216,7 @@ public:
         return d_parm;
     }
 
-    /* 
-    Right now, don't really need counts at grid cell - community level, 
-    since read_workerflow is doing operations at the Unit level
-       
-    // !\brief Return student counts at a specific grid cell 
-    inline const amrex::iMultiFab& getStudentCounts() const {
-        return student_counts;
-    }
-    // !\brief Return student counts at a specific grid cell   
-
-
-    */
-
+    /* Since read_workerflow update worker status Unit-wise and not community-wise - Get total teacher needed for each unit */
     inline const amrex::Gpu::DeviceVector<int>& getUnitTotalTeacherCounts() const {
         return Unit_total_teacher_counts;
     }
@@ -253,9 +235,8 @@ public:
     inline const amrex::Gpu::DeviceVector<int>& getUnitDaycrTeacherCounts() const {
         return Unit_daycr_teacher_counts;
     }
-    void printCounts(const amrex::iMultiFab& worker_counts, const iMultiFab& unit_mf, const DemographicData& demo) const;
-    // void printCounts(const amrex::iMultiFab& worker_counts) const;
-    
+    void printCounts(const iMultiFab& unit_mf, const DemographicData& demo) const;
+    void printWorkersAndTeachers(const DemographicData& demo) const;
 protected:
 
     amrex::iMultiFab student_counts;
@@ -301,6 +282,3 @@ protected:
 using AgentIterator = typename AgentContainer::ParIterType;
 
 #endif
-
-
-

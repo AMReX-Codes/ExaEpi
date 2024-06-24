@@ -36,7 +36,7 @@ void DiseaseParm::Initialize ()
     xmit_work_diff_age = 0.090_rt*pWO;
     xmit_work_diff_group = 0.075_rt*pWO;
     xmit_work_diff_group_diff_age = 0.060_rt*pWO;  // later model, when a_j is older than a_i
-    
+
     // Optimistic scenario: 50% reduction in external child contacts during school dismissal
     //   or remote learning, and no change in household contacts
     Child_compliance=0.5_rt; Child_HH_closure=1.0_rt;
@@ -71,7 +71,6 @@ void DiseaseParm::Initialize ()
     xmit_work_diff_age *= p_trans[0];
     xmit_work_diff_group *= p_trans[0];
     xmit_work_diff_group_diff_age *= p_trans[0];
-
 
     for (int i = 0; i < 5; i++) {
         xmit_comm[i] *= p_trans[0];
@@ -162,4 +161,3 @@ void DiseaseParm::printMatrix () {
     }
     amrex::Print() << "\n";
 }
-
