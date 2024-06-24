@@ -29,7 +29,7 @@ static void binaryInteractionWork ( const int a_i, /*!< Index of infectious agen
     infect *= a_lparm->vac_eff;
     auto age_group_ptr = a_ptd.m_idata[IntIdx::age_group];
     auto work_i_ptr = a_ptd.m_idata[IntIdx::work_i];
-    auto work_j_ptr = a_ptd.m_idata[IntIdx::work_j];
+   // auto work_j_ptr = a_ptd.m_idata[IntIdx::work_j];
     auto workplace_ptr = a_ptd.m_idata[IntIdx::workplace];
     auto workgroup_ptr = a_ptd.m_idata[IntIdx::workgroup];
     auto withdrawn_ptr = a_ptd.m_idata[IntIdx::withdrawn];
@@ -40,17 +40,15 @@ static void binaryInteractionWork ( const int a_i, /*!< Index of infectious agen
     //infect *= j_mask;
     ParticleReal prob = 1.0_prt;
 
-    //  Original Code
-
+    /*//  Original Code
     //  Workgroup transmission
-
     if (workgroup_ptr[a_i] && (work_i_ptr[a_i] >= 0)) { // transmitter i at work
         if ((work_i_ptr[a_j] >= 0) && (workgroup_ptr[a_i] == workgroup_ptr[a_j])) {  // coworker
             prob *= 1.0_prt - infect * a_lparm->xmit_work * a_work_scale;
         }
     }
 
-
+    */
     //  Tried this initially, but realized, this would lead to interaction between all workers within the same work community
    /*
    if (workgroup_ptr[a_i] && workgroup_ptr[a_j] && (work_i_ptr[a_i] == work_i_ptr[a_j]) && (work_j_ptr[a_i] == work_j_ptr[a_j])) // can i replace the two last boolean by work_i_ptr[a_i] >= 0 && work_i_ptr[a_j] >= 0 ?
@@ -89,7 +87,7 @@ static void binaryInteractionWork ( const int a_i, /*!< Index of infectious agen
   */
 
     // Adding workplaces interaction as well as workgroup interaction - with infeection susceptibilty different between ages
-  /*
+
     if (workplace_ptr[a_i] && (work_i_ptr[a_i] >= 0)) { // transmitter i at work
     // the first condition is inportant because its zero for people without work
     // the second one, is it necessary? since its initialze to home i,j which is always >=0? unless its -1 somewhere i cant find!
@@ -127,7 +125,7 @@ static void binaryInteractionWork ( const int a_i, /*!< Index of infectious agen
             }
         }
    }
-   */
+
 
     Gpu::Atomic::Multiply(&a_prob_ptr[a_j], prob);
 }

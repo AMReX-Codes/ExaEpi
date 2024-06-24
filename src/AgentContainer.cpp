@@ -657,24 +657,26 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,    /*!< Number 
         3 = elementary neighborhood 1
         4 = elementary neighborhood 2
         */
+
         amrex::ParallelFor(bx,
             [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
         {
-            teacher_counts_arr(i, j, 0) = (student_counts_arr(i, j, 0) + 19)  / 20;
-            teacher_counts_arr(i, j, 1) = (student_counts_arr(i, j, 1) + 19)  / 20;
-            teacher_counts_arr(i, j, 2) = (student_counts_arr(i, j, 2) + 19)  / 20;
-            teacher_counts_arr(i, j, 3) = (student_counts_arr(i, j, 3) + 19)  / 20;
-            teacher_counts_arr(i, j, 4) = (student_counts_arr(i, j, 4) + 19)  / 20;
-            int total = teacher_counts_arr(i, j, 0) + teacher_counts_arr(i, j, 1) + teacher_counts_arr(i, j, 2) + teacher_counts_arr(i, j, 3) + teacher_counts_arr(i, j, 4);
-            teacher_counts_arr(i, j, 5) = total;
+            if (k == 0){ // avoid double compute
+                teacher_counts_arr(i, j, 0) = (student_counts_arr(i, j, 0) + 19)  / 20;
+                teacher_counts_arr(i, j, 1) = (student_counts_arr(i, j, 1) + 19)  / 20;
+                teacher_counts_arr(i, j, 2) = (student_counts_arr(i, j, 2) + 19)  / 20;
+                teacher_counts_arr(i, j, 3) = (student_counts_arr(i, j, 3) + 19)  / 20;
+                teacher_counts_arr(i, j, 4) = (student_counts_arr(i, j, 4) + 19)  / 20;
+                int total = teacher_counts_arr(i, j, 0) + teacher_counts_arr(i, j, 1) + teacher_counts_arr(i, j, 2) + teacher_counts_arr(i, j, 3) + teacher_counts_arr(i, j, 4);
+                teacher_counts_arr(i, j, 5) = total;
 
-            amrex::Gpu::Atomic::AddNoRet(&Unit_total_teacher_counts_ptr[unit_arr(i,j,0)], total);
-            amrex::Gpu::Atomic::AddNoRet(&Unit_elem3_teacher_counts_ptr[unit_arr(i,j,0)], teacher_counts_arr(i, j, 3));
-            amrex::Gpu::Atomic::AddNoRet(&Unit_elem4_teacher_counts_ptr[unit_arr(i,j,0)], teacher_counts_arr(i, j, 4));
-            amrex::Gpu::Atomic::AddNoRet(&Unit_midl_teacher_counts_ptr[unit_arr(i,j,0)] , teacher_counts_arr(i, j, 2));
-            amrex::Gpu::Atomic::AddNoRet(&Unit_high_teacher_counts_ptr[unit_arr(i,j,0)] , teacher_counts_arr(i, j, 1));
-            amrex::Gpu::Atomic::AddNoRet(&Unit_daycr_teacher_counts_ptr[unit_arr(i,j,0)]  , teacher_counts_arr(i, j, 0));
-
+                amrex::Gpu::Atomic::AddNoRet(&Unit_total_teacher_counts_ptr[unit_arr(i,j,0)], total);
+                amrex::Gpu::Atomic::AddNoRet(&Unit_elem3_teacher_counts_ptr[unit_arr(i,j,0)], teacher_counts_arr(i, j, 3));
+                amrex::Gpu::Atomic::AddNoRet(&Unit_elem4_teacher_counts_ptr[unit_arr(i,j,0)], teacher_counts_arr(i, j, 4));
+                amrex::Gpu::Atomic::AddNoRet(&Unit_midl_teacher_counts_ptr[unit_arr(i,j,0)] , teacher_counts_arr(i, j, 2));
+                amrex::Gpu::Atomic::AddNoRet(&Unit_high_teacher_counts_ptr[unit_arr(i,j,0)] , teacher_counts_arr(i, j, 1));
+                amrex::Gpu::Atomic::AddNoRet(&Unit_daycr_teacher_counts_ptr[unit_arr(i,j,0)]  , teacher_counts_arr(i, j, 0));
+            }
         });
     }
 
@@ -1454,8 +1456,8 @@ void AgentContainer::printWorkersAndTeachers(const DemographicData& demo) const 
                 auto& soa = ptile.GetStructOfArrays();
                 const size_t np = ptile.numParticles();
                 auto age_group_ptr = soa.GetIntData(IntIdx::age_group).data();
-                auto work_i_ptr = soa.GetIntData(IntIdx::work_i).data();
-                auto work_j_ptr = soa.GetIntData(IntIdx::work_j).data();
+                //auto work_i_ptr = soa.GetIntData(IntIdx::work_i).data();
+                //auto work_j_ptr = soa.GetIntData(IntIdx::work_j).data();
                 auto school_ptr = soa.GetIntData(IntIdx::school).data();
                 auto workplace_ptr = soa.GetIntData(IntIdx::workplace).data();
                 auto workgroup_ptr = soa.GetIntData(IntIdx::workgroup).data();
