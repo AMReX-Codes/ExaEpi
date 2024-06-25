@@ -29,6 +29,7 @@ struct TestParams
                                              (see AgentContainer::moveRandomTravel) */
     short ic_type;                      /*!< initialization type (see ExaEpi::ICType) */
 
+    int num_diseases;   /*!< Number of diseases to track */
     /*! Census data filename (DemographicData::InitFromFile)
 
         The file contents are:
@@ -52,7 +53,7 @@ struct TestParams
     */
     std::string workerflow_filename;
 
-    std::string initial_case_type;
+    std::vector<std::string> initial_case_type;
     int num_initial_cases;
 
     /*! Initial cases filename (CaseData::InitFromFile):

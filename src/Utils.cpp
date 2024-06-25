@@ -39,6 +39,10 @@ void ExaEpi::Utils::get_test_params (   TestParams& params,         /*!< Test pa
     params.random_travel_int = -1;
     pp.query("random_travel_int", params.random_travel_int);
 
+    params.num_diseases = 1;
+    pp.query("number_of_diseases", params.num_diseases);
+    params.initial_case_type.resize(params.num_diseases);
+
     std::string ic_type = "demo";
     pp.query( "ic_type", ic_type );
     if (ic_type == "demo") {
@@ -47,10 +51,10 @@ void ExaEpi::Utils::get_test_params (   TestParams& params,         /*!< Test pa
         params.ic_type = ICType::Census;
         pp.get("census_filename", params.census_filename);
         pp.get("workerflow_filename", params.workerflow_filename);
-        pp.get("initial_case_type", params.initial_case_type);
-        if (params.initial_case_type == "file") {
+        pp.getarr("initial_case_type", params.initial_case_type,0,params.num_diseases);
+        if (params.initial_case_type[0] == "file") {
             pp.get("case_filename", params.case_filename);
-        } else if (params.initial_case_type == "random") {
+        } else if (params.initial_case_type[0] == "random") {
             pp.get("num_initial_cases", params.num_initial_cases);
         } else {
             amrex::Abort("initial case type not recognized");

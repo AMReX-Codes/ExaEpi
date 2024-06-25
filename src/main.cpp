@@ -99,7 +99,7 @@ void runAgent ()
     if (params.ic_type == ICType::Census) { demo.InitFromFile(params.census_filename); }
 
     CaseData cases;
-    if (params.ic_type == ICType::Census && params.initial_case_type == "file") {
+    if (params.ic_type == ICType::Census && params.initial_case_type[0] == "file") {
         cases.InitFromFile(params.case_filename);
     }
 
@@ -159,7 +159,7 @@ void runAgent ()
             pc.initAgentsCensus(num_residents, unit_mf, FIPS_mf, comm_mf, demo);
             ExaEpi::Initialization::read_workerflow(demo, params, unit_mf, comm_mf, pc);
 
-            if (params.initial_case_type == "file") {
+            if (params.initial_case_type[0] == "file") {
                 ExaEpi::Initialization::setInitialCasesFromFile(pc, unit_mf, FIPS_mf, comm_mf,
                                                         cases, demo);
             } else {

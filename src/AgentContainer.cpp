@@ -539,17 +539,13 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,    /*!< Number 
 
             int start = offset_arr(i, j, k, n);
             int nborhood = 0;
-
-            // dont we NEED if !community_size?
             for (int ii = 0; ii < num_to_add; ++ii) {
                 int ip = start + ii;
                 auto& agent = aos[ip];
                 int il2 = amrex::Random_int(100, engine);
-                if (ii % family_size ==0)
-                {
+                if (ii % family_size ==0) {
                     nborhood = amrex::Random_int(4, engine);
                 }
-
                 int age_group = -1;
 
                 if (family_size == 1) {
