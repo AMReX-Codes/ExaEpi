@@ -305,10 +305,6 @@ void runAgent ()
             //            pc.Redistribute();
 
             cur_time += 1.0_rt; // time step is one day
-            if (i==0){
-                pc.printCounts(unit_mf, demo);
-                pc.printWorkersAndTeachers(demo);
-            }
         }
     }
 

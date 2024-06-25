@@ -1,3 +1,4 @@
+
 /*! @file AgentContainer.H
     \brief Contains #AgentContainer class and related structs
 */
@@ -235,8 +236,7 @@ public:
     inline const amrex::Gpu::DeviceVector<int>& getUnitDaycrTeacherCounts() const {
         return Unit_daycr_teacher_counts;
     }
-    void printCounts(const iMultiFab& unit_mf, const DemographicData& demo) const;
-    void printWorkersAndTeachers(const DemographicData& demo) const;
+
 protected:
 
     amrex::iMultiFab student_counts;
@@ -282,3 +282,4 @@ protected:
 using AgentIterator = typename AgentContainer::ParIterType;
 
 #endif
+

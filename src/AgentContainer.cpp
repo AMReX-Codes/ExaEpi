@@ -1,3 +1,4 @@
+
 /*! @file AgentContainer.cpp
     \brief Function implementations for #AgentContainer class
 */
@@ -483,7 +484,6 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,    /*!< Number 
         auto work_j_ptr = soa.GetIntData(IntIdx::work_j).data();
         auto nborhood_ptr = soa.GetIntData(IntIdx::nborhood).data();
         auto school_ptr = soa.GetIntData(IntIdx::school).data();
-        auto workplace_ptr = soa.GetIntData(IntIdx::workplace).data();
         auto workgroup_ptr = soa.GetIntData(IntIdx::workgroup).data();
         auto work_nborhood_ptr = soa.GetIntData(IntIdx::work_nborhood).data();
 
@@ -614,7 +614,6 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,    /*!< Number 
                 work_j_ptr[ip] = j;
                 nborhood_ptr[ip] = nborhood;
                 work_nborhood_ptr[ip] = 5*nborhood;
-                workplace_ptr[ip] = 0;
                 workgroup_ptr[ip] = 0;
 
 
@@ -1348,196 +1347,4 @@ void AgentContainer::interactNight ( MultiFab& a_mask_behavior /*!< Masking beha
     if (haveInteractionModel(ExaEpi::InteractionNames::nborhood)) {
         m_interactions[ExaEpi::InteractionNames::nborhood]->interactAgents( *this, a_mask_behavior );
     }
-}
-
-void AgentContainer::printCounts(const iMultiFab& unit_mf, const DemographicData& demo) const{
-    for (MFIter mfi(unit_mf, TilingIfNotGPU()); mfi.isValid(); ++mfi)
-    {
-        const auto& student_counts_arr = student_counts[mfi].array();
-        const auto& teacher_counts_arr = teacher_counts[mfi].array();
-        const amrex::Box& bx = mfi.validbox();
-        auto unit_arr = unit_mf[mfi].array();
-        auto Ndaywork = demo.Ndaywork_d.data();
-        auto Unit_total_teacher_counts_ptr = Unit_total_teacher_counts.data();
-        auto Unit_elem3_teacher_counts_ptr = Unit_elem3_teacher_counts.data();
-        auto Unit_elem4_teacher_counts_ptr = Unit_elem4_teacher_counts.data();
-        auto Unit_midl_teacher_counts_ptr = Unit_midl_teacher_counts.data();
-        auto Unit_high_teacher_counts_ptr = Unit_high_teacher_counts.data();
-        auto Unit_daycr_teacher_counts_ptr = Unit_daycr_teacher_counts.data();
-
-
-        for (amrex::IntVect iv = bx.smallEnd(); iv <= bx.bigEnd(); bx.next(iv))
-        {
-            int i = iv[0];
-            int j = iv[1];
-            auto to = unit_arr(i, j, 0);
-
-            int elementary_3_count = student_counts_arr(iv, 3);
-            int elementary_4_count = student_counts_arr(iv, 4);
-            int middle_count = student_counts_arr(iv, 2);
-            int high_count = student_counts_arr(iv, 1);
-            int daycare_count = student_counts_arr(iv, 0);
-
-            int elementary_3_teacher_count = teacher_counts_arr(iv, 3);
-            int elementary_4_teacher_count = teacher_counts_arr(iv, 4);
-            int middle_teacher_count = teacher_counts_arr(iv, 2);
-            int high_teacher_count = teacher_counts_arr(iv, 1);
-            int daycare_teacher_count = teacher_counts_arr(iv, 0);
-            int total_teacher_count =  teacher_counts_arr(iv, 5);
-
-            amrex::Print() << "  Counts at grid cell (" << i << ", " << j << "):\n";
-            amrex::Print() << "  Unit " << to <<  "\n";
-            amrex::Print() << "  Workers: of workers using Ndaywork" <<  Ndaywork[to] << "\n";
-            amrex::Print() << "  Elementary School 3 Students: " << elementary_3_count << "\n";
-            amrex::Print() << "  Elementary School 3 Teachers: " << elementary_3_teacher_count << "\n";
-            amrex::Print() << "  Elementary School 4 Students: " << elementary_4_count << "\n";
-            amrex::Print() << "  Elementary School 4 Teachers: " << elementary_4_teacher_count << "\n";
-            amrex::Print() << "  Middle School Students: " << middle_count << "\n";
-            amrex::Print() << "  Middle School Teachers: " << middle_teacher_count << "\n";
-            amrex::Print() << "  High School Students: " << high_count << "\n";
-            amrex::Print() << "  High School Teachers: " << high_teacher_count << "\n";
-            amrex::Print() << "  Playgroups + Day care: " << daycare_count << "\n";
-            amrex::Print() << "  Playgroups + Day care Teachers: " << daycare_teacher_count << "\n";
-            amrex::Print() << "  Total Teachers: " << total_teacher_count << "\n";
-            amrex::Print() << "  Total Teachers UNITS:              " << to << " = " << Unit_total_teacher_counts_ptr[to] << "\n";
-            amrex::Print() << "  Total day care     Teachers UNITS: " << to << " = " << Unit_daycr_teacher_counts_ptr[to] << "\n";
-            amrex::Print() << "  Total elementary 3 Teachers UNITS: " << to << " = " << Unit_elem3_teacher_counts_ptr[to] << "\n";
-            amrex::Print() << "  Total elementary 4 Teachers UNITS: " << to << " = " << Unit_elem4_teacher_counts_ptr[to] << "\n";
-            amrex::Print() << "  Total midle school Teachers UNITS: " << to << " = " << Unit_midl_teacher_counts_ptr[to] << "\n";
-            amrex::Print() << "  Total high school  Teachers UNITS: " << to << " = " << Unit_high_teacher_counts_ptr[to] << "\n";
-
-        }
-    }
-}
-void AgentContainer::printWorkersAndTeachers(const DemographicData& demo) const {
-    BL_PROFILE("AgentContainer::printWorkersAndTeachers");
-
-    // Variables for total counts
-    int total_pop = 0;
-    int total_ag0 = 0;
-    int total_ag1 = 0;
-    int total_ag2 = 0;
-    int total_ag3 = 0;
-    int total_ag4 = 0;
-    int total_workers = 0;
-    int total_teachers = 0;
-    int error_count = 0;
-
-    // Variables for total counts from data
-    int total_workers_data = 0;
-    int total_teachers_data = 0;
-
-    // Pointers to demographic data
-    auto Ndaywork = demo.Ndaywork_d.data();
-    auto Unit_total_teacher_counts_ptr = Unit_total_teacher_counts.data();
-
-    for (int lev = 0; lev <= finestLevel(); ++lev) {
-        auto& plev = GetParticles(lev);
-
-#ifdef AMREX_USE_OMP
-#pragma omp parallel if (Gpu::notInLaunchRegion())
-#endif
-        {
-            // Private variables for parallel regions
-            int total_pop_private = 0;
-            int total_ag0_private = 0;
-            int total_ag1_private = 0;
-            int total_ag2_private = 0;
-            int total_ag3_private = 0;
-            int total_ag4_private = 0;
-            int total_workers_private = 0;
-            int total_teachers_private = 0;
-            int error_count_private = 0;
-
-            for (MFIter mfi = MakeMFIter(lev, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
-                int gid = mfi.index();
-                int tid = mfi.LocalTileIndex();
-                auto& ptile = plev.at(std::make_pair(gid, tid));
-                auto& soa = ptile.GetStructOfArrays();
-                const size_t np = ptile.numParticles();
-                auto age_group_ptr = soa.GetIntData(IntIdx::age_group).data();
-                //auto work_i_ptr = soa.GetIntData(IntIdx::work_i).data();
-                //auto work_j_ptr = soa.GetIntData(IntIdx::work_j).data();
-                auto school_ptr = soa.GetIntData(IntIdx::school).data();
-                auto workplace_ptr = soa.GetIntData(IntIdx::workplace).data();
-                auto workgroup_ptr = soa.GetIntData(IntIdx::workgroup).data();
-
-                for (size_t i = 0; i < np; ++i) {
-                    ++total_pop_private;
-                    if (age_group_ptr[i] == 0) { ++total_ag0_private; }
-                    else if (age_group_ptr[i] == 1) { ++total_ag1_private; }
-                    else if (age_group_ptr[i] == 2) { ++total_ag2_private; }
-                    else if (age_group_ptr[i] == 3) { ++total_ag3_private; }
-                    else { ++total_ag4_private; }
-
-                    if ((age_group_ptr[i] == 2 || age_group_ptr[i] == 3) && (workplace_ptr[i] > 0 || workgroup_ptr[i] > 0)) {
-                        ++total_workers_private;
-
-                        if (school_ptr[i] > 0) {
-                            ++total_teachers_private;
-                        } else {
-                            ++error_count_private;
-                        }
-                    }
-                }
-            }
-
-#ifdef AMREX_USE_OMP
-#pragma omp atomic
-#endif
-            total_pop += total_pop_private;
-#ifdef AMREX_USE_OMP
-#pragma omp atomic
-#endif
-            total_ag0 += total_ag0_private;
-#ifdef AMREX_USE_OMP
-#pragma omp atomic
-#endif
-            total_ag1 += total_ag1_private;
-#ifdef AMREX_USE_OMP
-#pragma omp atomic
-#endif
-            total_ag2 += total_ag2_private;
-#ifdef AMREX_USE_OMP
-#pragma omp atomic
-#endif
-            total_ag3 += total_ag3_private;
-#ifdef AMREX_USE_OMP
-#pragma omp atomic
-#endif
-            total_ag4 += total_ag4_private;
-#ifdef AMREX_USE_OMP
-#pragma omp atomic
-#endif
-            total_workers += total_workers_private;
-#ifdef AMREX_USE_OMP
-#pragma omp atomic
-#endif
-            total_teachers += total_teachers_private;
-#ifdef AMREX_USE_OMP
-#pragma omp atomic
-#endif
-            error_count += error_count_private;
-
-        }
-    }
-
-    // Add from demographic data and AgentContainer
-    for (int u = 0; u < demo.Nunit; ++u) {
-        total_workers_data += Ndaywork[u];
-        total_teachers_data += Unit_total_teacher_counts_ptr[u];
-    }
-
-    // Print the results
-    std::cout << "Total Population from sim: " << total_pop << std::endl;
-    std::cout << "Total Age Group 0 from sim: " << total_ag0 << std::endl;
-    std::cout << "Total Age Group 1 from sim: " << total_ag1 << std::endl;
-    std::cout << "Total Age Group 2 from sim: " << total_ag2 << std::endl;
-    std::cout << "Total Age Group 3 from sim: " << total_ag3 << std::endl;
-    std::cout << "Total Age Group 4 from sim: " << total_ag4 << std::endl;
-    std::cout << "Total Workers from sim: " << total_workers << std::endl;
-    std::cout << "Total Teachers from sim: " << total_teachers << std::endl;
-    std::cout << "Total Workers from data: " << total_workers_data << std::endl;
-    std::cout << "Total Teachers from data: " << total_teachers_data << std::endl;
-    std::cout << "Error count: " << error_count << std::endl;
 }

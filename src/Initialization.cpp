@@ -132,7 +132,6 @@ namespace Initialization
 
     const Box& domain = pc.Geom(0).Domain();
 
-    /* This is where workplaces should be assigned */
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
 #endif
@@ -146,7 +145,6 @@ namespace Initialization
         auto work_i_ptr = soa.GetIntData(IntIdx::work_i).data();
         auto work_j_ptr = soa.GetIntData(IntIdx::work_j).data();
         auto nborhood_ptr = soa.GetIntData(IntIdx::nborhood).data();
-        auto workplace_ptr = soa.GetIntData(IntIdx::workplace).data();
         auto workgroup_ptr = soa.GetIntData(IntIdx::workgroup).data();
         auto school_ptr = soa.GetIntData(IntIdx::school).data();
         auto work_nborhood_ptr = soa.GetIntData(IntIdx::work_nborhood).data();
@@ -251,63 +249,42 @@ namespace Initialization
                             int choice = amrex::Random_int(total_available, engine);
                             if (choice < available_slots[0]) {
                                 school_ptr[ip] = 3;  // elementary 3 school
-                                workplace_ptr[ip] = 3;
-                                workgroup_ptr[ip] = 1 ;
+                                workgroup_ptr[ip] = 3 ;
                                 amrex::Gpu::Atomic::AddNoRet(d_elem3_teachers, 1);
                             } else if (choice < available_slots[0] + available_slots[1]) {
                                 school_ptr[ip] = 4;  // elementary 4 school
-                                workplace_ptr[ip] = 4;
-                                workgroup_ptr[ip] = 1 ;
+                                workgroup_ptr[ip] = 4 ;
                                 amrex::Gpu::Atomic::AddNoRet(d_elem4_teachers, 1);
                             } else if (choice < available_slots[0] + available_slots[1] + available_slots[2]) {
                                 school_ptr[ip] = 2;  // middle school
-                                workplace_ptr[ip] = 2;
-                                workgroup_ptr[ip] = 1 ;
+                                workgroup_ptr[ip] = 2 ;
                                 amrex::Gpu::Atomic::AddNoRet(d_middle_teachers, 1);
                             } else if (choice < available_slots[0] + available_slots[1] + available_slots[2] + available_slots[3]) {
                                 school_ptr[ip] = 1;  // high school
-                                workplace_ptr[ip] = 1;
                                 workgroup_ptr[ip] = 1 ;
                                 amrex::Gpu::Atomic::AddNoRet(d_high_teachers, 1);
                             } else if (choice < total_available) {
                                 school_ptr[ip] = 5;  // day care
-                                workplace_ptr[ip] = 5;
-                                workgroup_ptr[ip] = 1 ;
+                                workgroup_ptr[ip] = 5 ;
                                 amrex::Gpu::Atomic::AddNoRet(d_daycr_teachers, 1);
                             }
                         }
 
 
                     }
-                    else{
+                    else
+                    {
+                        constexpr int WG_size = 20;
+                        number = (unsigned int) rint( ((Real) Ndaywork[to]) /
+                                 ((Real) WG_size * (Start[to+1] - Start[to])) );
 
-                        constexpr int WP_size = 100; // workplace size
-                        constexpr int WG_size = 20; // workgroup size
-
-                        // max numbers of workplace needed
-                        unsigned int num_workplaces = (unsigned int) rint( ((Real) Ndaywork[to] - total_teacher_counts_ptr[to] ) / ((Real) WP_size * (Start[to+1] - Start[to])) );
-
-
-                        // Randomly assign agent to a workplace
-                        // add workplace pointers
-                        if (num_workplaces > 0) {
-                            workplace_ptr[ip] = 6 + amrex::Random_int(num_workplaces, engine);
-                        } else {
-                            workplace_ptr[ip] = 6;
-                        }
-
-                        // work_nborhood_ptr -- NOT USED ANYWHERE
                         work_nborhood_ptr[ip]=4*(amrex::Random_int(4, engine))+nborhood_ptr[ip];
 
-                        // max numbers of workgroup needed within a workplace
-                        // = total number of workers in a unit / num of comm / num of workplace / WG_size
-                        unsigned int num_workgroup = (unsigned int) rint( ((Real) Ndaywork[to]) - total_teacher_counts_ptr[to] / ((Real) num_workplaces * WG_size * (Start[to+1] - Start[to])) );
-
-                        if (num_workgroup) {
-                            workgroup_ptr[ip] = 1 + amrex::Random_int(num_workgroup, engine);
+                        if (number) {
+                            workgroup_ptr[ip] = 6 + amrex::Random_int(number, engine);
                         }
                         else {
-                            workplace_ptr[ip] = 1;
+                            workgroup_ptr[ip] = 6;
                         }
 
                     }
