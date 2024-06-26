@@ -5,6 +5,7 @@
 #ifndef UTILS_H_
 #define UTILS_H_
 
+#include <vector>
 #include <AMReX_Geometry.H>
 #include <AMReX_IntVect.H>
 
@@ -30,6 +31,8 @@ struct TestParams
     short ic_type;                      /*!< initialization type (see ExaEpi::ICType) */
 
     int num_diseases;   /*!< Number of diseases to track */
+    std::vector<std::string> disease_names; /*!< Names of the diseases */
+
     /*! Census data filename (DemographicData::InitFromFile)
 
         The file contents are:
@@ -53,14 +56,14 @@ struct TestParams
     */
     std::string workerflow_filename;
 
+    /*! Initial case type (random or read from file) */
     std::vector<std::string> initial_case_type;
-    int num_initial_cases;
-
+    /*! Number of initial cases (in case of random initialization) */
+    std::vector<int> num_initial_cases;
     /*! Initial cases filename (CaseData::InitFromFile):
         The case data file is an ASCII text file with three columns of numbers:
-        FIPS code, current number of cases, and cumulative number of cases till date.
-    */
-    std::string case_filename;
+        FIPS code, current number of cases, and cumulative number of cases till date. */
+    std::vector<std::string> case_filename;
 
     int aggregated_diag_int;            /*!< interval for writing aggregated diagnostic data
                                              (see: ExaEpi::IO::writeFIPSData) */

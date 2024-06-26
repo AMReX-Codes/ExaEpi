@@ -41,7 +41,16 @@ void ExaEpi::Utils::get_test_params (   TestParams& params,         /*!< Test pa
 
     params.num_diseases = 1;
     pp.query("number_of_diseases", params.num_diseases);
+
+    params.disease_names.resize(params.num_diseases);
+    for (int d = 0; d < params.num_diseases; d++) {
+        params.disease_names[d] = amrex::Concatenate("default", d, 2);
+    }
+    pp.queryarr("disease_names", params.disease_names,0,params.num_diseases);
+
     params.initial_case_type.resize(params.num_diseases);
+    params.num_initial_cases.resize(params.num_diseases);
+    params.case_filename.resize(params.num_diseases);
 
     std::string ic_type = "demo";
     pp.query( "ic_type", ic_type );
@@ -52,12 +61,36 @@ void ExaEpi::Utils::get_test_params (   TestParams& params,         /*!< Test pa
         pp.get("census_filename", params.census_filename);
         pp.get("workerflow_filename", params.workerflow_filename);
         pp.getarr("initial_case_type", params.initial_case_type,0,params.num_diseases);
-        if (params.initial_case_type[0] == "file") {
-            pp.get("case_filename", params.case_filename);
-        } else if (params.initial_case_type[0] == "random") {
-            pp.get("num_initial_cases", params.num_initial_cases);
+        if (params.num_diseases == 1) {
+            if (params.initial_case_type[0] == "file") {
+                if (pp.contains("case_filename")) {
+                    pp.get("case_filename", params.case_filename[0]);
+                } else {
+                    std::string key = "case_filename_" + params.disease_names[0];
+                    pp.get(key.c_str(), params.case_filename[0]);
+                }
+            } else if (params.initial_case_type[0] == "random") {
+                if (pp.contains("num_initial_cases")) {
+                    pp.get("num_initial_cases", params.num_initial_cases[0]);
+                } else {
+                    std::string key = "num_initial_cases_" + params.disease_names[0];
+                    pp.get(key.c_str(), params.num_initial_cases[0]);
+                }
+            } else {
+                amrex::Abort("initial case type not recognized");
+            }
         } else {
-            amrex::Abort("initial case type not recognized");
+            for (int d = 0; d < params.num_diseases; d++) {
+                if (params.initial_case_type[d] == "file") {
+                    std::string key = "case_filename_" + params.disease_names[d];
+                    pp.get(key.c_str(), params.case_filename[d]);
+                } else if (params.initial_case_type[d] == "random") {
+                    std::string key = "num_initial_cases_" + params.disease_names[d];
+                    pp.get(key.c_str(), params.num_initial_cases[d]);
+                } else {
+                    amrex::Abort("initial case type not recognized");
+                }
+            }
         }
     } else {
         amrex::Abort("ic type not recognized");
