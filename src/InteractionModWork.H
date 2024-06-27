@@ -1,4 +1,3 @@
-
 /*! @file InteractionModWork.H
  * \brief Contains the class describing agent interactions at work
  */
@@ -14,9 +13,7 @@ using namespace amrex;
 /*! \brief One-on-one interaction between an infectious agent and a susceptible agent.
  *
  * This function defines the one-on-one interaction between an infectious agent and a
- * susceptible agent at work.
- *
- * Now Adding how interaction between coworkers are different if workgroup /age differ  */
+ * susceptible agent at work. */
 template <typename PTDType>
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
 static void binaryInteractionWork ( const int a_i, /*!< Index of infectious agent */
@@ -28,6 +25,7 @@ static void binaryInteractionWork ( const int a_i, /*!< Index of infectious agen
 {
     Real infect = a_lparm->infect;
     infect *= a_lparm->vac_eff;
+
     auto work_i_ptr = a_ptd.m_idata[IntIdx::work_i];
     auto workgroup_ptr = a_ptd.m_idata[IntIdx::workgroup];
     auto withdrawn_ptr = a_ptd.m_idata[IntIdx::withdrawn];
@@ -38,8 +36,7 @@ static void binaryInteractionWork ( const int a_i, /*!< Index of infectious agen
     //infect *= j_mask;
     ParticleReal prob = 1.0_prt;
 
-    // Work  Original Code
-    // Workgroup transmission
+    /* Workgroup transmission */
     if (workgroup_ptr[a_i] && (work_i_ptr[a_i] >= 0)) { // transmitter i at work
         if ((work_i_ptr[a_j] >= 0) && (workgroup_ptr[a_i] == workgroup_ptr[a_j])) {  // coworker
             prob *= 1.0_prt - infect * a_lparm->xmit_work * a_work_scale;
@@ -48,8 +45,6 @@ static void binaryInteractionWork ( const int a_i, /*!< Index of infectious agen
 
     Gpu::Atomic::Multiply(&a_prob_ptr[a_j], prob);
 }
-
-
 
 /*! \brief Class describing agent interactions at work */
 template <typename AC, typename ACT, typename ACTD, typename A>
@@ -176,4 +171,3 @@ void InteractionModWork<AC,ACT,ACTD,A>::interactAgents(AC& a_agents, /*!< Agent 
 }
 
 #endif
-
