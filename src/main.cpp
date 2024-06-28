@@ -381,46 +381,6 @@ void runAgent ()
             //            pc.Redistribute();
 
             cur_time += 1.0_rt; // time step is one day
-            if ( i==0 ) //|| i ==  params.nsteps -1)
-            {
-                //pc.printCounts(worker_counts, unit_mf, demo);
-                pc.printWorkersAndTeachers(demo, unit_mf);
-                /*
-                for (amrex::MFIter mfi(unit_mf, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
-                    // Get the valid box for this tile
-                    const amrex::Box& bx = mfi.validbox();
-                    // Access the array of this tile
-                    const auto& unit_arr = unit_mf[mfi].array();
-                    const auto& comm_arr = comm_mf[mfi].array();
-                    const auto& student_counts_arr = pc.getStudentCounts()[mfi].array();
-                    const auto& teacher_counts_arr = pc.getTeacherCounts()[mfi].array();
-
-                    // Loop over all the indices in the valid box
-                    for (amrex::IntVect iv = bx.smallEnd(); iv <= bx.bigEnd(); bx.next(iv)) {
-                        int i = iv[0];
-                        int j = iv[1];
-                        int k = iv[2];
-
-                        // Print the value at this index
-                        std::cout << "--------------------------------------- \n unit_mf(" << i << ", " << j << ", " << k << ") = " << unit_arr(i, j, k) << std::endl;
-                        std::cout << "comm_mf(" << i << ", " << j << ", " << k << ") = " << comm_arr(i,j, k) << std::endl;
-                        std::cout << "std_count_mf(" << i << ", " << j << ", " << k << ") = " << student_counts_arr(i,j, k, SchoolType::total) << std::endl;
-                        std::cout << "std_count_mf(" << i << ", " << j << ", " << k << ") = " << student_counts_arr(i,j, k, SchoolType::elem_3) << std::endl;
-                        std::cout << "std_count_mf(" << i << ", " << j << ", " << k << ") = " << student_counts_arr(i,j, k, SchoolType::elem_4) << std::endl;
-                        std::cout << "std_count_mf(" << i << ", " << j << ", " << k << ") = " << student_counts_arr(i,j, k, SchoolType::middle) << std::endl;
-                        std::cout << "std_count_mf(" << i << ", " << j << ", " << k << ") = " << student_counts_arr(i,j, k, SchoolType::high) << std::endl;
-                        std::cout << "std_count_mf(" << i << ", " << j << ", " << k << ") = " << student_counts_arr(i,j, k, SchoolType::day_care) << std::endl;
-                        std::cout << "teach_count_mf(" << i << ", " << j << ", " << k << ") = " << teacher_counts_arr(i,     j, k, SchoolType::total) << std::endl;
-                        std::cout << "teach_count_mf(" << i << ", " << j << ", " << k << ") = " << teacher_counts_arr(i,     j, k,SchoolType::elem_3) << std::endl;
-                        std::cout << "teach_count_mf(" << i << ", " << j << ", " << k << ") = " << teacher_counts_arr(i,     j, k,SchoolType::elem_4) << std::endl;
-                        std::cout << "teach_count_mf(" << i << ", " << j << ", " << k << ") = " << teacher_counts_arr(i,     j, k,SchoolType::middle) << std::endl;
-                        std::cout << "teach_count_mf(" << i << ", " << j << ", " << k << ") = " << teacher_counts_arr(i,     j, k,SchoolType::high) << std::endl;
-                        std::cout << "teach_count_mf(" << i << ", " << j << ", " << k << ") = " << teacher_counts_arr(i,     j, k, SchoolType::day_care) << std::endl;
-
-
-                    }
-                }*/
-            }
         }
     }
 
