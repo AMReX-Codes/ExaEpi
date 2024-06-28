@@ -132,6 +132,12 @@ namespace Initialization
 
     const Box& domain = pc.Geom(0).Domain();
 
+    const auto& teacherCounts = pc.getTeacherCounts();
+    amrex::iMultiFab newTeacherCounts(teacherCounts.boxArray(), teacherCounts.DistributionMap(), teacherCounts.nComp(), teacherCounts.nGrow());
+    // Copy the data from the const multifab to the mutable multifab
+    amrex::iMultiFab::Copy(newTeacherCounts, teacherCounts, 0, 0, teacherCounts.nComp(), teacherCounts.nGrow());
+
+
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
 #endif
@@ -159,37 +165,11 @@ namespace Initialization
         auto Ncommunity = demo.Ncommunity;
         auto Nunit = demo.Nunit;
 
-        // Retrieving teacher counts from the AgentContainer
-        auto total_teacher_counts = pc.getUnitTotalTeacherCounts();
-        auto elem4_teacher_counts = pc.getUnitElem4TeacherCounts();
-        auto elem3_teacher_counts = pc.getUnitElem3TeacherCounts();
-        auto midl_teacher_counts = pc.getUnitMidlTeacherCounts();
-        auto high_teacher_counts = pc.getUnitHighTeacherCounts();
-        auto daycr_teacher_counts = pc.getUnitDaycrTeacherCounts();
-
-        auto total_teacher_counts_ptr = total_teacher_counts.data();
-        auto elem4_teacher_counts_ptr = elem4_teacher_counts.data();
-        auto elem3_teacher_counts_ptr = elem3_teacher_counts.data();
-        auto midl_teacher_counts_ptr = midl_teacher_counts.data();
-        auto high_teacher_counts_ptr = high_teacher_counts.data();
-        auto daycr_teacher_counts_ptr = daycr_teacher_counts.data();
-
-        // Variables for tracking teacher counts
-         // Device scalars for tracking teacher counts
-        amrex::Gpu::DeviceScalar<int> elem4_teachers(0);
-        amrex::Gpu::DeviceScalar<int> elem3_teachers(0);
-        amrex::Gpu::DeviceScalar<int> middle_teachers(0);
-        amrex::Gpu::DeviceScalar<int> high_teachers(0);
-        amrex::Gpu::DeviceScalar<int> daycr_teachers(0);
-
-        auto d_elem4_teachers = elem4_teachers.dataPtr();
-        auto d_elem3_teachers = elem3_teachers.dataPtr();
-        auto d_middle_teachers = middle_teachers.dataPtr();
-        auto d_high_teachers = high_teachers.dataPtr();
-        auto d_daycr_teachers = daycr_teachers.dataPtr();
+        auto totalTeacherCounts_arr = newTeacherCounts[mfi].array();
+        auto unit_teacher_count = pc.getUnitTeacherCounts().data();
 
         // First Assign working community
-        amrex::ParallelForRNG( np,
+        amrex::ParallelForRNG(np,
             [=] AMREX_GPU_DEVICE (int ip, RandomEngine const& engine) noexcept
             {
                 auto from = unit_arr(home_i_ptr[ip], home_j_ptr[ip], 0);
@@ -201,7 +181,7 @@ namespace Initialization
 
                 int age_group = age_group_ptr[ip];
                 /* Check working-age population */
-                if ((age_group == 2) || (age_group == 3))  {
+                if ((age_group == 2) || (age_group == 3)) {
                     unsigned int irnd = amrex::Random_int(nwork, engine);
                     int to = 0;
                     int comm_to = 0;
@@ -211,7 +191,7 @@ namespace Initialization
                         while (irnd >= flow[from][to]) { to++; }
                     }
 
-                    /*If from=to unit, 25% EXTRA chance of working in home community*/
+                    /* If from=to unit, 25% EXTRA chance of working in home community */
                     if ((from == to) && (amrex::Random(engine) < 0.25)) {
                         comm_to = comm_arr(home_i_ptr[ip], home_j_ptr[ip], 0);
                     } else {
@@ -225,21 +205,23 @@ namespace Initialization
                     work_j_ptr[ip] = comm_to_iv[1];
                     school_ptr[ip] = -1;
 
-                    int elem3_teacher_count = *d_elem3_teachers;
-                    int elem4_teacher_count = *d_elem4_teachers;
-                    int middle_teacher_count = *d_middle_teachers;
-                    int high_teacher_count = *d_high_teachers;
-                    int daycr_teacher_count = *d_daycr_teachers;
+                    int total_elem3 = totalTeacherCounts_arr(work_i_ptr[ip], work_j_ptr[ip], 0, SchoolType::elem_3);
+                    int total_elem4 = totalTeacherCounts_arr(work_i_ptr[ip], work_j_ptr[ip], 0, SchoolType::elem_4);
+                    int total_middle = totalTeacherCounts_arr(work_i_ptr[ip], work_j_ptr[ip], 0, SchoolType::middle);
+                    int total_high = totalTeacherCounts_arr(work_i_ptr[ip], work_j_ptr[ip], 0, SchoolType::high);
+                    int total_daycare = totalTeacherCounts_arr(work_i_ptr[ip], work_j_ptr[ip], 0, SchoolType::day_care);
 
                     // 25% chance of being a teacher if in working-age population (until max_teacher_numb is met)
-                    if (amrex::Random(engine) < 0.25 && (elem3_teacher_count + elem4_teacher_count + middle_teacher_count + high_teacher_count + daycr_teacher_count) < total_teacher_counts_ptr[to])
+                    if (amrex::Random(engine) < 0.25 && ((total_elem3 + total_elem4
+                                                        + total_middle + total_high
+                                                        + total_daycare) > 0))
                     {
                         int available_slots[5] = {
-                            elem3_teacher_count < elem3_teacher_counts_ptr[to],
-                            elem4_teacher_count < elem4_teacher_counts_ptr[to],
-                            middle_teacher_count < midl_teacher_counts_ptr[to],
-                            high_teacher_count < high_teacher_counts_ptr[to],
-                            daycr_teacher_count < daycr_teacher_counts_ptr[to]
+                            total_elem3 > 0,
+                            total_elem4 > 0,
+                            total_middle > 0,
+                            total_high > 0,
+                            total_daycare > 0
                         };
 
                         int total_available = available_slots[0] + available_slots[1] + available_slots[2] + available_slots[3] + available_slots[4];
@@ -247,51 +229,47 @@ namespace Initialization
                         if (total_available > 0)
                         {
                             int choice = amrex::Random_int(total_available, engine);
-                            if (choice < available_slots[0]) {
+                            if (available_slots[0] && choice-- == 0) {
                                 school_ptr[ip] = 3;  // elementary 3 school
-                                workgroup_ptr[ip] = 3 ;
-                                amrex::Gpu::Atomic::AddNoRet(d_elem3_teachers, 1);
-                            } else if (choice < available_slots[0] + available_slots[1]) {
+                                workgroup_ptr[ip] = 3;
+                                amrex::Gpu::Atomic::AddNoRet(&totalTeacherCounts_arr(work_i_ptr[ip], work_j_ptr[ip], 0, SchoolType::elem_3), -1);
+                            } else if (available_slots[1] && choice-- == 0)  {
                                 school_ptr[ip] = 4;  // elementary 4 school
-                                workgroup_ptr[ip] = 4 ;
-                                amrex::Gpu::Atomic::AddNoRet(d_elem4_teachers, 1);
-                            } else if (choice < available_slots[0] + available_slots[1] + available_slots[2]) {
+                                workgroup_ptr[ip] = 4;
+                                amrex::Gpu::Atomic::AddNoRet(&totalTeacherCounts_arr(work_i_ptr[ip], work_j_ptr[ip], 0, SchoolType::elem_4), -1);
+                            } else if (available_slots[2] && choice-- == 0) {
                                 school_ptr[ip] = 2;  // middle school
-                                workgroup_ptr[ip] = 2 ;
-                                amrex::Gpu::Atomic::AddNoRet(d_middle_teachers, 1);
-                            } else if (choice < available_slots[0] + available_slots[1] + available_slots[2] + available_slots[3]) {
+                                workgroup_ptr[ip] = 2;
+                                amrex::Gpu::Atomic::AddNoRet(&totalTeacherCounts_arr(work_i_ptr[ip], work_j_ptr[ip], 0, SchoolType::middle ), -1);
+                            } else if (available_slots[3] && choice-- == 0) {
                                 school_ptr[ip] = 1;  // high school
-                                workgroup_ptr[ip] = 1 ;
-                                amrex::Gpu::Atomic::AddNoRet(d_high_teachers, 1);
-                            } else if (choice < total_available) {
+                                workgroup_ptr[ip] = 1;
+                                amrex::Gpu::Atomic::AddNoRet(&totalTeacherCounts_arr(work_i_ptr[ip], work_j_ptr[ip], 0, SchoolType::high), -1);
+                            } else if (available_slots[4] && choice-- == 0) {
                                 school_ptr[ip] = 5;  // day care
-                                workgroup_ptr[ip] = 5 ;
-                                amrex::Gpu::Atomic::AddNoRet(d_daycr_teachers, 1);
+                                workgroup_ptr[ip] = 5;
+                                amrex::Gpu::Atomic::AddNoRet(&totalTeacherCounts_arr(work_i_ptr[ip], work_j_ptr[ip], 0, SchoolType::day_care), -1);
                             }
                         }
-
-
                     }
                     else
                     {
                         constexpr int WG_size = 20;
-                        number = (unsigned int) rint( ((Real) Ndaywork[to]) /
-                                 ((Real) WG_size * (Start[to+1] - Start[to])) );
+                        number = (unsigned int) rint(((Real) Ndaywork[to] - unit_teacher_count[to])/
+                                                    ((Real) WG_size * (Start[to+1] - Start[to])));
 
-                        work_nborhood_ptr[ip]=4*(amrex::Random_int(4, engine))+nborhood_ptr[ip];
+                        work_nborhood_ptr[ip] = 4 * (amrex::Random_int(4, engine)) + nborhood_ptr[ip];
 
                         if (number) {
                             workgroup_ptr[ip] = 6 + amrex::Random_int(number, engine);
-                        }
-                        else {
+                        } else {
                             workgroup_ptr[ip] = 6;
                         }
-
                     }
-
                 }
             });
-            amrex::Gpu::Device::synchronize();
+
+        amrex::Gpu::Device::synchronize();
 
         }
     }

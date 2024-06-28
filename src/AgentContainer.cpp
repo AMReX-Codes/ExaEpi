@@ -1,4 +1,3 @@
-
 /*! @file AgentContainer.cpp
     \brief Function implementations for #AgentContainer class
 */
@@ -365,21 +364,11 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,    /*!< Number 
     iMultiFab fam_id (num_residents.boxArray(), num_residents.DistributionMap(), 7, 0);
     num_families.setVal(0);
 
-    // Initialize teachers variables
     auto Nunit = demo.Nunit;
-    Unit_total_teacher_counts.resize(Nunit, 0);
-    Unit_elem3_teacher_counts.resize(Nunit, 0);
-    Unit_elem4_teacher_counts.resize(Nunit, 0);
-    Unit_midl_teacher_counts.resize(Nunit, 0);
-    Unit_high_teacher_counts.resize(Nunit, 0);
-    Unit_daycr_teacher_counts.resize(Nunit, 0);
+    unit_teacher_counts_d.resize(Nunit, 0);
 
-    auto Unit_total_teacher_counts_ptr = Unit_total_teacher_counts.data();
-    auto Unit_elem3_teacher_counts_ptr = Unit_elem3_teacher_counts.data();
-    auto Unit_elem4_teacher_counts_ptr = Unit_elem4_teacher_counts.data();
-    auto Unit_midl_teacher_counts_ptr = Unit_midl_teacher_counts.data();
-    auto Unit_high_teacher_counts_ptr = Unit_high_teacher_counts.data();
-    auto Unit_daycr_teacher_counts_ptr = Unit_daycr_teacher_counts.data();
+    amrex::Gpu::DeviceVector<int> teacher_student_ratios_d(teacher_student_ratios.size());
+    amrex::Gpu::copy(amrex::Gpu::hostToDevice, teacher_student_ratios.begin(), teacher_student_ratios.end(), teacher_student_ratios_d.begin());
 
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
@@ -413,6 +402,8 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,    /*!< Number 
         //auto N65plus = demo.N65plus_d.data();
 
         auto Ncommunity = demo.Ncommunity;
+        auto ratios = teacher_student_ratios_d.dataPtr();
+        auto unit_teacher_counts_d_ptr = unit_teacher_counts_d.data();
 
         auto bx = mfi.tilebox();
         amrex::ParallelForRNG(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k, amrex::RandomEngine const& engine) noexcept
@@ -538,7 +529,6 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,    /*!< Number 
         auto student_counts_arr = student_counts[mfi].array();
         auto teacher_counts_arr = teacher_counts[mfi].array();
 
-
         Long pid;
 #ifdef AMREX_USE_OMP
 #pragma omp critical (init_agents_nextid)
@@ -657,7 +647,6 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,    /*!< Number 
                 work_nborhood_ptr[ip] = 5*nborhood;
                 workgroup_ptr[ip] = 0;
 
-
                 if (age_group == 0) {
                     school_ptr[ip] = 5; // note - need to handle playgroups
                 } else if (age_group == 1) {
@@ -667,49 +656,40 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,    /*!< Number 
                 }
 
                 // Increment the appropriate student counter based on the school assignment
-                if (school_ptr[ip] == 3) {
-                    amrex::Gpu::Atomic::AddNoRet(&student_counts_arr(i, j, 3), 1);  // Elementary school 3
-                } else if (school_ptr[ip] == 4) {
-                    amrex::Gpu::Atomic::AddNoRet(&student_counts_arr(i, j, 4), 1);  // Elementary school 4
-                } else if (school_ptr[ip] == 2) {
-                    amrex::Gpu::Atomic::AddNoRet(&student_counts_arr(i, j, 2), 1);  // Middle school
-                } else if (school_ptr[ip] == 1) {
-                    amrex::Gpu::Atomic::AddNoRet(&student_counts_arr(i, j, 1), 1);  // High school
-                } else if (school_ptr[ip] == 5) {
-                    amrex::Gpu::Atomic::AddNoRet(&student_counts_arr(i, j, 0), 1);  // Playgroups + Day care
+                if (school_ptr[ip] == SchoolType::elem_3) {
+                    amrex::Gpu::Atomic::AddNoRet(&student_counts_arr(i, j, k, SchoolType::elem_3), 1);
+                } else if (school_ptr[ip] == SchoolType::elem_4) {
+                    amrex::Gpu::Atomic::AddNoRet(&student_counts_arr(i, j, k, SchoolType::elem_4), 1);
+                } else if (school_ptr[ip] == SchoolType::middle) {
+                    amrex::Gpu::Atomic::AddNoRet(&student_counts_arr(i, j, k, SchoolType::middle), 1);
+                } else if (school_ptr[ip] == SchoolType::high) {
+                    amrex::Gpu::Atomic::AddNoRet(&student_counts_arr(i, j, k, SchoolType::high), 1);
+                } else if (school_ptr[ip] == SchoolType::day_care) {
+                    amrex::Gpu::Atomic::AddNoRet(&student_counts_arr(i, j, k, SchoolType::day_care), 1);
                 }
+
+                if (school_ptr[ip]>0) {amrex::Gpu::Atomic::AddNoRet(&student_counts_arr(i, j, k, SchoolType::total), 1); }
 
             }
         });
 
-        /*
-        Code number
-        0 = daycare for now -- Handle Preschool later
-        1 = high school
-        2 = middle
-        3 = elementary neighborhood 1
-        4 = elementary neighborhood 2
-        */
-
         amrex::ParallelFor(bx,
             [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
         {
-            if (k == 0){ // avoid double compute
-                teacher_counts_arr(i, j, 0) = (student_counts_arr(i, j, 0) + 19)  / 20;
-                teacher_counts_arr(i, j, 1) = (student_counts_arr(i, j, 1) + 19)  / 20;
-                teacher_counts_arr(i, j, 2) = (student_counts_arr(i, j, 2) + 19)  / 20;
-                teacher_counts_arr(i, j, 3) = (student_counts_arr(i, j, 3) + 19)  / 20;
-                teacher_counts_arr(i, j, 4) = (student_counts_arr(i, j, 4) + 19)  / 20;
-                int total = teacher_counts_arr(i, j, 0) + teacher_counts_arr(i, j, 1) + teacher_counts_arr(i, j, 2) + teacher_counts_arr(i, j, 3) + teacher_counts_arr(i, j, 4);
-                teacher_counts_arr(i, j, 5) = total;
 
-                amrex::Gpu::Atomic::AddNoRet(&Unit_total_teacher_counts_ptr[unit_arr(i,j,0)], total);
-                amrex::Gpu::Atomic::AddNoRet(&Unit_elem3_teacher_counts_ptr[unit_arr(i,j,0)], teacher_counts_arr(i, j, 3));
-                amrex::Gpu::Atomic::AddNoRet(&Unit_elem4_teacher_counts_ptr[unit_arr(i,j,0)], teacher_counts_arr(i, j, 4));
-                amrex::Gpu::Atomic::AddNoRet(&Unit_midl_teacher_counts_ptr[unit_arr(i,j,0)] , teacher_counts_arr(i, j, 2));
-                amrex::Gpu::Atomic::AddNoRet(&Unit_high_teacher_counts_ptr[unit_arr(i,j,0)] , teacher_counts_arr(i, j, 1));
-                amrex::Gpu::Atomic::AddNoRet(&Unit_daycr_teacher_counts_ptr[unit_arr(i,j,0)]  , teacher_counts_arr(i, j, 0));
-            }
+            teacher_counts_arr(i, j, k, SchoolType::elem_3)   = (unsigned int) rint((double)(student_counts_arr(i, j, k, SchoolType::elem_3)   + (ratios[SchoolType::elem_3] - 1))   / ((double)ratios[SchoolType::elem_3]));
+            teacher_counts_arr(i, j, k, SchoolType::elem_4)   = (student_counts_arr(i, j, k, SchoolType::elem_4)   + (ratios[SchoolType::elem_4] - 1))   / ratios[SchoolType::elem_4];
+            teacher_counts_arr(i, j, k, SchoolType::middle)   = (student_counts_arr(i, j, k, SchoolType::middle)   + (ratios[SchoolType::middle] - 1))   / ratios[SchoolType::middle];
+            teacher_counts_arr(i, j, k, SchoolType::high)     = (student_counts_arr(i, j, k, SchoolType::high)     + (ratios[SchoolType::high]   - 1))   / ratios[SchoolType::high];
+            teacher_counts_arr(i, j, k, SchoolType::day_care) = (student_counts_arr(i, j, k, SchoolType::day_care) + (ratios[SchoolType::day_care] - 1)) / ratios[SchoolType::day_care];
+
+            int total = teacher_counts_arr(i, j, k, SchoolType::day_care)
+                      + teacher_counts_arr(i, j, k, SchoolType::elem_4)
+                      + teacher_counts_arr(i, j, k, SchoolType::elem_3)
+                      + teacher_counts_arr(i, j, k, SchoolType::middle)
+                      + teacher_counts_arr(i, j, k, SchoolType::high);
+            teacher_counts_arr(i, j, k, SchoolType::total) = total;
+            amrex::Gpu::Atomic::AddNoRet(&unit_teacher_counts_d_ptr[unit_arr(i,j,k,0)],total);
         });
     }
 

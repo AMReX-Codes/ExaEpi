@@ -67,6 +67,20 @@ struct IntIdxDisease
     };
 };
 
+/*! \brief School Type  */
+struct SchoolType
+{
+    enum {
+        total = 0,   /*!< All School type */
+        high = 1,    /*!< High School */
+        middle,      /*!< Middle School */
+        elem_3,      /*!< Elementary School Neighbordhoo 1 */
+        elem_4,      /*!< Elementary School Neighbordhoo 1 */
+        day_care,     /*!< Day care + Playground */
+        total_school_type
+    };
+};
+
 /*! \brief Disease status */
 struct Status
 {
@@ -152,4 +166,3 @@ bool notSusceptible ( const int      a_idx, /*!< Agent index */
 }
 
 #endif
-

@@ -1,4 +1,3 @@
-
 /*! @file AgentContainer.H
     \brief Contains #AgentContainer class and related structs
 */
@@ -76,7 +75,7 @@ public:
                                     0,
                                     RealIdx::nattribs,
                                     IntIdx::nattribs> (a_geom, a_dmap, a_ba),
-          student_counts(a_ba, a_dmap, 5, 0),
+          student_counts(a_ba, a_dmap, 6, 0),
           teacher_counts(a_ba, a_dmap, 6, 0)
     {
         BL_PROFILE("AgentContainer::AgentContainer");
@@ -94,6 +93,8 @@ public:
             pp.query("symptomatic_withdraw", m_symptomatic_withdraw);
             pp.query("shelter_compliance", m_shelter_compliance);
             pp.query("symptomatic_withdraw_compliance", m_symptomatic_withdraw_compliance);
+            pp.queryarr("teacher_student_ratios", teacher_student_ratios);
+
         }
 
         {
@@ -300,35 +301,17 @@ public:
     }
 
     /* Since read_workerflow update worker status Unit-wise and not community-wise - Get total teacher needed for each unit */
-    inline const amrex::Gpu::DeviceVector<int>& getUnitTotalTeacherCounts() const {
-        return Unit_total_teacher_counts;
+    inline const amrex::Gpu::DeviceVector<int>& getUnitTeacherCounts() const {
+        return unit_teacher_counts_d;
     }
-    inline const amrex::Gpu::DeviceVector<int>& getUnitElem3TeacherCounts() const {
-        return Unit_elem3_teacher_counts;
-    }
-    inline const amrex::Gpu::DeviceVector<int>& getUnitElem4TeacherCounts() const {
-        return Unit_elem4_teacher_counts;
-    }
-    inline const amrex::Gpu::DeviceVector<int>& getUnitMidlTeacherCounts() const {
-        return Unit_midl_teacher_counts;
-    }
-    inline const amrex::Gpu::DeviceVector<int>& getUnitHighTeacherCounts() const {
-        return Unit_high_teacher_counts;
-    }
-    inline const amrex::Gpu::DeviceVector<int>& getUnitDaycrTeacherCounts() const {
-        return Unit_daycr_teacher_counts;
-    }
+
+    inline const amrex::iMultiFab& getTeacherCounts() const { return teacher_counts; }
 
 protected:
 
     amrex::iMultiFab student_counts;
     amrex::iMultiFab teacher_counts;
-    amrex::Gpu::DeviceVector<int> Unit_total_teacher_counts;
-    amrex::Gpu::DeviceVector<int> Unit_elem3_teacher_counts;
-    amrex::Gpu::DeviceVector<int> Unit_elem4_teacher_counts;
-    amrex::Gpu::DeviceVector<int> Unit_midl_teacher_counts;
-    amrex::Gpu::DeviceVector<int> Unit_high_teacher_counts;
-    amrex::Gpu::DeviceVector<int> Unit_daycr_teacher_counts;
+    amrex::Gpu::DeviceVector<int> unit_teacher_counts_d;
 
     int m_num_diseases; /*!< Number of diseases */
     std::vector<std::string> m_disease_names; /*!< names of the diseases */
@@ -337,6 +320,7 @@ protected:
 
     amrex::Real m_shelter_compliance = 0.95_rt;
     amrex::Real m_symptomatic_withdraw_compliance = 0.95_rt;
+    std::vector<int> teacher_student_ratios = {20, 20, 20, 20, 20, 1000}; // ignore daycare teachers since daycare interaction isnt handled yet!
 
     std::vector<DiseaseParm*> h_parm;    /*!< Disease parameters */
     std::vector<DiseaseParm*> d_parm;    /*!< Disease parameters (GPU device) */
