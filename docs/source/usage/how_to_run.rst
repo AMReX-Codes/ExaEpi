@@ -26,8 +26,13 @@ Runtime parameters are specified in an `inputs` file, which is required to run E
 An example `inputs` file can be bound at `ExaEpi/examples/inputs`. Below, we document
 the runtime parameters than can be set in the inputs file.
 
-In addition to the ExaEpi inputs, there are also a number of runtime options that can be configured for AMReX itself. Please see XXX for more information on these options.
+The following are inputs for the overall simulation:
 
+* ``agent.number_of_diseases`` (`integer`)
+    The number of diseases to track. (Default is ``1``).
+* ``agent.disease_names`` (vector of `strings`)
+    Names of the diseases; the size of the vector must be the same as ``agent.number_of_diseases``.
+    If unspecified, the disease names are set as ``default00``, ``default01``, ``...``.
 * ``agent.ic_type`` (`string`: either ``"census"`` or ``"demo"``)
     If ``"census"``, initial conditions will be read from the provided census data file.
     If ``"demo"``, agents will be initialized according to a power law distribution.
@@ -40,15 +45,29 @@ In addition to the ExaEpi inputs, there are also a number of runtime options tha
     The path to the ``*.bin`` file containing worker flow information.
     Must be provided if ``ic_type`` is ``"census"``. Examples of these data files are provided
     in ``ExaEpi/data/CensusData``.
-* ``agent.initial_case_type`` (`string`)
-    Either ``random`` or ``file``. If ``random``, ``agent.num_initial_cases`` must be set.
+* ``agent.initial_case_type`` (vector of `strings`: each of which is either ``"random"`` or ``"file"``)
+    The size of the vector must be the same as ``agent.number_of_diseases``.
+    If ``random``, ``agent.num_initial_cases`` must be set.
     If ``file``, ``agent.case_filename`` must be set. Must be provided if ``ic_type`` is ``"census"``.
 * ``agent.case_filename`` (`string`)
-    The path to the ``*.cases`` file containing the initial case data to use.
-    Must be provided if ``initial_case_type`` is ``"file"``. Examples of these data files are provided
-    in ``ExaEpi/data/CaseData``.
+    When ``agent.number_of_diseases = 1``: The path to the ``*.cases`` file containing the initial case
+    data to use. Must be provided if ``initial_case_type`` is ``"file"``. Examples of these data files
+    are provided in ``ExaEpi/data/CaseData``.
+* ``agent.case_filename_[disease name]`` (`string`)
+    When ``agent.number_of_diseases > 1``:
+    The path to the ``*.cases`` file containing the initial case data for ``[disease name]`` to use,
+    where ``[disease name]`` is from the list of names specified in ``agent.disease_names`` (or the
+    the default value).
+    Must be provided if ``initial_case_type`` for ``[disease name]`` is ``"file"``;
+    Examples of these data files are provided in ``ExaEpi/data/CaseData``.
 * ``agent.num_initial_cases`` (int)
-    The number of initial cases to seed. Must be provided if ``initial_case_type`` is ``"random"``.
+    When ``agent.number_of_diseases = 1``:  The number of initial cases to seed. Must be provided if
+    ``initial_case_type`` is ``"random"``.
+* ``agent.num_initial_cases_[disease name]`` (int)
+    When ``agent.number_of_diseases > 1``:  The number of initial cases for to seed for ``[disease name]``,
+    where ``[disease name]`` is any of the names specified in ``agent.disease_names`` (or the
+    the default value).
+    Must be provided if ``initial_case_type`` is ``"random"`` for ``[disease name]``.
 * ``agent.nsteps`` (`integer`)
     The number of days to simulate.
 * ``agent.plot_int`` (`integer`)
@@ -73,8 +92,23 @@ In addition to the ExaEpi inputs, there are also a number of runtime options tha
     Whether or not to have symptomatic agents withdraw.
 * ``agent.symptomatic_withdraw_compliance`` (`float`, default: 0.95)
     Compliance rate for agents withdrawing when they have symptoms. Should be 0.0 to 1.0.
-* ``agent.shelter_compliance`` (`float`)
-    Fraction of agents that comply with shelter-in-place order.
+* ``agents.size`` (`tuple of 2 integers`: e.g. ``(1, 1)``, default: ``(1, 1)``)
+    This option is deprecated and will removed in a future version of ExaEpi. It controls
+    the number of cells in the domain when running in `demo` mode. During actual usage,
+    this number will be overridden and is irrelevant.
+* ``agent.max_grid_size`` (`integer`, default: ``16``)
+    This option sets the maximum grid size used for MPI domain decomposition. If set to
+    ``16``, for example, the domain will be broken up into grids of `16^2` communities, and
+    these grids will be assigned to different MPI ranks / GPUs.
+* ``diag.output_filename`` (vector of `strings`, default: ``output.dat``, ``output_[disease name].dat``)
+    Filename for the output data; the size of the vector must be the same as ``agent.number_of_diseases``.
+    The default is ``output.dat`` for ``agent.number_of_diseases = 1`` and ``output_[disease name].dat``
+    for ``agent.number_of_diseases > 1``, where ``[disease name]`` is from the list of names specified
+    in ``agent.disease_names`` (or the default values).
+
+
+The following inputs specify the transmission parameters:
+
 * ``contact.pSC`` (`float`, default: 0.2)
     This is contact matrix scaling factor for schools.
 * ``contact.pCO`` (`float`, default: 1.45)
@@ -88,6 +122,9 @@ In addition to the ExaEpi inputs, there are also a number of runtime options tha
 * ``contact.pBAR`` (`float`, default: -1.0)
     This is contact matrix scaling factor for bars or other large social gatherings.
     Setting this to < 0 turns this transmission off.
+
+The following inputs specify the disease parameters:
+
 * ``disease.nstrain`` (`integer`)
     The number of disease strains we're modeling.
 * ``disease.p_trans`` (`list of float`, example: ``0.2 0.3``)
@@ -117,17 +154,15 @@ In addition to the ExaEpi inputs, there are also a number of runtime options tha
     Standard deviation of the infectious period in days.
 * ``disease.symptomdev_length_std`` (`float`, default: ``1.0``)
     Standard deviation of the time until symptom development in days.
-* ``agents.size`` (`tuple of 2 integers`: e.g. ``(1, 1)``, default: ``(1, 1)``)
-    This option is deprecated and will removed in a future version of ExaEpi. It controls
-    the number of cells in the domain when running in `demo` mode. During actual usage,
-    this number will be overridden and is irrelevant.
-* ``agent.max_grid_size`` (`integer`, default: ``16``)
-    This option sets the maximum grid size used for MPI domain decomposition. If set to
-    ``16``, for example, the domain will be broken up into grids of `16^2` communities, and
-    these grids will be assigned to different MPI ranks / GPUs.
-* ``diag.output_filename`` (`string`, default: ``output.dat``)
-    Filename for the output data.
 
+`Note`: for ``agent.number_of_diseases > 1``, the disease parameters that are common
+to all the diseases can be specified as above. Any parameter that is `different for a specific disease`
+can be specified as follows:
+
+* ``disease_[disease name].[key] = [value]``
+
+where ``[disease name]`` is any of the names specified in ``agent.disease_names`` (or the
+default value), and ``[key]`` is any of the parameters listed above.
 
 In addition to the ExaEpi inputs, there are also a number of runtime options that can be configured for AMReX itself. Please see <https://amrex-codes.github.io/amrex/docs_html/GPU.html#inputs-parameters>`__ for more information on these options.
 

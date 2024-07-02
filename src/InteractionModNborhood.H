@@ -91,12 +91,12 @@ class InteractionModNborhood : public InteractionModel<AC,ACT,ACTD,A>
     + For each agent *i* in the bin-sorted array of agents:
       + Find its bin and the range of indices in the bin-sorted array for agents in its bin
       + If the agent is #Status::immune, do nothing.
-      + If the agent is #Status::infected with the number of days infected (RealIdx::disease_counter)
-        less than the #DiseaseParm::incubation_length, do nothing.
+      + If the agent is #Status::infected with the number of days infected (RealIdxDisease::disease_counter)
+        less than the incubation length, do nothing.
       + Else, for each agent *j* in the same bin:
         + If the agent is #Status::immune, do nothing.
-        + If the agent is #Status::infected with the number of days infected (RealIdx::disease_counter)
-          less than the #DiseaseParm::incubation_length, do nothing.
+        + If the agent is #Status::infected with the number of days infected (RealIdxDisease::disease_counter)
+          less than the incubation length, do nothing.
         + Else if *i* is not infected and *j* is infected, compute probability of *i* getting infected
           from *j* (see below).
 
@@ -110,6 +110,7 @@ void InteractionModNborhood<AC,ACT,ACTD,A>::interactAgents( AC& a_agents, /*!< A
                                                             MultiFab& /*a_mask*/ /*!< Masking behavior */)
 {
     BL_PROFILE("InteractionModNborhood::interactAgents");
+    int n_disease = a_agents.numDiseases();
 
     IntVect bin_size = {AMREX_D_DECL(1, 1, 1)};
     for (int lev = 0; lev < a_agents.numLevels(); ++lev)
@@ -140,38 +141,41 @@ void InteractionModNborhood<AC,ACT,ACTD,A>::interactAgents( AC& a_agents, /*!< A
             auto inds = bins_ptr->permutationPtr();
             auto offsets = bins_ptr->offsetsPtr();
 
-            auto prob_ptr = this->getAgentProbPtr(a_agents,lev,mfi);
-            //auto mask_arr = a_mask[mfi].array();
-            auto lparm = a_agents.getDiseaseParameters_d();
+            for (int d = 0; d < n_disease; d++) {
+                auto prob_ptr = this->getAgentProbPtr(a_agents,lev,mfi,d);
+                //auto mask_arr = a_mask[mfi].array();
+                auto lparm = a_agents.getDiseaseParameters_d(d);
 
-            ParallelForRNG( bins_ptr->numItems(),
-                            [=] AMREX_GPU_DEVICE (int ii, RandomEngine const& /*engine*/)
-                            noexcept
-            {
-                auto i = inds[ii];
-                int i_cell = binner(pstruct_ptr[i]);
-                auto cell_start = offsets[i_cell];
-                auto cell_stop  = offsets[i_cell+1];
+                ParallelForRNG( bins_ptr->numItems(),
+                                [=] AMREX_GPU_DEVICE (int ii, RandomEngine const& /*engine*/)
+                                noexcept
+                {
+                    auto i = inds[ii];
+                    int i_cell = binner(pstruct_ptr[i]);
+                    auto cell_start = offsets[i_cell];
+                    auto cell_stop  = offsets[i_cell+1];
 
-                AMREX_ALWAYS_ASSERT( (Long) i < np);
-                if ( notSusceptible<ACTD>(i, ptd) )  { return; }
+                    AMREX_ALWAYS_ASSERT( (Long) i < np);
+                    if ( notSusceptible<ACTD>(i, ptd, d) )  { return; }
 
-                //Real i_mask = mask_arr(home_i_ptr[i], home_j_ptr[i], 0);
-                for (unsigned int jj = cell_start; jj < cell_stop; ++jj) {
+                    //Real i_mask = mask_arr(home_i_ptr[i], home_j_ptr[i], 0);
+                    for (unsigned int jj = cell_start; jj < cell_stop; ++jj) {
 
-                    auto j = inds[jj];
-                    AMREX_ALWAYS_ASSERT( (Long) j < np);
+                        auto j = inds[jj];
+                        AMREX_ALWAYS_ASSERT( (Long) j < np);
 
-                    //Real j_mask = mask_arr(home_i_ptr[j], home_j_ptr[j], 0);
-                    if (i == j) continue;
+                        //Real j_mask = mask_arr(home_i_ptr[j], home_j_ptr[j], 0);
+                        if (i == j) continue;
 
-                    if ( isInfectious<ACTD>(j, ptd) ) {
-                        Real social_scale = 1.0;  // TODO this should vary based on cell
-                        binaryInteractionNborhood<ACTD>( j, i, ptd, lparm, social_scale, prob_ptr );
+                        if ( isInfectious<ACTD>(j, ptd, d) ) {
+                            Real social_scale = 1.0_prt;  // TODO this should vary based on cell
+                            binaryInteractionNborhood<ACTD>( j, i, ptd, lparm, social_scale, prob_ptr );
+                        }
                     }
-                }
-            });
-            Gpu::synchronize();
+                });
+                Gpu::synchronize();
+            }
+
         }
     }
 }

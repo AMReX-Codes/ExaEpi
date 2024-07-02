@@ -63,12 +63,14 @@ class InteractionModel
         /*! \brief Get probability pointer from agent container */
         inline ParticleReal* getAgentProbPtr (  AC&           a_agents,  /*!< agent container */
                                                 const int     a_lev,     /*!< level */
-                                                const MFIter& a_mfi      /*!< multifab iterator*/ )
+                                                const MFIter& a_mfi,     /*!< multifab iterator*/
+                                                const int     a_d_idx    /*!< disease index */ )
         {
             BL_PROFILE("InteractionModel::getAgentProbPtr");
             auto& ptile = a_agents.ParticlesAt(a_lev, a_mfi);
             auto& soa   = ptile.GetStructOfArrays();
-            return soa.GetRealData(RealIdx::prob).data();
+            int r_RT = RealIdx::nattribs;
+            return soa.GetRealData(r_RT+r0(a_d_idx)+RealIdxDisease::prob).data();
         }
 
         /*! \brief Make particle bins for interactions at a given model */
