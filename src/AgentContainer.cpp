@@ -409,7 +409,6 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,    /*!< Number 
         //auto N64 = demo.N64_d.data();
         //auto N65plus = demo.N65plus_d.data();
 
-        auto Ncommunity = demo.Ncommunity;
         auto ratios = student_teacher_ratios_d.dataPtr();
         auto unit_teacher_counts_d_ptr = unit_teacher_counts_d.data();
         auto comm_teacher_counts_total_d_ptr = comm_teacher_counts_total_d.data();
@@ -691,11 +690,11 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,    /*!< Number 
         {
             int comm = comm_arr(i,j,k);
 
-            comm_teacher_counts_high_d_ptr[comm]   = (student_counts_arr(i, j, k, SchoolType::high))   / ((double)ratios[SchoolType::high]);
-            comm_teacher_counts_middle_d_ptr[comm] = (student_counts_arr(i, j, k, SchoolType::middle))   / ((double)ratios[SchoolType::middle]);
-            comm_teacher_counts_elem3_d_ptr[comm]  = (student_counts_arr(i, j, k, SchoolType::elem_3))   / ((double)ratios[SchoolType::elem_3]);
-            comm_teacher_counts_elem4_d_ptr[comm]  = (student_counts_arr(i, j, k, SchoolType::elem_4))   / ((double)ratios[SchoolType::elem_4]);
-            comm_teacher_counts_daycr_d_ptr[comm]  = (student_counts_arr(i, j, k, SchoolType::day_care))   / ((double)ratios[SchoolType::day_care]);
+            comm_teacher_counts_high_d_ptr[comm]   = (int)((student_counts_arr(i, j, k, SchoolType::high))     / (ratios[SchoolType::high]));
+            comm_teacher_counts_middle_d_ptr[comm] = (int)((student_counts_arr(i, j, k, SchoolType::middle))   / (ratios[SchoolType::middle]));
+            comm_teacher_counts_elem3_d_ptr[comm]  = (int)((student_counts_arr(i, j, k, SchoolType::elem_3))   / (ratios[SchoolType::elem_3]));
+            comm_teacher_counts_elem4_d_ptr[comm]  = (int)((student_counts_arr(i, j, k, SchoolType::elem_4))   / (ratios[SchoolType::elem_4]));
+            comm_teacher_counts_daycr_d_ptr[comm]  = (int)((student_counts_arr(i, j, k, SchoolType::day_care)) / (ratios[SchoolType::day_care]));
 
             int total = comm_teacher_counts_high_d_ptr[comm]
                       + comm_teacher_counts_middle_d_ptr[comm]
