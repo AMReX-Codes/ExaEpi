@@ -72,10 +72,10 @@ struct SchoolType
 {
     enum {
         total = 0,   /*!< All School type */
-        high = 1,    /*!< High School */
+        high,    /*!< High School */
         middle,      /*!< Middle School */
-        elem_3,      /*!< Elementary School Neighbordhoo 1 */
-        elem_4,      /*!< Elementary School Neighbordhoo 1 */
+        elem_3,      /*!< Elementary School Neighbordhood 1 */
+        elem_4,      /*!< Elementary School Neighbordhood 2 */
         day_care,     /*!< Day care + Playground */
         total_school_type
     };

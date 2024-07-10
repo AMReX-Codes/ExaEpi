@@ -44,7 +44,7 @@ struct DiseaseParm
     amrex::Real xmit_nc_child[5] = {amrex::Real(.15*pHCC0), amrex::Real(.15*pHCC1), amrex::Real(.08*pHC), amrex::Real(.08*pHC), amrex::Real(.08*pHC)};
     /*! Work transmission probabilities for each age group (<5, 5-17, 18-29, 30-64, 65+) */
     amrex::Real xmit_work = amrex::Real(0.115*pWO);
-    /*! School transmission probabilities for each age group (<5, 5-17, 18-29, 30-64, 65+) */
+    /*! School transmission probabilities for each school tyoe (High, Middle, Elem3/4 , Daycare/Playgroups */
     amrex::Real xmit_school[7] = {amrex::Real(0.), amrex::Real(.105*pHSC), amrex::Real(.125*pMSC), amrex::Real(.145*pESC), amrex::Real(.145*pESC), amrex::Real(.15), amrex::Real(.35)};
 
     /* Within family, from child or adult, for 5 age groups (here Thai paper, US:0.6->0.8)*/
@@ -58,9 +58,11 @@ struct DiseaseParm
                 xmit_nc_child_SC[5],  /*!< Transmission probability for neighborhood cluster (child) - school closed ?? */
                 xmit_nc_adult_SC[5];  /*!< Transmission probability for neighborhood cluster (adult) - school closed ?? */
     amrex::Real xmit_comm_SC[5],      /*!< Transmission probability in community - school closed */
-                xmit_hood_SC[5],      /*!< Transmission probability in neighborhood - school closed ?? */
-                xmit_sch_c2a[5],      /*!< Transmission probability in school - child to adult */
-                xmit_sch_a2c[5];      /*!< Transmission probability in school - adult to child */
+                xmit_hood_SC[5];      /*!< Transmission probability in neighborhood - school closed ?? */
+     /*!< Transmission probability in school - child to adult */
+    amrex::Real xmit_sch_c2a[7] = {amrex::Real(0.), amrex::Real(.105*pHSC), amrex::Real(.125*pMSC), amrex::Real(.145*pESC), amrex::Real(.145*pESC), amrex::Real(.15), amrex::Real(.35)};
+    /*!< Transmission probability in school - adult to child */
+    amrex::Real xmit_sch_a2c[7] = {amrex::Real(0.), amrex::Real(.105*pHSC), amrex::Real(.125*pMSC), amrex::Real(.145*pESC), amrex::Real(.145*pESC), amrex::Real(.15), amrex::Real(.35)};
 
     amrex::Real infect = amrex::Real(1.0); /*!< Overall multiplier for agent's infectiousness */
 
