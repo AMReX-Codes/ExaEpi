@@ -44,7 +44,7 @@ struct DiseaseParm
     amrex::Real xmit_nc_child[5] = {amrex::Real(.15*pHCC0), amrex::Real(.15*pHCC1), amrex::Real(.08*pHC), amrex::Real(.08*pHC), amrex::Real(.08*pHC)};
     /*! Work transmission probabilities for each age group (<5, 5-17, 18-29, 30-64, 65+) */
     amrex::Real xmit_work = amrex::Real(0.115*pWO);
-    /*! School transmission probabilities for each school tyoe (High, Middle, Elem3/4 , Daycare/Playgroups */
+    /*! School transmission probabilities for each school type (High, Middle, Elem3/4 , Daycare/Playgroups */
     amrex::Real xmit_school[7] = {amrex::Real(0.), amrex::Real(.105*pHSC), amrex::Real(.125*pMSC), amrex::Real(.145*pESC), amrex::Real(.145*pESC), amrex::Real(.15), amrex::Real(.35)};
 
     /* Within family, from child or adult, for 5 age groups (here Thai paper, US:0.6->0.8)*/
