@@ -92,6 +92,8 @@ The following are inputs for the overall simulation:
     Whether or not to have symptomatic agents withdraw.
 * ``agent.symptomatic_withdraw_compliance`` (`float`, default: 0.95)
     Compliance rate for agents withdrawing when they have symptoms. Should be 0.0 to 1.0.
+* ``agent.student_teacher_ratios`` (`list of integers`, default: ``20 20 20 20 20 1000000000``)
+    This option sets the desired student-teacher ratio for High School, Middle School, Elementary School in Neighborhood 1, Elementary School in Neighborhood 2, and Day Care, respectively. A large value of this ratio indicates that there should be 0 teachers in the associated school type (e.g., by default, there are no teachers assigned to Day Care).
 * ``agents.size`` (`tuple of 2 integers`: e.g. ``(1, 1)``, default: ``(1, 1)``)
     This option is deprecated and will removed in a future version of ExaEpi. It controls
     the number of cells in the domain when running in `demo` mode. During actual usage,

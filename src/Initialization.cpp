@@ -145,9 +145,7 @@ namespace Initialization
         auto home_j_ptr = soa.GetIntData(IntIdx::home_j).data();
         auto work_i_ptr = soa.GetIntData(IntIdx::work_i).data();
         auto work_j_ptr = soa.GetIntData(IntIdx::work_j).data();
-        auto nborhood_ptr = soa.GetIntData(IntIdx::nborhood).data();
         auto workgroup_ptr = soa.GetIntData(IntIdx::workgroup).data();
-        auto work_nborhood_ptr = soa.GetIntData(IntIdx::work_nborhood).data();
         auto np = soa.numParticles();
 
         auto unit_arr = unit_mf[mfi].array();
@@ -198,13 +196,127 @@ namespace Initialization
                     number = (unsigned int) rint( ((Real) Ndaywork[to]) /
                              ((Real) WG_size * (Start[to+1] - Start[to])) );
 
-                    work_nborhood_ptr[ip]=4*(amrex::Random_int(4, engine))+nborhood_ptr[ip];
-
                     if (number) {
                         workgroup_ptr[ip] = 1 + amrex::Random_int(number, engine);
                     }
                 }
             });
+        }
+        assignTeachersAndWorkgroup(demo,unit_mf,comm_mf,pc);
+    }
+
+    void assignTeachersAndWorkgroup (const DemographicData& demo,  /*!< Demographic data */
+                          const iMultiFab& unit_mf,     /*!< MultiFab with unit number at each grid cell */
+                          const iMultiFab& comm_mf,     /*!< MultiFab with community number at each grid cell */
+                          AgentContainer& pc            /*!< Agent container (particle container) */ )
+    {
+        auto total_teacher_unit = pc.getUnitTeacherCounts();
+
+        auto total_teacher_counts = pc.getCommTeacherCounts();
+        amrex::Gpu::DeviceVector<int> total_teacher_counts_mod(total_teacher_counts.size(),0);
+        auto total_teacher_counts_ptr = total_teacher_counts.data();
+
+        auto daycr_teacher_counts = pc.getCommDayCrTeacherCounts();
+        amrex::Gpu::DeviceVector<int> daycr_teacher_counts_mod(daycr_teacher_counts.size(),0);
+        auto daycr_teacher_counts_ptr = daycr_teacher_counts_mod.data();
+
+        auto high_teacher_counts = pc.getCommHighTeacherCounts();
+        amrex::Gpu::DeviceVector<int> high_teacher_counts_mod(high_teacher_counts.size(),0);
+        auto high_teacher_counts_ptr = high_teacher_counts_mod.data();
+
+        auto middle_teacher_counts = pc.getCommMiddleTeacherCounts();
+        amrex::Gpu::DeviceVector<int> middle_teacher_counts_mod(middle_teacher_counts.size(),0);
+        auto middle_teacher_counts_ptr = middle_teacher_counts_mod.data();
+
+        auto elem3_teacher_counts = pc.getCommElem3TeacherCounts();
+        amrex::Gpu::DeviceVector<int> elem3_teacher_counts_mod(elem3_teacher_counts.size(),0);
+        auto elem3_teacher_counts_ptr = elem3_teacher_counts_mod.data();
+
+        auto elem4_teacher_counts = pc.getCommElem4TeacherCounts();
+        amrex::Gpu::DeviceVector<int> elem4_teacher_counts_mod(elem4_teacher_counts.size(),0);
+        auto elem4_teacher_counts_ptr = elem4_teacher_counts_mod.data();
+
+        for (MFIter mfi(unit_mf, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+            auto& agents_tile = pc.GetParticles(0)[std::make_pair(mfi.index(),mfi.LocalTileIndex())];
+            auto& soa = agents_tile.GetStructOfArrays();
+            auto age_group_ptr = soa.GetIntData(IntIdx::age_group).data();
+            auto workgroup_ptr = soa.GetIntData(IntIdx::workgroup).data();
+            auto work_i_ptr = soa.GetIntData(IntIdx::work_i).data();
+            auto work_j_ptr = soa.GetIntData(IntIdx::work_j).data();
+            auto school_ptr = soa.GetIntData(IntIdx::school).data();
+
+            auto unit_arr = unit_mf[mfi].array();
+            auto comm_arr = comm_mf[mfi].array();
+            auto Ndaywork = demo.Ndaywork_d.data();
+            auto Start = demo.Start_d.data();
+
+            auto np = soa.numParticles();
+            for (int ip = 0; ip < np; ++ip) {
+                int to = unit_arr(work_i_ptr[ip], work_j_ptr[ip],0);
+
+                if (total_teacher_unit.data()[to] && (age_group_ptr[ip] == 2 || age_group_ptr[ip] == 3) && workgroup_ptr[ip] > 0)
+                {
+                    int comm_to = comm_arr(work_i_ptr[ip], work_j_ptr[ip],0);
+                    int elem3_teacher  = elem3_teacher_counts_ptr[comm_to];
+                    int elem4_teacher  = elem4_teacher_counts_ptr[comm_to];
+                    int middle_teacher = middle_teacher_counts_ptr[comm_to];
+                    int high_teacher   = high_teacher_counts_ptr[comm_to];
+                    int daycr_teacher  = daycr_teacher_counts_ptr[comm_to];
+                    int total          = total_teacher_counts_ptr[comm_to];
+
+                    // 50% chance of being a teacher if in working-age population (until max_teacher_numb is met)
+                    if (amrex::Random() < 0.50 && (elem3_teacher + elem4_teacher
+                                                        + middle_teacher + high_teacher
+                                                        + daycr_teacher) < total)
+                    {
+                        int available_slots[5] = {
+                            elem3_teacher  < elem3_teacher_counts.data()[comm_to],
+                            elem4_teacher  < elem4_teacher_counts.data()[comm_to],
+                            middle_teacher < middle_teacher_counts.data()[comm_to],
+                            high_teacher   < high_teacher_counts.data()[comm_to],
+                            daycr_teacher  < daycr_teacher_counts.data()[comm_to]
+                        };
+
+                        int total_available = available_slots[0] + available_slots[1] + available_slots[2] + available_slots[3] + available_slots[4];
+                        if (total_available > 0)
+                        {
+                            int choice = amrex::Random_int(total_available);
+                            if (choice < available_slots[0]) {
+                                school_ptr[ip] = 3;  // elementary 3 school
+                                workgroup_ptr[ip] = 3 ;
+                                elem3_teacher_counts_ptr[comm_to]++;
+                            } else if (choice < available_slots[0] + available_slots[1]) {
+                                school_ptr[ip] = 4;  // elementary 4 school
+                                workgroup_ptr[ip] = 4 ;
+                                elem4_teacher_counts_ptr[comm_to]++;
+                            } else if (choice < available_slots[0] + available_slots[1] + available_slots[2]) {
+                                school_ptr[ip] = 2;  // middle school
+                                workgroup_ptr[ip] = 2 ;
+                                middle_teacher_counts_ptr[comm_to]++;
+                            } else if (choice < available_slots[0] + available_slots[1] + available_slots[2] + available_slots[3]) {
+                                school_ptr[ip] = 1;  // high school
+                                workgroup_ptr[ip] = 1 ;
+                                high_teacher_counts_ptr[comm_to]++;
+                            } else if (choice < total_available) {
+                                school_ptr[ip] = 5;  // day care
+                                workgroup_ptr[ip] = 5 ;
+                                daycr_teacher_counts_ptr[comm_to]++;
+                            }
+                        }
+                    }
+                    else{
+                        constexpr int WG_size = 20;
+                        unsigned int number = (unsigned int) rint( ((Real) Ndaywork[to] - total_teacher_unit.data()[to] ) /
+                                 ((Real) WG_size * (Start[to+1] - Start[to])) );
+
+                        if (number) {
+                            workgroup_ptr[ip] = 6 + amrex::Random_int(number);
+                        }
+
+                    }
+                }
+
+            }
         }
     }
 
