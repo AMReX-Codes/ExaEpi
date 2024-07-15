@@ -21,7 +21,8 @@ static void binaryInteractionNborhood ( const int a_i, /*!< Index of infectious 
                                         const PTDType& a_ptd, /*!< Particle tile data */
                                         const DiseaseParm* const a_lparm, /*!< disease paramters */
                                         const Real a_social_scale, /*!< Social scale */
-                                        ParticleReal* const a_prob_ptr /*!< infection probability */)
+                                        ParticleReal* const a_prob_ptr, /*!< infection probability */
+                                        const bool m_at_work_ptr /*!< whether agents are at work or at home */)
 {
     Real infect = a_lparm->infect;
     infect *= a_lparm->vac_eff;
@@ -30,6 +31,7 @@ static void binaryInteractionNborhood ( const int a_i, /*!< Index of infectious 
     auto nborhood_ptr = a_ptd.m_idata[IntIdx::nborhood];
     auto school_ptr = a_ptd.m_idata[IntIdx::school];
     auto withdrawn_ptr = a_ptd.m_idata[IntIdx::withdrawn];
+    auto work_nborhood_ptr = a_ptd.m_idata[IntIdx::work_nborhood];
 
     if (withdrawn_ptr[a_i] || withdrawn_ptr[a_j]) { return; }
 
@@ -37,20 +39,27 @@ static void binaryInteractionNborhood ( const int a_i, /*!< Index of infectious 
     //infect *= j_mask;
     ParticleReal prob = 1.0_prt;
 
-    // school < 0 means a child normally attends school, but not today
-    /* Should always be in the same community = same cell */
-    if (school_ptr[a_i] < 0) {  // not attending school, use _SC contacts
-        prob *= 1.0_prt - infect * a_lparm->xmit_comm_SC[age_group_ptr[a_j]] * a_social_scale;
-    } else {
-        prob *= 1.0_prt - infect * a_lparm->xmit_comm[age_group_ptr[a_j]] * a_social_scale;
+    int nborhood_ai = nborhood_ptr[a_i];
+    int nborhood_aj = nborhood_ptr[a_j];
+
+    if (m_at_work_ptr) {
+        nborhood_ai = (age_group_ptr[a_i] <= 1) ? nborhood_ptr[a_i] : work_nborhood_ptr[a_i];
+        nborhood_aj = (age_group_ptr[a_j] <= 1) ? nborhood_ptr[a_j] : work_nborhood_ptr[a_j];
     }
-    // /* Neighborhood? */
-    if (nborhood_ptr[a_i] == nborhood_ptr[a_j]) {
-        if (school_ptr[a_i] < 0)  {
-            // not attending school, use _SC contacts
+
+    // school = 0 means child not going to school (school < 0 not defined anywhere for children)
+    // Should always be in the same community = same cell
+    if (nborhood_ai == nborhood_aj) {
+        if (school_ptr[a_i] < 0 ) { // not attending school, use _SC contacts
             prob *= 1.0_prt - infect * a_lparm->xmit_hood_SC[age_group_ptr[a_j]] * a_social_scale;
         } else {
             prob *= 1.0_prt - infect * a_lparm->xmit_hood[age_group_ptr[a_j]] * a_social_scale;
+        }
+    } else { // Community?
+        if (school_ptr[a_i] < 0) { // not attending school, use _SC contacts
+            prob *= 1.0_prt - infect * a_lparm->xmit_comm_SC[age_group_ptr[a_j]] * a_social_scale;
+        } else {
+            prob *= 1.0_prt - infect * a_lparm->xmit_comm[age_group_ptr[a_j]] * a_social_scale;
         }
     }
 
@@ -129,7 +138,7 @@ void InteractionModNborhood<AC,ACT,ACTD,A>::interactAgents( AC& a_agents, /*!< A
         {
             auto pair_ind = std::make_pair(mfi.index(), mfi.LocalTileIndex());
             auto bins_ptr = a_agents.getBins(pair_ind, ExaEpi::InteractionNames::nborhood);
-
+            auto m_at_work_ptr = a_agents.isAtWork(); /*! Flag to indicate if agents are at work */
             auto& ptile = a_agents.ParticlesAt(lev, mfi);
             const auto& ptd = ptile.getParticleTileData();
             auto& aos   = ptile.GetArrayOfStructs();
@@ -169,7 +178,7 @@ void InteractionModNborhood<AC,ACT,ACTD,A>::interactAgents( AC& a_agents, /*!< A
 
                         if ( isInfectious<ACTD>(j, ptd, d) ) {
                             Real social_scale = 1.0_prt;  // TODO this should vary based on cell
-                            binaryInteractionNborhood<ACTD>( j, i, ptd, lparm, social_scale, prob_ptr );
+                            binaryInteractionNborhood<ACTD>( j, i, ptd, lparm, social_scale, prob_ptr, m_at_work_ptr );
                         }
                     }
                 });
