@@ -22,7 +22,7 @@ static void binaryInteractionNborhood ( const int a_i, /*!< Index of infectious 
                                         const DiseaseParm* const a_lparm, /*!< disease paramters */
                                         const Real a_social_scale, /*!< Social scale */
                                         ParticleReal* const a_prob_ptr, /*!< infection probability */
-                                        const bool m_at_work_ptr /*!< whether agents are at work or at home */)
+                                        const bool a_at_work_ptr /*!< whether agents are at work or at home */)
 {
     Real infect = a_lparm->infect;
     infect *= a_lparm->vac_eff;
@@ -42,7 +42,7 @@ static void binaryInteractionNborhood ( const int a_i, /*!< Index of infectious 
     int nborhood_ai = nborhood_ptr[a_i];
     int nborhood_aj = nborhood_ptr[a_j];
 
-    if (m_at_work_ptr) {
+    if (a_at_work_ptr) {
         nborhood_ai = (age_group_ptr[a_i] <= 1) ? nborhood_ptr[a_i] : work_nborhood_ptr[a_i];
         nborhood_aj = (age_group_ptr[a_j] <= 1) ? nborhood_ptr[a_j] : work_nborhood_ptr[a_j];
     }
@@ -138,7 +138,7 @@ void InteractionModNborhood<AC,ACT,ACTD,A>::interactAgents( AC& a_agents, /*!< A
         {
             auto pair_ind = std::make_pair(mfi.index(), mfi.LocalTileIndex());
             auto bins_ptr = a_agents.getBins(pair_ind, ExaEpi::InteractionNames::nborhood);
-            auto m_at_work_ptr = a_agents.isAtWork(); /*! Flag to indicate if agents are at work */
+            auto flag_at_work = a_agents.isAtWork(); /*! Flag to indicate if agents are at work */
             auto& ptile = a_agents.ParticlesAt(lev, mfi);
             const auto& ptd = ptile.getParticleTileData();
             auto& aos   = ptile.GetArrayOfStructs();
@@ -178,7 +178,7 @@ void InteractionModNborhood<AC,ACT,ACTD,A>::interactAgents( AC& a_agents, /*!< A
 
                         if ( isInfectious<ACTD>(j, ptd, d) ) {
                             Real social_scale = 1.0_prt;  // TODO this should vary based on cell
-                            binaryInteractionNborhood<ACTD>( j, i, ptd, lparm, social_scale, prob_ptr, m_at_work_ptr );
+                            binaryInteractionNborhood<ACTD>( j, i, ptd, lparm, social_scale, prob_ptr, flag_at_work );
                         }
                     }
                 });
