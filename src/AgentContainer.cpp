@@ -659,7 +659,7 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,    /*!< Number 
                 nborhood_ptr[ip] = nborhood;
                 work_nborhood_ptr[ip] = 5*nborhood;
                 workgroup_ptr[ip] = 0;
-                random_travel_ptr[ip] = 0;
+                random_travel_ptr[ip] = -1;
 
                 if (age_group == 0) {
                     school_ptr[ip] = 5; // note - need to handle playgroups
@@ -861,14 +861,15 @@ void AgentContainer::moveRandomTravel (const iMultiFab& unit_mf)
             const size_t np = aos.numParticles();
             auto& soa   = ptile.GetStructOfArrays();
             auto random_travel_ptr = soa.GetIntData(IntIdx::random_travel).data();
+            auto withdrawn_ptr = soa.GetIntData(IntIdx::withdrawn).data();
 
             amrex::ParallelForRNG( np,
             [=] AMREX_GPU_DEVICE (int i, RandomEngine const& engine) noexcept
             {
                 ParticleType& p = pstruct[i];
-
+                if (withdrawn_ptr[i] == 1) {return ;}
                 if (amrex::Random(engine) < 0.0001) {
-                    random_travel_ptr[i] = 1;
+                    random_travel_ptr[i] = i;
                     int random_unit = -1;
                     while (random_unit == -1) {
                         int i_random = i_max*amrex::Random(engine);
@@ -908,8 +909,8 @@ void AgentContainer::returnRandomTravel ()
             amrex::ParallelForRNG( np,
             [=] AMREX_GPU_DEVICE (int i, RandomEngine const& engine) noexcept
             {
-                if (random_travel_ptr[i] == 1) {
-                    random_travel_ptr[i] = 0;
+                if (random_travel_ptr[i] >= 0) {
+                    random_travel_ptr[i] = -1;
                 }
             });
         }

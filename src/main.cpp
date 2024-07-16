@@ -371,9 +371,8 @@ void runAgent ()
                     using SrcData = AgentContainer::ParticleTileType::ConstParticleTileDataType;
                     on_travel_pc.copyParticles(pc,
                                                [=] AMREX_GPU_HOST_DEVICE (const SrcData& src, int ip) {
-                                                   return src.m_idata[IntIdx::random_travel][ip];
+                                                   return (src.m_idata[IntIdx::random_travel][ip] >= 0);
                                                });
-                    amrex::Print() << "Selected " << on_travel_pc.TotalNumberOfParticles() << " for random travel. \n";
             }
 
             // Typical day
