@@ -142,7 +142,7 @@ void writePlotFile (const AgentContainer& pc, /*!< Agent (particle) container */
                                 write_int_comp,
                                 real_varnames,
                                 int_varnames,
-                                "ZLIB@6" );
+                                "ZLIB@3" );
     }
 }
 
