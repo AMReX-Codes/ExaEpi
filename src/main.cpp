@@ -187,6 +187,7 @@ void runAgent ()
     mask_behavior.setVal(1);
 
     AgentContainer pc(geom, dm, ba, params.num_diseases, params.disease_names);
+    AgentContainer on_travel_pc(geom, dm, ba, params.num_diseases, params.disease_names);
 
     {
         BL_PROFILE_REGION("Initialization");
@@ -365,6 +366,16 @@ void runAgent ()
                 pc.shelterStop();
             }
 
+            if ((params.random_travel_int > 0) && (i % params.random_travel_int == 0)) {
+                    pc.moveRandomTravel(unit_mf);
+                    using SrcData = AgentContainer::ParticleTileType::ConstParticleTileDataType;
+                    on_travel_pc.copyParticles(pc,
+                                               [=] AMREX_GPU_HOST_DEVICE (const SrcData& src, int ip) {
+                                                   return src.m_idata[IntIdx::random_travel][ip];
+                                               });
+                    amrex::Print() << "Selected " << on_travel_pc.TotalNumberOfParticles() << " for random travel. \n";
+            }
+
             // Typical day
             pc.morningCommute(mask_behavior);
             pc.interactDay(mask_behavior);
@@ -372,13 +383,16 @@ void runAgent ()
             pc.interactEvening(mask_behavior);
             pc.interactNight(mask_behavior);
 
+            if (params.random_travel_int > 0) {
+                pc.interactRandomTravel(mask_behavior, on_travel_pc);
+            }
+
             // Infect agents based on their interactions
             pc.infectAgents();
 
-            //            if ((params.random_travel_int > 0) && (i % params.random_travel_int == 0)) {
-            //                pc.moveRandomTravel();
-            //            }
-            //            pc.Redistribute();
+            if (params.random_travel_int > 0) {
+                pc.returnRandomTravel();
+            }
 
             cur_time += 1.0_rt; // time step is one day
         }

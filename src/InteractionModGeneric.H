@@ -25,6 +25,9 @@ class InteractionModGeneric : public InteractionModel<AC,ACT,ACTD,A>
         /*! \brief Simulate agent interaction with a simple generic model */
         virtual void interactAgents( AC&, MultiFab& );
 
+        /*! \brief Simulate agent interaction with a simple generic model */
+        virtual void interactAgents( AC&, MultiFab&, AC& ) {};
+
     protected:
 
     private:

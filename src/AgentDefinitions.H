@@ -52,6 +52,7 @@ struct IntIdx
         workgroup,      /*!< workgroup ID */
         work_nborhood,  /*!< work neighborhood ID */
         withdrawn,      /*!< quarantine status */
+        random_travel,  /*!< on long distance travel? */
         nattribs        /*!< number of integer-type attribute */
     };
 };
