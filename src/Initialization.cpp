@@ -261,10 +261,10 @@ namespace Initialization
 
             auto np = soa.numParticles();
             for (int ip = 0; ip < np; ++ip) {
-
+                
                 int comm_to = (int) domain.index(IntVect(AMREX_D_DECL(work_i_ptr[ip],work_j_ptr[ip],0)));
-                if (comm_to >= Ncommunity) {
-                    continue;
+                if (comm_to >= Ncommunity) { 
+                    continue; 
                 }
                 int to = 0;
                 while (comm_to >= Start[to+1]) { to++; }
