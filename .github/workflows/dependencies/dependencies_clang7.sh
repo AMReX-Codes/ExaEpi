@@ -12,4 +12,4 @@ sudo apt-get update
 sudo apt-get install -y  \
     build-essential      \
     clang-7 gfortran     \
-    libhdf5-openmpi-dev
+    libhdf5-dev

@@ -94,7 +94,7 @@ void writePlotFile (const AgentContainer& pc, /*!< Agent (particle) container */
                                                 pc.ParticleGeom(0),
                                                 cur_time,
                                                 step,
-                                                "ZLIB@6" );
+                                                "ZLIB@3" );
     }
 
     {

@@ -83,7 +83,7 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - name: Dependencies
-      run: .github/workflows/dependencies/dependencies_gcc8.sh
+      run: .github/workflows/dependencies/dependencies_gcc8_nompi.sh
     - name: Build & Install
       run: |
         mkdir build
