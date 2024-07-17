@@ -250,7 +250,6 @@ namespace Initialization
             auto work_j_ptr = soa.GetIntData(IntIdx::work_j).data();
             auto school_ptr = soa.GetIntData(IntIdx::school).data();
 
-            auto unit_arr = unit_mf[mfi].array();
             auto comm_arr = comm_mf[mfi].array();
             auto Ndaywork = demo.Ndaywork_d.data();
             auto Start = demo.Start_d.data();
@@ -268,7 +267,6 @@ namespace Initialization
 
                 if (total_teacher_unit.data()[to] && (age_group_ptr[ip] == 2 || age_group_ptr[ip] == 3) && workgroup_ptr[ip] > 0)
                 {
-                    int comm_to = comm_arr(work_i_ptr[ip], work_j_ptr[ip],0);
                     int elem3_teacher  = elem3_teacher_counts_ptr[comm_to];
                     int elem4_teacher  = elem4_teacher_counts_ptr[comm_to];
                     int middle_teacher = middle_teacher_counts_ptr[comm_to];
