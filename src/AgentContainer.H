@@ -283,6 +283,11 @@ public:
         }
     }
 
+    /*! \brief Return flag indicating if agents are at work */
+    inline bool isAtWork() const {
+        return m_at_work;
+    }
+
     /*! \brief Return disease parameters object pointer (host) */
     inline const DiseaseParm* getDiseaseParameters_h (int d /*!< disease index */) const {
         return h_parm[d];
