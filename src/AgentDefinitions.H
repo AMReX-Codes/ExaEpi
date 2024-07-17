@@ -81,6 +81,19 @@ struct SchoolType
     };
 };
 
+/*! \brief Age Group */
+struct AgeGroups
+{
+    enum {
+        u5 = 0, /*!< Under 5 */
+        a5to17,  /*!< 5-17 */
+        a18to29, /*!< 18-29 */
+        a30to64, /*!< 30-64 */
+        o65,    /*!< over 65 */
+        total   /*!< number of age groups */
+    };
+};
+
 /*! \brief Disease status */
 struct Status
 {

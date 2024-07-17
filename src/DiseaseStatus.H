@@ -27,7 +27,7 @@ class DiseaseStatus
     public:
 
         /*! \brief constructor */
-        DiseaseStatus<AC,ACT,ACTD,A>();
+        DiseaseStatus<AC,ACT,ACTD,A>() { }
 
         /*! \brief default destructor */
         virtual ~DiseaseStatus<AC,ACT,ACTD,A>() = default;
@@ -38,24 +38,6 @@ class DiseaseStatus
         virtual void updateAgents(AC&, MultiFab&, const int) const;
 
     protected:
-
-        /*! sick -> hospital probabilities */
-        Vector<Real> m_CHR = {.0104_rt, .0104_rt, .070_rt, .28_rt, 1.0_rt};
-        /*! hospital -> ICU probabilities */
-        Vector<Real> m_CIC = {.24_rt, .24_rt, .24_rt, .36_rt, .35_rt};
-        /*! ICU -> ventilator probabilities */
-        Vector<Real> m_CVE = {.12_rt, .12_rt, .12_rt, .22_rt, .22_rt};
-        /*! ventilator -> dead probilities */
-        Vector<Real> m_CVF = {.20_rt, .20_rt, .20_rt, 0.45_rt, 1.26_rt};
-
-        /*! sick -> hospital probabilities */
-        Gpu::DeviceVector<Real> m_CHR_d;
-        /*! hospital -> ICU probabilities */
-        Gpu::DeviceVector<Real> m_CIC_d;
-        /*! ICU -> ventilator probabilities */
-        Gpu::DeviceVector<Real> m_CVE_d;
-        /*! ventilator -> dead probilities */
-        Gpu::DeviceVector<Real> m_CVF_d;
 
         /*! \brief Copy host vector to device */
         inline void copyToDevice (  const Vector<Real>&      a_vec_h, /*!< host vector */
@@ -69,17 +51,6 @@ class DiseaseStatus
                             a_vec_d.begin() );
         }
 };
-
-/*! Constructor */
-template<typename AC, typename ACT, typename ACTD, typename A>
-DiseaseStatus<AC,ACT,ACTD,A>::DiseaseStatus()
-{
-    copyToDevice(m_CHR, m_CHR_d);
-    copyToDevice(m_CIC, m_CIC_d);
-    copyToDevice(m_CVE, m_CVE_d);
-    copyToDevice(m_CVF, m_CVF_d);
-    Gpu::streamSynchronize();
-}
 
 /*! At a given step, update the disease status of each agent based on the following overall logic:
     + If agent status is #Status::never or #Status::susceptible, do nothing
@@ -151,11 +122,6 @@ void DiseaseStatus<AC,ACT,ACTD,A>::updateAgents(AC& a_agents, /*!< Agent contain
             auto symptomatic_withdraw = a_agents.symptomaticWithdraw();
             auto symptomatic_withdraw_compliance = a_agents.symptomaticWithdrawCompliance();
 
-            auto CHR = m_CHR_d.data();
-            auto CIC = m_CIC_d.data();
-            auto CVE = m_CVE_d.data();
-            auto CVF = m_CVF_d.data();
-
             ParallelForRNG( np,
                             [=] AMREX_GPU_DEVICE (int i, RandomEngine const& engine) noexcept
             {
@@ -197,57 +163,50 @@ void DiseaseStatus<AC,ACT,ACTD,A>::updateAgents(AC& a_agents, /*!< Agent contain
                         return;
                     }
                     if (counter_ptr[i] == Math::ceil(incubation_period_ptr[i])) {
-                        // decide if hospitalized
-                        Real p_hosp = CHR[age_group_ptr[i]];
-                        if (Random(engine) < p_hosp) {
-                            if ((age_group_ptr[i]) < 3) {  // age groups 0-4, 5-18, 19-29
-                                timer_ptr[i] = 3;  // Ages 0-49 hospitalized for 3.1 days
-                            }
-                            else if (age_group_ptr[i] == 4) {
-                                timer_ptr[i] = 7;  // Age 65+ hospitalized for 6.5 days
-                            }
-                            else if (Random(engine) < 0.57) {
-                                timer_ptr[i] = 3;  // Proportion of 30-64 that is under 50
-                            }
-                            else {
-                                timer_ptr[i] = 8;  // Age 50-64 hospitalized for 7.8 days
-                            }
+                        int flag_ICU = 0, flag_vent = 0;
+                        disease_parm_h->check_hospitalization( timer_ptr[i],
+                                                               flag_ICU,
+                                                               flag_vent,
+                                                               age_group_ptr[i],
+                                                               engine );
+                        if (timer_ptr[i] > 0) {
                             Gpu::Atomic::AddNoRet( &ds_arr(  home_i_ptr[i],
-                                                                    home_j_ptr[i],
-                                                                    0,
-                                                                    DiseaseStats::hospitalization ),
-                                                          1.0_rt );
-                            if (Random(engine) < CIC[age_group_ptr[i]]) {
-                                timer_ptr[i] += 10;  // move to ICU
-                                Gpu::Atomic::AddNoRet( &ds_arr( home_i_ptr[i],
-                                                                       home_j_ptr[i],
-                                                                       0,
-                                                                       DiseaseStats::ICU ),
-                                                              1.0_rt );
-                                if (Random(engine) < CVE[age_group_ptr[i]]) {
-                                    Gpu::Atomic::AddNoRet( &ds_arr(  home_i_ptr[i],
-                                                                     home_j_ptr[i],
-                                                                     0,
-                                                                     DiseaseStats::ventilator ),
-                                                           1.0_rt );
-                                    timer_ptr[i] += 10;  // put on ventilator
-                                }
-                            }
+                                                             home_j_ptr[i],
+                                                             0,
+                                                             DiseaseStats::hospitalization ),
+                                                   1.0_rt );
+                        }
+                        if (flag_ICU == 1) {
+                            Gpu::Atomic::AddNoRet( &ds_arr( home_i_ptr[i],
+                                                            home_j_ptr[i],
+                                                            0,
+                                                            DiseaseStats::ICU ),
+                                                   1.0_rt );
+                        }
+                        if (flag_vent == 1) {
+                            Gpu::Atomic::AddNoRet( &ds_arr(  home_i_ptr[i],
+                                                             home_j_ptr[i],
+                                                             0,
+                                                             DiseaseStats::ventilator ),
+                                                   1.0_rt );
                         }
                     } else {
                         if (timer_ptr[i] > 0.0_rt) {
                             // do hospital things
                             timer_ptr[i] -= 1.0_rt;
                             if (timer_ptr[i] == 0) {
-                                if (CVF[age_group_ptr[i]] > 2.0_rt) {
-                                    if (Random(engine) < (CVF[age_group_ptr[i]] - 2.0_rt)) {
-                                        Gpu::Atomic::AddNoRet( &ds_arr(  home_i_ptr[i],
-                                                                         home_j_ptr[i],
-                                                                         0,
-                                                                         DiseaseStats::death),
-                                                               1.0_rt );
-                                        status_ptr[i] = Status::dead;
-                                    }
+                                int flag = 1;
+                                disease_parm_d->check_survival( flag,
+                                                                age_group_ptr[i],
+                                                                2.0_rt,
+                                                                engine );
+                                if (flag == 0) {
+                                    Gpu::Atomic::AddNoRet( &ds_arr(  home_i_ptr[i],
+                                                                     home_j_ptr[i],
+                                                                     0,
+                                                                     DiseaseStats::death),
+                                                           1.0_rt );
+                                    status_ptr[i] = Status::dead;
                                 }
                                 Gpu::Atomic::AddNoRet( &ds_arr(  home_i_ptr[i],
                                                                  home_j_ptr[i],
@@ -263,15 +222,18 @@ void DiseaseStatus<AC,ACT,ACTD,A>::updateAgents(AC& a_agents, /*!< Agent contain
                                 }
                             }
                             if (timer_ptr[i] == 10) {
-                                if (CVF[age_group_ptr[i]] > 1.0_rt) {
-                                    if (Random(engine) < (CVF[age_group_ptr[i]] - 1.0_rt)) {
-                                        Gpu::Atomic::AddNoRet( &ds_arr(  home_i_ptr[i],
-                                                                         home_j_ptr[i],
-                                                                         0,
-                                                                         DiseaseStats::death ),
-                                                               1.0_rt);
-                                        status_ptr[i] = Status::dead;
-                                    }
+                                int flag = 1;
+                                disease_parm_d->check_survival( flag,
+                                                                age_group_ptr[i],
+                                                                1.0_rt,
+                                                                engine );
+                                if (flag == 0) {
+                                    Gpu::Atomic::AddNoRet( &ds_arr(  home_i_ptr[i],
+                                                                     home_j_ptr[i],
+                                                                     0,
+                                                                     DiseaseStats::death),
+                                                           1.0_rt );
+                                    status_ptr[i] = Status::dead;
                                 }
                                 Gpu::Atomic::AddNoRet( &ds_arr(  home_i_ptr[i],
                                                                  home_j_ptr[i],
@@ -292,11 +254,16 @@ void DiseaseStatus<AC,ACT,ACTD,A>::updateAgents(AC& a_agents, /*!< Agent contain
                                 }
                             }
                             if (timer_ptr[i] == 20) {
-                                if (Random(engine) < CVF[age_group_ptr[i]]) {
+                                int flag = 1;
+                                disease_parm_d->check_survival( flag,
+                                                                age_group_ptr[i],
+                                                                0.0_rt,
+                                                                engine );
+                                if (flag == 0) {
                                     Gpu::Atomic::AddNoRet( &ds_arr(  home_i_ptr[i],
                                                                      home_j_ptr[i],
                                                                      0,
-                                                                     DiseaseStats::death ),
+                                                                     DiseaseStats::death),
                                                            1.0_rt );
                                     status_ptr[i] = Status::dead;
                                 }

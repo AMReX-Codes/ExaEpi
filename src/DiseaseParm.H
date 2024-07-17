@@ -5,8 +5,11 @@
 #ifndef DISEASE_PARM_H_
 #define DISEASE_PARM_H_
 
+#include <AMReX_Random.H>
 #include <AMReX_REAL.H>
 #include <AMReX_GpuMemory.H>
+
+#include "AgentDefinitions.H"
 
 /*! \brief Disease parameters
 
@@ -35,34 +38,76 @@ struct DiseaseParm
 
     // these are computed from the above
     /*! Community transmission probabilities for each age group (<5, 5-17, 18-29, 30-64, 65+) */
-    amrex::Real xmit_comm[5] = {amrex::Real(.0000125*pCO), amrex::Real(.0000375*pCO), amrex::Real(.00010*pCO), amrex::Real(.00010*pCO), amrex::Real(.00015*pCO)};
+    amrex::Real xmit_comm[AgeGroups::total] = { amrex::Real(.0000125*pCO),
+                                                amrex::Real(.0000375*pCO),
+                                                amrex::Real(.00010*pCO),
+                                                amrex::Real(.00010*pCO),
+                                                amrex::Real(.00015*pCO) };
     /*! Neighborhood transmission probabilities for each age group (<5, 5-17, 18-29, 30-64, 65+) */
-    amrex::Real xmit_hood[5] = {amrex::Real(.00005*pNH), amrex::Real(.00015*pNH), amrex::Real(.00040*pNH), amrex::Real(.00040*pNH), amrex::Real(.00060*pNH)};
+    amrex::Real xmit_hood[AgeGroups::total] = { amrex::Real(.00005*pNH),
+                                                amrex::Real(.00015*pNH),
+                                                amrex::Real(.00040*pNH),
+                                                amrex::Real(.00040*pNH),
+                                                amrex::Real(.00060*pNH) };
     /*! Transmission probabilities of adults for each age group (<5, 5-17, 18-29, 30-64, 65+) for neighborhood cluster */
-    amrex::Real xmit_nc_adult[5] = {amrex::Real(.08*pHC),  amrex::Real(.08*pHC), amrex::Real(.1*pHC), amrex::Real(.1*pHC), amrex::Real(.1*pHC)};
+    amrex::Real xmit_nc_adult[AgeGroups::total] = { amrex::Real(.08*pHC),
+                                                    amrex::Real(.08*pHC),
+                                                    amrex::Real(.1*pHC),
+                                                    amrex::Real(.1*pHC),
+                                                    amrex::Real(.1*pHC) };
     /*! Transmission probabilities of children for each age group (<5, 5-17, 18-29, 30-64, 65+) for neighborhood cluster */
-    amrex::Real xmit_nc_child[5] = {amrex::Real(.15*pHCC0), amrex::Real(.15*pHCC1), amrex::Real(.08*pHC), amrex::Real(.08*pHC), amrex::Real(.08*pHC)};
+    amrex::Real xmit_nc_child[AgeGroups::total] = { amrex::Real(.15*pHCC0),
+                                                    amrex::Real(.15*pHCC1),
+                                                    amrex::Real(.08*pHC),
+                                                    amrex::Real(.08*pHC),
+                                                    amrex::Real(.08*pHC) };
     /*! Work transmission probabilities for each age group (<5, 5-17, 18-29, 30-64, 65+) */
     amrex::Real xmit_work = amrex::Real(0.115*pWO);
     /*! School transmission probabilities for each school type (High, Middle, Elem3/4 , Daycare/Playgroups */
-    amrex::Real xmit_school[7] = {amrex::Real(0.), amrex::Real(.105*pHSC), amrex::Real(.125*pMSC), amrex::Real(.145*pESC), amrex::Real(.145*pESC), amrex::Real(.15), amrex::Real(.35)};
+    amrex::Real xmit_school[7] = {  amrex::Real(0.),
+                                    amrex::Real(.105*pHSC),
+                                    amrex::Real(.125*pMSC),
+                                    amrex::Real(.145*pESC),
+                                    amrex::Real(.145*pESC),
+                                    amrex::Real(.15),
+                                    amrex::Real(.35) };
 
     /* Within family, from child or adult, for 5 age groups (here Thai paper, US:0.6->0.8)*/
     /*! Transmission probability within family for each age-group of adult */
-    amrex::Real xmit_adult[5] = {amrex::Real(.3*pFA), amrex::Real(.3*pFA), amrex::Real(.4*pFA), amrex::Real(.4*pFA), amrex::Real(.4*pFA)};
+    amrex::Real xmit_adult[AgeGroups::total] = {  amrex::Real(.3*pFA),
+                                                  amrex::Real(.3*pFA),
+                                                  amrex::Real(.4*pFA),
+                                                  amrex::Real(.4*pFA),
+                                                  amrex::Real(.4*pFA) };
     /*! Transmission probability within family for each age-group of child */
-    amrex::Real xmit_child[5] = {amrex::Real(.6*pFA), amrex::Real(.6*pFA), amrex::Real(.3*pFA), amrex::Real(.3*pFA), amrex::Real(.3*pFA)};
+    amrex::Real xmit_child[AgeGroups::total] = {  amrex::Real(.6*pFA),
+                                                  amrex::Real(.6*pFA),
+                                                  amrex::Real(.3*pFA),
+                                                  amrex::Real(.3*pFA),
+                                                  amrex::Real(.3*pFA) };
 
-    amrex::Real xmit_child_SC[5],     /*!< Transmission probability of child - school closed */
-                xmit_adult_SC[5],     /*!< Transmission probability of adult - school closed */
-                xmit_nc_child_SC[5],  /*!< Transmission probability for neighborhood cluster (child) - school closed ?? */
-                xmit_nc_adult_SC[5];  /*!< Transmission probability for neighborhood cluster (adult) - school closed ?? */
-    amrex::Real xmit_comm_SC[5],      /*!< Transmission probability in community - school closed */
-                xmit_hood_SC[5];      /*!< Transmission probability in neighborhood - school closed ?? */
+    amrex::Real xmit_child_SC[AgeGroups::total],     /*!< Transmission probability of child - school closed */
+                xmit_adult_SC[AgeGroups::total],     /*!< Transmission probability of adult - school closed */
+                xmit_nc_child_SC[AgeGroups::total],  /*!< Transmission probability for neighborhood cluster (child) - school closed ?? */
+                xmit_nc_adult_SC[AgeGroups::total];  /*!< Transmission probability for neighborhood cluster (adult) - school closed ?? */
+    amrex::Real xmit_comm_SC[AgeGroups::total],      /*!< Transmission probability in community - school closed */
+                xmit_hood_SC[AgeGroups::total];      /*!< Transmission probability in neighborhood - school closed ?? */
      /*!< Transmission probability in school - child to adult */
-    amrex::Real xmit_sch_c2a[7] = {amrex::Real(0.), amrex::Real(.105*pHSC), amrex::Real(.125*pMSC), amrex::Real(.145*pESC), amrex::Real(.145*pESC), amrex::Real(.15), amrex::Real(.35)};
+    amrex::Real xmit_sch_c2a[7] = { amrex::Real(0.),
+                                    amrex::Real(.105*pHSC),
+                                    amrex::Real(.125*pMSC),
+                                    amrex::Real(.145*pESC),
+                                    amrex::Real(.145*pESC),
+                                    amrex::Real(.15),
+                                    amrex::Real(.35) };
     /*!< Transmission probability in school - adult to child */
-    amrex::Real xmit_sch_a2c[7] = {amrex::Real(0.), amrex::Real(.105*pHSC), amrex::Real(.125*pMSC), amrex::Real(.145*pESC), amrex::Real(.145*pESC), amrex::Real(.15), amrex::Real(.35)};
+    amrex::Real xmit_sch_a2c[7] = { amrex::Real(0.),
+                                    amrex::Real(.105*pHSC),
+                                    amrex::Real(.125*pMSC),
+                                    amrex::Real(.145*pESC),
+                                    amrex::Real(.145*pESC),
+                                    amrex::Real(.15),
+                                    amrex::Real(.35) };
 
     amrex::Real infect = amrex::Real(1.0); /*!< Overall multiplier for agent's infectiousness */
 
@@ -84,8 +129,86 @@ struct DiseaseParm
     amrex::Real mean_immune_time = 30*6;  /*! mean immunity time in days*/
     amrex::Real immune_time_spread = 30*2;  /*! spread in immunity time in days*/
 
+    /*! sick -> hospital probabilities */
+    amrex::Real m_CHR[AgeGroups::total] = { amrex::Real(.0104),
+                                            amrex::Real(.0104),
+                                            amrex::Real(.070),
+                                            amrex::Real(.28),
+                                            amrex::Real(1.0) };
+    /*! hospital -> ICU probabilities */
+    amrex::Real m_CIC[AgeGroups::total] = { amrex::Real(.24),
+                                            amrex::Real(.24),
+                                            amrex::Real(.24),
+                                            amrex::Real(.36),
+                                            amrex::Real(.35) };
+    /*! ICU -> ventilator probabilities */
+    amrex::Real m_CVE[AgeGroups::total] = { amrex::Real(.12),
+                                            amrex::Real(.12),
+                                            amrex::Real(.12),
+                                            amrex::Real(.22),
+                                            amrex::Real(.22) };
+    /*! ventilator -> dead probilities */
+    amrex::Real m_CVF[AgeGroups::total] = { amrex::Real(.20),
+                                            amrex::Real(.20),
+                                            amrex::Real(.20),
+                                            amrex::Real(0.45),
+                                            amrex::Real(1.26) };
+
     void Initialize ();
 
     void printMatrix ();
+
+    /*! \brief Given age group, decide if hospitalized or not;
+     *  if so, compute number of hospitalization days and check if
+     *  moved to ICU and ventilator */
+    AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+    void check_hospitalization( amrex::Real& a_t_hosp, /*!< number of hospitalization days */
+                                int& a_ICU, /*!< moved to ICU ? */
+                                int& a_ventilator, /*!< moved to ventilator? */
+                                const int a_age_grp, /*!< age group */
+                                const amrex::RandomEngine& a_reng /*!< random engine */) const
+    {
+        a_t_hosp = 0.0;
+        a_ICU = 0;
+        a_ventilator = 0;
+        amrex::Real p_hosp = m_CHR[a_age_grp];
+        if (amrex::Random(a_reng) < p_hosp) {
+            if ((a_age_grp) < AgeGroups::a30to64) {  // age groups 0-4, 5-18, 19-29
+                a_t_hosp = 3;  // Ages 0-49 hospitalized for 3.1 days
+            }
+            else if (a_age_grp == AgeGroups::o65) {
+                a_t_hosp = 7;  // Age 65+ hospitalized for 6.5 days
+            }
+            else if (amrex::Random(a_reng) < 0.57) {
+                a_t_hosp = 3;  // Proportion of 30-64 that is under 50
+            }
+            else {
+                a_t_hosp = 8;  // Age 50-64 hospitalized for 7.8 days
+            }
+            if (amrex::Random(a_reng) < m_CIC[a_age_grp]) {
+                a_t_hosp += 10;  // move to ICU
+                a_ICU = 1;
+                if (amrex::Random(a_reng) < m_CVE[a_age_grp]) {
+                    a_t_hosp += 10;  // put on ventilator
+                    a_ventilator = 1;
+                }
+            }
+        }
+    }
+
+    /*! \brief Check if hospitalized patient survives or dies */
+    AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+    void check_survival( int& a_flag, /*!< survive or die */
+                         const int a_age_grp, /*!< age group */
+                         const amrex::Real a_offset, /*!< DG: don't understand this */
+                         const amrex::RandomEngine& a_reng /*!< random engine */) const
+    {
+        a_flag = 1;
+        if (m_CVF[a_age_grp] > a_offset) {
+            if (amrex::Random(a_reng) < (m_CVF[a_age_grp]-a_offset)) {
+                a_flag = 0;
+            }
+        }
+    }
 };
 #endif
