@@ -886,13 +886,14 @@ void AgentContainer::moveRandomTravel (const iMultiFab& unit_mf)
 
 /*! \brief Return agents from random travel
 */
-void AgentContainer::returnRandomTravel ()
+void AgentContainer::returnRandomTravel (const AgentContainer& on_travel_pc)
 {
     BL_PROFILE("AgentContainer::returnRandomTravel");
 
     for (int lev = 0; lev <= finestLevel(); ++lev)
     {
         auto& plev  = GetParticles(lev);
+        const auto& plev_travel = on_travel_pc.GetParticles(lev);
 
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
@@ -902,17 +903,35 @@ void AgentContainer::returnRandomTravel ()
             int gid = mfi.index();
             int tid = mfi.LocalTileIndex();
             auto& ptile = plev[std::make_pair(gid, tid)];
+            auto& aos   = ptile.GetArrayOfStructs();
+            //ParticleType* pstruct = &(aos[0]);
+            const size_t np = aos.numParticles();
             auto& soa   = ptile.GetStructOfArrays();
             auto random_travel_ptr = soa.GetIntData(IntIdx::random_travel).data();
-            const size_t np = soa.numParticles();
 
-            amrex::ParallelForRNG( np,
-            [=] AMREX_GPU_DEVICE (int i, RandomEngine const& engine) noexcept
-            {
-                if (random_travel_ptr[i] >= 0) {
-                    random_travel_ptr[i] = -1;
-                }
-            });
+            const auto& ptile_travel = plev_travel.at(std::make_pair(gid, tid));
+            const auto& aos_travel   = ptile_travel.GetArrayOfStructs();
+            //const ParticleType* pstruct_travel = &(aos_travel[0]);
+            const size_t np_travel = aos_travel.numParticles();
+            auto& soa_travel= ptile.GetStructOfArrays();
+            auto random_travel_ptr_travel = soa_travel.GetIntData(IntIdx::random_travel).data();
+
+            int r_RT = RealIdx::nattribs;
+            int n_disease = m_num_diseases;
+            for (int d = 0; d < n_disease; d++) {
+                auto prob_ptr        = soa.GetRealData(r_RT+r0(d)+RealIdxDisease::prob).data();
+                auto prob_ptr_travel = soa_travel.GetRealData(r_RT+r0(d)+RealIdxDisease::prob).data();
+
+                amrex::ParallelFor( np_travel,
+                    [=] AMREX_GPU_DEVICE (int i) noexcept
+                    {
+                        int dst_index = random_travel_ptr_travel[i];
+                        prob_ptr[dst_index] = prob_ptr_travel[i];
+                        AMREX_ALWAYS_ASSERT(random_travel_ptr[dst_index] = dst_index);
+                        AMREX_ALWAYS_ASSERT(random_travel_ptr[dst_index] >= 0);
+                        random_travel_ptr[dst_index] = -1;
+                    });
+            }
         }
     }
 }

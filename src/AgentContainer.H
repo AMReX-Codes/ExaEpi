@@ -251,7 +251,7 @@ public:
 
     void moveRandomTravel (const amrex::iMultiFab& unit_mf);
 
-    void returnRandomTravel ();
+    void returnRandomTravel (const AgentContainer& on_travel_pc);
 
     void updateStatus (MFPtrVec& ds);
 
