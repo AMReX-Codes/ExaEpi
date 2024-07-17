@@ -78,6 +78,7 @@ public:
           student_counts(a_ba, a_dmap, SchoolType::total_school_type, 0)
     {
         BL_PROFILE("AgentContainer::AgentContainer");
+        m_num_diseases = 1;
         AMREX_ASSERT(m_num_diseases < ExaEpi::max_num_diseases);
         m_num_diseases = a_num_diseases;
         m_disease_names = a_disease_names;
