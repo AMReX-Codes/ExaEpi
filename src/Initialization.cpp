@@ -253,7 +253,6 @@ namespace Initialization
             auto school_ptr = soa.GetIntData(IntIdx::school).data();
             auto work_nborhood_ptr = soa.GetIntData(IntIdx::work_nborhood).data();
 
-            auto comm_arr = comm_mf[mfi].array();
             auto Ndaywork = demo.Ndaywork_d.data();
             auto Start = demo.Start_d.data();
             auto Ncommunity = demo.Ncommunity;
