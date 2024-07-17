@@ -873,7 +873,9 @@ void AgentContainer::updateStatus (MFPtrVec& a_disease_stats /*!< Community-wise
 {
     BL_PROFILE("AgentContainer::updateStatus");
 
-    m_disease_status.updateAgents(*this, a_disease_stats);
+    for (int d = 0; d < m_num_diseases; d++) {
+        m_disease_status.updateAgents(*this, (*a_disease_stats[d]), d);
+    }
 }
 
 /*! \brief Start shelter-in-place */
