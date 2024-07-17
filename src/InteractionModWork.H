@@ -149,6 +149,7 @@ void InteractionModWork<AC,ACT,ACTD,A>::interactAgents(AC& a_agents, /*!< Agent 
                     AMREX_ALWAYS_ASSERT( (Long) i < np);
 
                     if ( notSusceptible<ACTD>(i, ptd, d) )  { return; }
+                    if ( isHospitalized(i, ptd) )  { return; }
 
                     //Real i_mask = mask_arr(home_i_ptr[i], home_j_ptr[i], 0);
                     for (unsigned int jj = cell_start; jj < cell_stop; ++jj) {
@@ -157,6 +158,7 @@ void InteractionModWork<AC,ACT,ACTD,A>::interactAgents(AC& a_agents, /*!< Agent 
                         AMREX_ALWAYS_ASSERT( (Long) j < np);
                         //Real j_mask = mask_arr(home_i_ptr[j], home_j_ptr[j], 0);
                         if (i == j) continue;
+                        if ( isHospitalized(j, ptd) )  { continue; }
 
                         if ( isInfectious<ACTD>(j, ptd, d) ) {
                             Real work_scale = 1.0_prt;  // TODO this should vary based on cell
