@@ -210,6 +210,8 @@ namespace Initialization
                           const iMultiFab& comm_mf,     /*!< MultiFab with community number at each grid cell */
                           AgentContainer& pc            /*!< Agent container (particle container) */ )
     {
+        const Box& domain = pc.Geom(0).Domain();
+
         auto total_teacher_unit = pc.getUnitTeacherCounts();
 
         auto total_teacher_counts = pc.getCommTeacherCounts();
@@ -236,6 +238,9 @@ namespace Initialization
         amrex::Gpu::DeviceVector<int> elem4_teacher_counts_mod(elem4_teacher_counts.size(),0);
         auto elem4_teacher_counts_ptr = elem4_teacher_counts_mod.data();
 
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (Gpu::notInLaunchRegion())
+#endif
         for (MFIter mfi(unit_mf, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
             auto& agents_tile = pc.GetParticles(0)[std::make_pair(mfi.index(),mfi.LocalTileIndex())];
             auto& soa = agents_tile.GetStructOfArrays();
@@ -249,10 +254,17 @@ namespace Initialization
             auto comm_arr = comm_mf[mfi].array();
             auto Ndaywork = demo.Ndaywork_d.data();
             auto Start = demo.Start_d.data();
+            auto Ncommunity = demo.Ncommunity;
 
             auto np = soa.numParticles();
             for (int ip = 0; ip < np; ++ip) {
-                int to = unit_arr(work_i_ptr[ip], work_j_ptr[ip],0);
+
+                int comm_to = (int) domain.index(IntVect(AMREX_D_DECL(work_i_ptr[ip],work_j_ptr[ip],0)));
+                if (comm_to >= Ncommunity) {
+                    continue;
+                }
+                int to = 0;
+                while (comm_to >= Start[to+1]) { to++; }
 
                 if (total_teacher_unit.data()[to] && (age_group_ptr[ip] == 2 || age_group_ptr[ip] == 3) && workgroup_ptr[ip] > 0)
                 {
