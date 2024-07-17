@@ -164,11 +164,13 @@ void DiseaseStatus<AC,ACT,ACTD,A>::updateAgents(AC& a_agents, /*!< Agent contain
                     }
                     if (counter_ptr[i] == Math::ceil(incubation_period_ptr[i])) {
                         int flag_ICU = 0, flag_vent = 0;
-                        disease_parm_h->check_hospitalization( timer_ptr[i],
+                        Real num_days = 0;
+                        disease_parm_h->check_hospitalization( num_days,
                                                                flag_ICU,
                                                                flag_vent,
                                                                age_group_ptr[i],
                                                                engine );
+                        timer_ptr[i] = ParticleReal(num_days);
                         if (timer_ptr[i] > 0) {
                             Gpu::Atomic::AddNoRet( &ds_arr(  home_i_ptr[i],
                                                              home_j_ptr[i],
