@@ -20,6 +20,7 @@
 #include "AgentDefinitions.H"
 #include "DemographicData.H"
 #include "DiseaseParm.H"
+#include "DiseaseStatus.H"
 #include "InteractionModelLibrary.H"
 
 /*! \brief Assigns school by taking a random number between 0 and 100, and using
@@ -321,6 +322,16 @@ public:
         return comm_teacher_counts_total_d;
     }
 
+    /*! \brief return the symptomatic withdrawal status */
+    inline int symptomaticWithdraw() const {
+        return m_symptomatic_withdraw;
+    }
+
+    /*! \brief return the symptomatic withdrawal compliance */
+    inline amrex::Real symptomaticWithdrawCompliance() const {
+        return m_symptomatic_withdraw_compliance;
+    }
+
 protected:
 
     amrex::iMultiFab student_counts;
@@ -336,10 +347,10 @@ protected:
     int m_num_diseases; /*!< Number of diseases */
     std::vector<std::string> m_disease_names; /*!< names of the diseases */
 
-    int m_symptomatic_withdraw = 1;
+    int m_symptomatic_withdraw = 1; /*!< whether symptomatic agents withdraw or not */
 
-    amrex::Real m_shelter_compliance = 0.95_rt;
-    amrex::Real m_symptomatic_withdraw_compliance = 0.95_rt;
+    amrex::Real m_shelter_compliance = 0.95_rt; /*!< Shelter-in-place compliance rate */
+    amrex::Real m_symptomatic_withdraw_compliance = 0.95_rt; /*!< Symptomatic withdrawal compliance rate */
 
     std::vector<DiseaseParm*> h_parm;    /*!< Disease parameters */
     std::vector<DiseaseParm*> d_parm;    /*!< Disease parameters (GPU device) */
@@ -351,10 +362,13 @@ protected:
         see AgentContainer::interactAgentsHomeWork() */
     std::map<std::pair<int, int>, amrex::DenseBins<PType> > m_bins_work;
 
-    std::map<std::string,IntModel*> m_interactions;
+    std::map<std::string,IntModel*> m_interactions; /*!< Map of interaction models */
 
     /*! Flag to indicate if agents are at work */
     bool m_at_work;
+
+    /*! Disease status update model */
+    DiseaseStatus<PCType,PTileType,PTDType,PType> m_disease_status;
 
     /*! \brief queries if a given interaction type (model) is available */
     inline bool haveInteractionModel( const std::string& a_mod_name ) const

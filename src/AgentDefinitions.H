@@ -93,6 +93,17 @@ struct Status
     };
 };
 
+/*! \brief Disease statistics */
+struct DiseaseStats
+{
+    enum {
+        hospitalization = 0, /*!< number of hospitalizations */
+        ICU,                 /*!< number of ICU cases */
+        ventilator,          /*!< number of ventilator cases */
+        death                /*!< number of deaths */
+    };
+};
+
 /*! \brief Compute index offsets for runtime int-type disease attributes */
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 int i0 ( const int a_d /*!< Disease index */)
@@ -107,7 +118,7 @@ int r0 ( const int a_d /*!< Disease index */)
     return a_d*RealIdxDisease::nattribs;
 }
 
-/*! \brief Disease status */
+/*! \brief Disease symptom status */
 struct SymptomStatus
 {
     enum {
