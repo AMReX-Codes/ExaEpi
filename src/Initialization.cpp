@@ -250,7 +250,6 @@ namespace Initialization
             auto work_j_ptr = soa.GetIntData(IntIdx::work_j).data();
             auto school_ptr = soa.GetIntData(IntIdx::school).data();
 
-            auto comm_arr = comm_mf[mfi].array();
             auto Ndaywork = demo.Ndaywork_d.data();
             auto Start = demo.Start_d.data();
             auto Ncommunity = demo.Ncommunity;
