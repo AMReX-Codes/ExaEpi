@@ -202,12 +202,11 @@ namespace Initialization
                 }
             });
         }
-        assignTeachersAndWorkgroup(demo,unit_mf,comm_mf,pc);
+        assignTeachersAndWorkgroup(demo,unit_mf,pc);
     }
 
     void assignTeachersAndWorkgroup (const DemographicData& demo,  /*!< Demographic data */
                           const iMultiFab& unit_mf,     /*!< MultiFab with unit number at each grid cell */
-                          const iMultiFab& comm_mf,     /*!< MultiFab with community number at each grid cell */
                           AgentContainer& pc            /*!< Agent container (particle container) */ )
     {
         const Box& domain = pc.Geom(0).Domain();
