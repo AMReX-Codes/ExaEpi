@@ -20,6 +20,8 @@ function as desired.
 
 import numpy as np
 
+import h5py
+
 import yt
 from yt.frontends import boxlib
 from yt.frontends.boxlib.data_structures import AMReXDataset
@@ -30,8 +32,6 @@ from matplotlib.animation import FuncAnimation
 import pandas as pd
 import geopandas as gpd
 from shapely.geometry import shape
-import shapefile
-# import fiona
 
 import os
 import sys
@@ -79,6 +79,33 @@ def get_raw_data(name: str):
     raw_df["FIPS"] = counties.d.astype(int)
     raw_df["per"] = raw_df.apply(lambda row: get_raw(row["FIPS"]), axis=1)
     ds.close()
+    return raw_df
+
+def get_raw_data_hdf5(name: str):
+    f = h5py.File(name, 'r')
+    found = 0
+    i = 0
+    while found < 2:
+        if f.attrs['component_' + str(i)] == b'FIPS':
+            fips_idx = i
+            found += 1
+        if f.attrs['component_' + str(i)] == b'infected':
+            inf_idx = i
+            found += 1
+        i += 1
+
+    fips = f['level_0']['data:datatype=' + str(fips_idx)][()]
+    infs = f['level_0']['data:datatype=' + str(inf_idx)][()]
+    unique_fips = np.unique(fips).astype(int)
+
+    def get_raw(county):
+        mask = fips == county
+        return np.log(1 + infs[mask].sum())
+
+    raw_df = pd.DataFrame()
+    raw_df["FIPS"] = unique_fips
+    raw_df["per"] = raw_df.apply(lambda row: get_raw(row["FIPS"]), axis=1)
+    f.close()
     return raw_df
 
 # example: prefix = "../data/San_Francisco_Bay_Region_2020_Census_Tracts/region_2020_censustract"
@@ -145,7 +172,7 @@ if __name__ == "__main__":
 
     argc = len(sys.argv)
     data_dir = sys.argv[1] if argc > 1 else "/global/cfs/projectdirs/m3623/test/output_usa/"
-    data_names = sorted([os.path.join(data_dir, f) for f in os.listdir(data_dir) if f.startswith("plt")])
+    data_names = sorted([os.path.join(data_dir, f) for f in os.listdir(data_dir) if f.endswith(".h5")])
 
     # BA: data/San_Francisco_Bay_Region_2020_Census_Tracts/region_2020_censustract
     # CA: data/CA_2020_Census_Tracts/tl_2020_06_tract
@@ -158,6 +185,6 @@ if __name__ == "__main__":
     for i in range(len(data_names)):
         # vmin and vmax are endpoints for color range; 16 > log(population of LA) is a safe upper bound
         # for per-capita, endpoints should be set to much less
-        fig = generate_plot(get_raw_data(data_names[i]), gdf, vmin=0, vmax=16, crop_usa = crop_usa)
+        fig = generate_plot(get_raw_data_hdf5(data_names[i]), gdf, vmin=0, vmax=16, crop_usa = crop_usa)
         fig.savefig(output_dir + "frame{:05d}".format(i))
         plt.close(fig)

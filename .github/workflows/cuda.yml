@@ -50,6 +50,8 @@ jobs:
         source /etc/profile.d/modules.sh
         module load /opt/nvidia/hpc_sdk/modulefiles/nvhpc/21.11
 
+        export HDF5_ROOT=/usr/lib/x86_64-linux-gnu/hdf5/openmpi
+
         which nvcc || echo "nvcc not in PATH!"
         which nvc++ || echo "nvc++ not in PATH!"
         which nvc || echo "nvc not in PATH!"
