@@ -94,6 +94,17 @@ struct AgeGroups
     };
 };
 
+/*! \brief Age Groups for Hospitalization Days */
+struct AgeGroups_Hosp
+{
+    enum {
+        u50 = 0, /*!< Under 50 */
+        a50to64, /*!< Ages 50-64 */
+        o65,     /*!< 65 and over */
+        total    /*!< number of age groups */
+    };
+};
+
 /*! \brief Disease status */
 struct Status
 {

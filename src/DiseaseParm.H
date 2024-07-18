@@ -129,6 +129,13 @@ struct DiseaseParm
     amrex::Real mean_immune_time = 30*6;  /*! mean immunity time in days*/
     amrex::Real immune_time_spread = 30*2;  /*! spread in immunity time in days*/
 
+    /*! number of hospitalization days by age group (#AgeGroups_Hosp); note that the
+     *  age groups here are under 50, 50-64, and over 65, and *not* the age groups
+     *  used in other parts of the code (#AgeGroups) */
+    amrex::Real m_t_hosp[AgeGroups_Hosp::total] = { amrex::Real(3), /* under 50 */
+                                                    amrex::Real(8), /* ages 50-64 */
+                                                    amrex::Real(7)  /* over 65 */ };
+
     /*! sick -> hospital probabilities */
     amrex::Real m_CHR[AgeGroups::total] = { amrex::Real(.0104),
                                             amrex::Real(.0104),
@@ -173,17 +180,18 @@ struct DiseaseParm
         a_ventilator = 0;
         amrex::Real p_hosp = m_CHR[a_age_grp];
         if (amrex::Random(a_reng) < p_hosp) {
-            if ((a_age_grp) < AgeGroups::a30to64) {  // age groups 0-4, 5-18, 19-29
-                a_t_hosp = 3;  // Ages 0-49 hospitalized for 3.1 days
-            }
-            else if (a_age_grp == AgeGroups::o65) {
-                a_t_hosp = 7;  // Age 65+ hospitalized for 6.5 days
-            }
-            else if (amrex::Random(a_reng) < 0.57) {
-                a_t_hosp = 3;  // Proportion of 30-64 that is under 50
-            }
-            else {
-                a_t_hosp = 8;  // Age 50-64 hospitalized for 7.8 days
+            if (a_age_grp < AgeGroups::a30to64) {  // age groups 0-4, 5-18, 19-29
+                // Ages 0-49 hospitalized for 3.1 days
+                a_t_hosp = m_t_hosp[AgeGroups_Hosp::u50];
+            } else if (a_age_grp == AgeGroups::o65) {
+                // Age 65+ hospitalized for 6.5 days
+                a_t_hosp = m_t_hosp[AgeGroups_Hosp::o65];
+            } else if (amrex::Random(a_reng) < 0.57) {
+                // Proportion of 30-64 that is under 50
+                a_t_hosp = m_t_hosp[AgeGroups_Hosp::u50];
+            } else {
+                // Age 50-64 hospitalized for 7.8 days
+                a_t_hosp = m_t_hosp[AgeGroups_Hosp::a50to64];
             }
             if (amrex::Random(a_reng) < m_CIC[a_age_grp]) {
                 a_t_hosp += 10;  // move to ICU

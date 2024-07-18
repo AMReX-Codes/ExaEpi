@@ -156,6 +156,16 @@ The following inputs specify the disease parameters:
     Standard deviation of the infectious period in days.
 * ``disease.symptomdev_length_std`` (`float`, default: ``1.0``)
     Standard deviation of the time until symptom development in days.
+* ``disease.hospitalization_days`` (`list of float`, default: ``3.0 8.0 7.0``)
+    Number of hospitalization days for age groups: under 50, 50-64, 65 and over.
+* ``disease.CHR`` (`list of float`, default: ``.0104, .0104, .070, .28, 1.0``)
+    Probability of hospitalization for age groups: under 5, 5-17, 18-29, 30-64, 65+
+* ``disease.CIC`` (`list of float`, default: ``.24, .24, .24, .36, .35``)
+    Probability of ICU for age groups: under 5, 5-17, 18-29, 30-64, 65+
+* ``disease.CVE`` (`list of float`, default: ``.12, .12, .12, .22, .22``)
+    Probability of ventilator for age groups: under 5, 5-17, 18-29, 30-64, 65+
+* ``disease.CVF`` (`list of float`, default: ``.20, .20, .20, 0.45, 1.26``)
+    Probability of death for age groups: under 5, 5-17, 18-29, 30-64, 65+
 
 `Note`: for ``agent.number_of_diseases > 1``, the disease parameters that are common
 to all the diseases can be specified as above. Any parameter that is `different for a specific disease`

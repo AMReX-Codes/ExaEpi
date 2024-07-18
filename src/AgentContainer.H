@@ -167,6 +167,36 @@ public:
 
                 pp.query("mean_immune_time", h_parm[d]->mean_immune_time);
                 pp.query("immune_time_spread", h_parm[d]->immune_time_spread);
+
+                amrex::Vector<amrex::Real> t_hosp(AgeGroups_Hosp::total);
+                for (int i = 0; i < AgeGroups_Hosp::total; i++) {
+                    t_hosp[i] = h_parm[d]->m_t_hosp[i];
+                }
+                pp.queryarr("hospitalization_days", t_hosp, 0, AgeGroups_Hosp::total);
+                for (int i = 0; i < AgeGroups_Hosp::total; i++) {
+                    h_parm[d]->m_t_hosp[i] = t_hosp[i];
+                }
+
+                amrex::Vector<amrex::Real> CHR(AgeGroups::total);
+                amrex::Vector<amrex::Real> CIC(AgeGroups::total);
+                amrex::Vector<amrex::Real> CVE(AgeGroups::total);
+                amrex::Vector<amrex::Real> CVF(AgeGroups::total);
+                for (int i = 0; i < AgeGroups::total; i++) {
+                    CHR[i] = h_parm[d]->m_CHR[i];
+                    CIC[i] = h_parm[d]->m_CIC[i];
+                    CVE[i] = h_parm[d]->m_CVE[i];
+                    CVF[i] = h_parm[d]->m_CVF[i];
+                }
+                pp.queryarr("CHR", CHR, 0, AgeGroups::total);
+                pp.queryarr("CIC", CHR, 0, AgeGroups::total);
+                pp.queryarr("CVE", CHR, 0, AgeGroups::total);
+                pp.queryarr("CVF", CHR, 0, AgeGroups::total);
+                for (int i = 0; i < AgeGroups::total; i++) {
+                    h_parm[d]->m_CHR[i] = CHR[i];
+                    h_parm[d]->m_CIC[i] = CIC[i];
+                    h_parm[d]->m_CVE[i] = CVE[i];
+                    h_parm[d]->m_CVF[i] = CVF[i];
+                }
             }
             {
                 std::string key = "disease_" + m_disease_names[d];
@@ -212,6 +242,36 @@ public:
 
                 pp.query("mean_immune_time", h_parm[d]->mean_immune_time);
                 pp.query("immune_time_spread", h_parm[d]->immune_time_spread);
+
+                amrex::Vector<amrex::Real> t_hosp(AgeGroups_Hosp::total);
+                for (int i = 0; i < AgeGroups_Hosp::total; i++) {
+                    t_hosp[i] = h_parm[d]->m_t_hosp[i];
+                }
+                pp.queryarr("hospitalization_days", t_hosp, 0, AgeGroups_Hosp::total);
+                for (int i = 0; i < AgeGroups_Hosp::total; i++) {
+                    h_parm[d]->m_t_hosp[i] = t_hosp[i];
+                }
+
+                amrex::Vector<amrex::Real> CHR(AgeGroups::total);
+                amrex::Vector<amrex::Real> CIC(AgeGroups::total);
+                amrex::Vector<amrex::Real> CVE(AgeGroups::total);
+                amrex::Vector<amrex::Real> CVF(AgeGroups::total);
+                for (int i = 0; i < AgeGroups::total; i++) {
+                    CHR[i] = h_parm[d]->m_CHR[i];
+                    CIC[i] = h_parm[d]->m_CIC[i];
+                    CVE[i] = h_parm[d]->m_CVE[i];
+                    CVF[i] = h_parm[d]->m_CVF[i];
+                }
+                pp.queryarr("CHR", CHR, 0, AgeGroups::total);
+                pp.queryarr("CIC", CHR, 0, AgeGroups::total);
+                pp.queryarr("CVE", CHR, 0, AgeGroups::total);
+                pp.queryarr("CVF", CHR, 0, AgeGroups::total);
+                for (int i = 0; i < AgeGroups::total; i++) {
+                    h_parm[d]->m_CHR[i] = CHR[i];
+                    h_parm[d]->m_CIC[i] = CIC[i];
+                    h_parm[d]->m_CVE[i] = CVE[i];
+                    h_parm[d]->m_CVF[i] = CVF[i];
+                }
             }
 
             h_parm[d]->Initialize();
