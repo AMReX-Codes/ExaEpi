@@ -165,7 +165,7 @@ void DiseaseStatus<AC,ACT,ACTD,A>::updateAgents(AC& a_agents, /*!< Agent contain
                     if (counter_ptr[i] == Math::ceil(incubation_period_ptr[i])) {
                         int flag_ICU = 0, flag_vent = 0;
                         Real num_days = 0;
-                        disease_parm_h->check_hospitalization( num_days,
+                        disease_parm_d->check_hospitalization( num_days,
                                                                flag_ICU,
                                                                flag_vent,
                                                                age_group_ptr[i],
@@ -304,6 +304,8 @@ void DiseaseStatus<AC,ACT,ACTD,A>::updateAgents(AC& a_agents, /*!< Agent contain
                     }
                 }
             });
+
+            Gpu::synchronize();
         }
     }
 }
