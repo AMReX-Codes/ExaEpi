@@ -173,6 +173,7 @@ struct DiseaseParm
                                 int& a_ICU, /*!< moved to ICU ? */
                                 int& a_ventilator, /*!< moved to ventilator? */
                                 const int a_age_grp, /*!< age group */
+                                const amrex::Real a_u50frac, /*!< Under-50 fraction in 30-64 age group */
                                 const amrex::RandomEngine& a_reng /*!< random engine */) const
     {
         a_t_hosp = 0.0;
@@ -186,7 +187,7 @@ struct DiseaseParm
             } else if (a_age_grp == AgeGroups::o65) {
                 // Age 65+ hospitalized for 6.5 days
                 a_t_hosp = m_t_hosp[AgeGroups_Hosp::o65];
-            } else if (amrex::Random(a_reng) < 0.57) {
+            } else if (amrex::Random(a_reng) < a_u50frac) {
                 // Proportion of 30-64 that is under 50
                 a_t_hosp = m_t_hosp[AgeGroups_Hosp::u50];
             } else {

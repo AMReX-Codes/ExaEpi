@@ -122,6 +122,9 @@ void DiseaseStatus<AC,ACT,ACTD,A>::updateAgents(AC& a_agents, /*!< Agent contain
             auto symptomatic_withdraw = a_agents.symptomaticWithdraw();
             auto symptomatic_withdraw_compliance = a_agents.symptomaticWithdrawCompliance();
 
+            // fraction of age group 30-64 who are under 50 (assuming uniform distribution)
+            static const Real u50frac = 0.57;
+
             ParallelForRNG( np,
                             [=] AMREX_GPU_DEVICE (int i, RandomEngine const& engine) noexcept
             {
@@ -169,6 +172,7 @@ void DiseaseStatus<AC,ACT,ACTD,A>::updateAgents(AC& a_agents, /*!< Agent contain
                                                                flag_ICU,
                                                                flag_vent,
                                                                age_group_ptr[i],
+                                                               u50frac,
                                                                engine );
                         timer_ptr[i] = ParticleReal(num_days);
                         if (timer_ptr[i] > 0) {
