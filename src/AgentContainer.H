@@ -21,6 +21,7 @@
 #include "DemographicData.H"
 #include "DiseaseParm.H"
 #include "DiseaseStatus.H"
+#include "HospitalModel.H"
 #include "InteractionModelLibrary.H"
 
 /*! \brief Assigns school by taking a random number between 0 and 100, and using
@@ -106,6 +107,8 @@ public:
             m_interactions[InteractionNames::work] = new InteractionModWork<PCType,PTileType,PTDType,PType>;
             m_interactions[InteractionNames::school] = new InteractionModSchool<PCType,PTileType,PTDType,PType>;
             m_interactions[InteractionNames::nborhood] = new InteractionModNborhood<PCType,PTileType,PTDType,PType>;
+
+            m_hospital = std::make_unique<HospitalModel<PCType,PTileType,PTDType,PType>>();
         }
 
         h_parm.resize(m_num_diseases);
@@ -309,7 +312,7 @@ public:
 
     void moveRandomTravel ();
 
-    void updateStatus (MFPtrVec& ds);
+    void updateStatus (MultiFab&, MFPtrVec&);
 
     void infectAgents ();
 
@@ -324,6 +327,8 @@ public:
     void moveAgentsToWork ();
 
     void moveAgentsToHome ();
+
+    void moveAgentsOther ();
 
     /*! \brief Return bin pointer at a given mfi, tile and model name */
     inline amrex::DenseBins<PType>* getBins( const std::pair<int,int>& a_idx,
@@ -423,6 +428,7 @@ protected:
     std::map<std::pair<int, int>, amrex::DenseBins<PType> > m_bins_work;
 
     std::map<std::string,IntModel*> m_interactions; /*!< Map of interaction models */
+    std::unique_ptr<HospitalModel<PCType,PTileType,PTDType,PType>> m_hospital; /*!< hospital model */
 
     /*! Flag to indicate if agents are at work */
     bool m_at_work;

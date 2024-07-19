@@ -14,6 +14,24 @@
 
 using namespace amrex;
 
+using MFPtr = std::unique_ptr<MultiFab>;
+using MFPtrVec = std::vector<MFPtr>;
+
+/*! \brief Assigns a hospital community to an agent: right now
+ *  it is the same as the home community */
+template <typename PTDType>
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+void assign_hospital( const int a_i, /*!< agent index */
+                      int* const a_hosp_i, /*!< hospital index i */
+                      int* const a_hosp_j, /*!< hospital index j */
+                      const PTDType& a_ptd /*!< Particle tile data */ )
+{
+    auto home_i_ptr = a_ptd.m_idata[IntIdx::home_i];
+    auto home_j_ptr = a_ptd.m_idata[IntIdx::home_j];
+    a_hosp_i[a_i] = home_i_ptr[a_i];
+    a_hosp_j[a_i] = home_j_ptr[a_i];
+}
+
 /*! \brief Disease status and its updates for each agent
  *
  *  Contains data and functions for updating disease status for agents.
@@ -35,21 +53,10 @@ class DiseaseStatus
         /*! \brief Updates disease status of each agent at a given step and
          *   also updates a MultiFab that tracks disease statistics (hospitalization,
          *   ICU, ventilator, and death) in a community. */
-        virtual void updateAgents(AC&, MultiFab&, const int) const;
+        virtual void updateAgents(AC&, MFPtrVec&) const;
 
     protected:
 
-        /*! \brief Copy host vector to device */
-        inline void copyToDevice (  const Vector<Real>&      a_vec_h, /*!< host vector */
-                                    Gpu::DeviceVector<Real>& a_vec_d  /*!< device vector */)
-        {
-            a_vec_d.resize(0);
-            a_vec_d.resize(a_vec_h.size());
-            Gpu::copyAsync( Gpu::hostToDevice,
-                            a_vec_h.begin(),
-                            a_vec_h.end(),
-                            a_vec_d.begin() );
-        }
 };
 
 /*! At a given step, update the disease status of each agent based on the following overall logic:
@@ -73,11 +80,10 @@ class DiseaseStatus
 */
 template<typename AC, typename ACT, typename ACTD, typename A>
 void DiseaseStatus<AC,ACT,ACTD,A>::updateAgents(AC& a_agents, /*!< Agent containter */
-                                                MultiFab& a_stats, /*!< MultiFab to store disease stats */
-                                                const int a_idx /*!< disease index */ ) const
+                                                MFPtrVec& a_stats /*!< MultiFab to store disease stats */ ) const
 {
     BL_PROFILE("DiseaseStatus::updateAgents");
-    AMREX_ASSERT(a_idx < a_agents.numDiseases());
+    int n_disease = a_agents.numDiseases();
 
     for (int lev = 0; lev <= a_agents.finestLevel(); ++lev)
     {
@@ -91,33 +97,16 @@ void DiseaseStatus<AC,ACT,ACTD,A>::updateAgents(AC& a_agents, /*!< Agent contain
             int gid = mfi.index();
             int tid = mfi.LocalTileIndex();
             auto& ptile = plev[std::make_pair(gid, tid)];
+            const auto& ptd = ptile.getParticleTileData();
             auto& soa   = ptile.GetStructOfArrays();
             const auto np = ptile.numParticles();
 
             auto age_group_ptr = soa.GetIntData(IntIdx::age_group).data();
             auto home_i_ptr = soa.GetIntData(IntIdx::home_i).data();
             auto home_j_ptr = soa.GetIntData(IntIdx::home_j).data();
+            auto hosp_i_ptr = soa.GetIntData(IntIdx::hosp_i).data();
+            auto hosp_j_ptr = soa.GetIntData(IntIdx::hosp_j).data();
             auto withdrawn_ptr = soa.GetIntData(IntIdx::withdrawn).data();
-            auto timer_ptr = soa.GetRealData(RealIdx::treatment_timer).data();
-
-            int i_RT = IntIdx::nattribs;
-            int r_RT = RealIdx::nattribs;
-
-            auto status_ptr      = soa.GetIntData(i_RT+i0(a_idx)+IntIdxDisease::status).data();
-            auto symptomatic_ptr = soa.GetIntData(i_RT+i0(a_idx)+IntIdxDisease::symptomatic).data();
-
-            auto counter_ptr           = soa.GetRealData(r_RT+r0(a_idx)+RealIdxDisease::disease_counter).data();
-            auto prob_ptr              = soa.GetRealData(r_RT+r0(a_idx)+RealIdxDisease::prob).data();
-            auto incubation_period_ptr = soa.GetRealData(r_RT+r0(a_idx)+RealIdxDisease::incubation_period).data();
-            auto infectious_period_ptr = soa.GetRealData(r_RT+r0(a_idx)+RealIdxDisease::infectious_period).data();
-            auto symptomdev_period_ptr = soa.GetRealData(r_RT+r0(a_idx)+RealIdxDisease::symptomdev_period).data();
-
-            auto* disease_parm_d = a_agents.getDiseaseParameters_d(a_idx);
-            auto* disease_parm_h = a_agents.getDiseaseParameters_h(a_idx);
-            auto mean_immune_time = disease_parm_h->mean_immune_time;
-            auto immune_time_spread = disease_parm_h->immune_time_spread;
-
-            auto ds_arr = a_stats[mfi].array();
 
             auto symptomatic_withdraw = a_agents.symptomaticWithdraw();
             auto symptomatic_withdraw_compliance = a_agents.symptomaticWithdrawCompliance();
@@ -125,192 +114,150 @@ void DiseaseStatus<AC,ACT,ACTD,A>::updateAgents(AC& a_agents, /*!< Agent contain
             // fraction of age group 30-64 who are under 50 (assuming uniform distribution)
             static const Real u50frac = 0.57;
 
-            ParallelForRNG( np,
-                            [=] AMREX_GPU_DEVICE (int i, RandomEngine const& engine) noexcept
+            int i_RT = IntIdx::nattribs;
+            int r_RT = RealIdx::nattribs;
+
+            Gpu::DeviceVector<int> flag_hosp, flag_ICU, flag_vent;
+            flag_hosp.resize(np);
+            flag_ICU.resize(np);
+            flag_vent.resize(np);
+            auto flag_hosp_ptr = flag_hosp.data();
+            auto flag_ICU_ptr = flag_ICU.data();
+            auto flag_vent_ptr = flag_vent.data();
+            ParallelFor( np, [=] AMREX_GPU_DEVICE (int i) noexcept
             {
-                prob_ptr[i] = 1.0_rt;
-                if ( status_ptr[i] == Status::never ||
-                     status_ptr[i] == Status::susceptible ) {
-                    return;
-                }
-                else if (status_ptr[i] == Status::immune) {
-                    counter_ptr[i] -= 1.0_rt;
-                    if (counter_ptr[i] < 0.0_rt) {
-                        counter_ptr[i] = 0.0_rt;
-                        timer_ptr[i] = 0.0_rt;
-                        status_ptr[i] = Status::susceptible;
+                flag_hosp_ptr[i] = 0;
+                flag_ICU_ptr[i] = 0;
+                flag_vent_ptr[i] = 0;
+            });
+            Gpu::synchronize();
+
+            for (int d = 0; d < n_disease; d++ ) {
+
+                auto status_ptr = soa.GetIntData(i_RT+i0(d)+IntIdxDisease::status).data();
+                auto symptomatic_ptr = soa.GetIntData(i_RT+i0(d)+IntIdxDisease::symptomatic).data();
+
+                auto timer_ptr = soa.GetRealData(r_RT+r0(d)+RealIdxDisease::treatment_timer).data();
+                auto counter_ptr = soa.GetRealData(r_RT+r0(d)+RealIdxDisease::disease_counter).data();
+                auto prob_ptr = soa.GetRealData(r_RT+r0(d)+RealIdxDisease::prob).data();
+                auto incubation_period_ptr = soa.GetRealData(r_RT+r0(d)+RealIdxDisease::incubation_period).data();
+                auto infectious_period_ptr = soa.GetRealData(r_RT+r0(d)+RealIdxDisease::infectious_period).data();
+                auto symptomdev_period_ptr = soa.GetRealData(r_RT+r0(d)+RealIdxDisease::symptomdev_period).data();
+
+                auto* disease_parm_d = a_agents.getDiseaseParameters_d(d);
+                auto* disease_parm_h = a_agents.getDiseaseParameters_h(d);
+                auto mean_immune_time = disease_parm_h->mean_immune_time;
+                auto immune_time_spread = disease_parm_h->immune_time_spread;
+
+                ParallelForRNG( np,
+                                [=] AMREX_GPU_DEVICE (int i, RandomEngine const& engine) noexcept
+                {
+                    prob_ptr[i] = 1.0_rt;
+                    if ( status_ptr[i] == Status::never ||
+                         status_ptr[i] == Status::susceptible ) {
                         return;
                     }
-                }
-                else if (status_ptr[i] == Status::infected) {
-                    counter_ptr[i] += 1;
-                    if (counter_ptr[i] == 1) {
-                        if (Random(engine) < disease_parm_d->p_asymp[0]) {
-                            symptomatic_ptr[i] = SymptomStatus::asymptomatic;
-                        } else {
-                            symptomatic_ptr[i] = SymptomStatus::presymptomatic;
+                    else if (status_ptr[i] == Status::immune) {
+                        counter_ptr[i] -= 1.0_rt;
+                        if (counter_ptr[i] < 0.0_rt) {
+                            counter_ptr[i] = 0.0_rt;
+                            timer_ptr[i] = 0.0_rt;
+                            status_ptr[i] = Status::susceptible;
+                            return;
                         }
                     }
-                    if (counter_ptr[i] == Math::floor(symptomdev_period_ptr[i])) {
-                        if (symptomatic_ptr[i] != SymptomStatus::asymptomatic) {
-                            symptomatic_ptr[i] = SymptomStatus::symptomatic;
-                        }
-                        if (    (symptomatic_ptr[i] == SymptomStatus::symptomatic)
-                            &&  (symptomatic_withdraw)
-                            &&  (Random(engine) < symptomatic_withdraw_compliance)) {
-                            withdrawn_ptr[i] = 1;
-                        }
-                    }
-                    if (counter_ptr[i] < incubation_period_ptr[i]) {
-                        // incubation phase
-                        return;
-                    }
-                    if (counter_ptr[i] == Math::ceil(incubation_period_ptr[i])) {
-                        int flag_ICU = 0, flag_vent = 0;
-                        Real num_days = 0;
-                        disease_parm_d->check_hospitalization( num_days,
-                                                               flag_ICU,
-                                                               flag_vent,
-                                                               age_group_ptr[i],
-                                                               u50frac,
-                                                               engine );
-                        timer_ptr[i] = ParticleReal(num_days);
-                        if (timer_ptr[i] > 0) {
-                            Gpu::Atomic::AddNoRet( &ds_arr(  home_i_ptr[i],
-                                                             home_j_ptr[i],
-                                                             0,
-                                                             DiseaseStats::hospitalization ),
-                                                   1.0_rt );
-                        }
-                        if (flag_ICU == 1) {
-                            Gpu::Atomic::AddNoRet( &ds_arr( home_i_ptr[i],
-                                                            home_j_ptr[i],
-                                                            0,
-                                                            DiseaseStats::ICU ),
-                                                   1.0_rt );
-                        }
-                        if (flag_vent == 1) {
-                            Gpu::Atomic::AddNoRet( &ds_arr(  home_i_ptr[i],
-                                                             home_j_ptr[i],
-                                                             0,
-                                                             DiseaseStats::ventilator ),
-                                                   1.0_rt );
-                        }
-                    } else {
-                        if (timer_ptr[i] > 0.0_rt) {
-                            // do hospital things
-                            timer_ptr[i] -= 1.0_rt;
-                            if (timer_ptr[i] == 0) {
-                                int flag = 1;
-                                disease_parm_d->check_survival( flag,
-                                                                age_group_ptr[i],
-                                                                2.0_rt,
-                                                                engine );
-                                if (flag == 0) {
-                                    Gpu::Atomic::AddNoRet( &ds_arr(  home_i_ptr[i],
-                                                                     home_j_ptr[i],
-                                                                     0,
-                                                                     DiseaseStats::death),
-                                                           1.0_rt );
-                                    status_ptr[i] = Status::dead;
-                                }
-                                Gpu::Atomic::AddNoRet( &ds_arr(  home_i_ptr[i],
-                                                                 home_j_ptr[i],
-                                                                 0,
-                                                                 DiseaseStats::hospitalization ),
-                                                       -1.0_rt );
-                                if (status_ptr[i] != Status::dead) {
-                                    status_ptr[i] = Status::immune;  // If alive, hospitalized patient recovers
-                                    counter_ptr[i] = (mean_immune_time - immune_time_spread)
-                                                     + 2.0_rt*immune_time_spread*Random(engine);
-                                    symptomatic_ptr[i] = SymptomStatus::presymptomatic;
-                                    withdrawn_ptr[i] = 0;
-                                }
-                            }
-                            if (timer_ptr[i] == 10) {
-                                int flag = 1;
-                                disease_parm_d->check_survival( flag,
-                                                                age_group_ptr[i],
-                                                                1.0_rt,
-                                                                engine );
-                                if (flag == 0) {
-                                    Gpu::Atomic::AddNoRet( &ds_arr(  home_i_ptr[i],
-                                                                     home_j_ptr[i],
-                                                                     0,
-                                                                     DiseaseStats::death),
-                                                           1.0_rt );
-                                    status_ptr[i] = Status::dead;
-                                }
-                                Gpu::Atomic::AddNoRet( &ds_arr(  home_i_ptr[i],
-                                                                 home_j_ptr[i],
-                                                                 0,
-                                                                 DiseaseStats::hospitalization ),
-                                                       -1.0_rt );
-                                Gpu::Atomic::AddNoRet( &ds_arr(  home_i_ptr[i],
-                                                                 home_j_ptr[i],
-                                                                 0,
-                                                                 DiseaseStats::ICU),
-                                                       -1.0_rt );
-                                if (status_ptr[i] != Status::dead) {
-                                    status_ptr[i] = Status::immune;  // If alive, ICU patient recovers
-                                    counter_ptr[i] = (mean_immune_time - immune_time_spread)
-                                                    + 2.0_rt*immune_time_spread*Random(engine);
-                                    symptomatic_ptr[i] = SymptomStatus::presymptomatic;
-                                    withdrawn_ptr[i] = 0;
-                                }
-                            }
-                            if (timer_ptr[i] == 20) {
-                                int flag = 1;
-                                disease_parm_d->check_survival( flag,
-                                                                age_group_ptr[i],
-                                                                0.0_rt,
-                                                                engine );
-                                if (flag == 0) {
-                                    Gpu::Atomic::AddNoRet( &ds_arr(  home_i_ptr[i],
-                                                                     home_j_ptr[i],
-                                                                     0,
-                                                                     DiseaseStats::death),
-                                                           1.0_rt );
-                                    status_ptr[i] = Status::dead;
-                                }
-                                Gpu::Atomic::AddNoRet( &ds_arr(  home_i_ptr[i],
-                                                                 home_j_ptr[i],
-                                                                 0,
-                                                                 DiseaseStats::hospitalization ),
-                                                       -1.0_rt );
-                                Gpu::Atomic::AddNoRet( &ds_arr(  home_i_ptr[i],
-                                                                 home_j_ptr[i],
-                                                                 0,
-                                                                 DiseaseStats::ICU ),
-                                                       -1.0_rt );
-                                Gpu::Atomic::AddNoRet( &ds_arr(  home_i_ptr[i],
-                                                                 home_j_ptr[i],
-                                                                 0,
-                                                                 DiseaseStats::ventilator ),
-                                                       -1.0_rt );
-                                if (status_ptr[i] != Status::dead) {
-                                    status_ptr[i] = Status::immune;  // If alive, ventilated patient recovers
-                                    counter_ptr[i] = (mean_immune_time - immune_time_spread)
-                                                     + 2.0_rt*immune_time_spread*Random(engine);
-                                    symptomatic_ptr[i] = SymptomStatus::presymptomatic;
-                                    withdrawn_ptr[i] = 0;
-                                }
-                            }
-                        } else { // not hospitalized, recover once not infectious
-                            if (counter_ptr[i] >= (incubation_period_ptr[i] + infectious_period_ptr[i])) {
-                                status_ptr[i] = Status::immune;
-                                counter_ptr[i] = (mean_immune_time - immune_time_spread)
-                                                 + 2.0_rt*immune_time_spread*Random(engine);
+                    else if (status_ptr[i] == Status::infected) {
+                        counter_ptr[i] += 1;
+                        if (counter_ptr[i] == 1) {
+                            if (Random(engine) < disease_parm_d->p_asymp[0]) {
+                                symptomatic_ptr[i] = SymptomStatus::asymptomatic;
+                            } else {
                                 symptomatic_ptr[i] = SymptomStatus::presymptomatic;
-                                withdrawn_ptr[i] = 0;
+                            }
+                        }
+                        if (counter_ptr[i] == Math::floor(symptomdev_period_ptr[i])) {
+                            if (symptomatic_ptr[i] != SymptomStatus::asymptomatic) {
+                                symptomatic_ptr[i] = SymptomStatus::symptomatic;
+                            }
+                            if (    (symptomatic_ptr[i] == SymptomStatus::symptomatic)
+                                &&  (symptomatic_withdraw)
+                                &&  (Random(engine) < symptomatic_withdraw_compliance)) {
+                                withdrawn_ptr[i] = 1;
+                            }
+                        }
+                        if (counter_ptr[i] < incubation_period_ptr[i]) {
+                            // incubation phase
+                            return;
+                        }
+                        if (counter_ptr[i] == Math::ceil(incubation_period_ptr[i])) {
+                            int flag_ICU = 0, flag_vent = 0;
+                            Real num_days = 0;
+                            disease_parm_d->check_hospitalization( num_days,
+                                                                   flag_ICU,
+                                                                   flag_vent,
+                                                                   age_group_ptr[i],
+                                                                   u50frac,
+                                                                   engine );
+                            timer_ptr[i] = ParticleReal(num_days);
+                            if (timer_ptr[i] > 0) { flag_hosp_ptr[i] = 1; }
+                            if (flag_ICU) { flag_ICU_ptr[i] = 1; }
+                            if (flag_vent) { flag_vent_ptr[i] = 1; }
+                        } else {
+                            if (!isHospitalized(i,ptd)) {
+                                if (counter_ptr[i] >= (incubation_period_ptr[i] + infectious_period_ptr[i])) {
+                                    status_ptr[i] = Status::immune;
+                                    counter_ptr[i] = (mean_immune_time - immune_time_spread)
+                                                     + 2.0_rt*immune_time_spread*Random(engine);
+                                    symptomatic_ptr[i] = SymptomStatus::presymptomatic;
+                                    withdrawn_ptr[i] = 0;
+                                }
                             }
                         }
                     }
+                });
+
+                Gpu::synchronize();
+            }
+
+            ParallelFor( np, [=] AMREX_GPU_DEVICE (int i) noexcept
+            {
+                if (flag_hosp_ptr[i] == 1) {
+                    AMREX_ALWAYS_ASSERT(!isHospitalized(i, ptd));
+                    assign_hospital( i, hosp_i_ptr, hosp_j_ptr, ptd);
                 }
             });
 
+            for (int d = 0; d < n_disease; d++) {
+                auto ds_arr = (*a_stats[d])[mfi].array();
+                ParallelFor( np, [=] AMREX_GPU_DEVICE (int i) noexcept
+                {
+                    if (flag_hosp_ptr[i] == 1) {
+                        Gpu::Atomic::AddNoRet( &ds_arr(  home_i_ptr[i],
+                                                         home_j_ptr[i],
+                                                         0,
+                                                         DiseaseStats::hospitalization ),
+                                               1.0_rt );
+                    }
+                    if (flag_ICU_ptr[i] == 1) {
+                        Gpu::Atomic::AddNoRet( &ds_arr(  home_i_ptr[i],
+                                                         home_j_ptr[i],
+                                                         0,
+                                                         DiseaseStats::ICU ),
+                                               1.0_rt );
+                    }
+                    if (flag_vent_ptr[i] == 1) {
+                        Gpu::Atomic::AddNoRet( &ds_arr(  home_i_ptr[i],
+                                                         home_j_ptr[i],
+                                                         0,
+                                                         DiseaseStats::ventilator ),
+                                               1.0_rt );
+                    }
+                });
+            }
+
             Gpu::synchronize();
         }
+
     }
 }
 #endif

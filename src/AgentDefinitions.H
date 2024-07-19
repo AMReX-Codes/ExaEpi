@@ -17,9 +17,7 @@ namespace ExaEpi
 struct RealIdx
 {
     enum {
-        /* Disease counter starts after infection. */
-        treatment_timer = 0,    /*!< Timer since hospital admission */
-        nattribs                /*!< number of real-type attribute*/
+        nattribs = 0 /*!< number of real-type attribute*/
     };
 };
 
@@ -28,7 +26,8 @@ struct RealIdxDisease
 {
     enum {
         /* Disease counter starts after infection. */
-        disease_counter = 0,    /*!< Counter since start of infection */
+        treatment_timer = 0,    /*!< Timer since hospital admission */
+        disease_counter,        /*!< Counter since start of infection */
         prob,                   /*!< Probability of infection */
         incubation_period,      /*!< Time until infectious */
         infectious_period,      /*!< Length of time infectious */
@@ -47,6 +46,8 @@ struct IntIdx
         home_j          /*!< home location index */,
         work_i          /*!< work location index */,
         work_j          /*!< work location index */,
+        hosp_i          /*!< hosp location index */,
+        hosp_j          /*!< hosp location index */,
         nborhood,       /*!< home neighborhood ID */
         school,         /*!< school type (elementary, middle, high, none) */
         workgroup,      /*!< workgroup ID */
@@ -206,7 +207,8 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE
 bool isHospitalized ( const int      a_idx, /*!< Agent index */
                       const PTDType& a_ptd  /*!< Particle tile data */ )
 {
-    return (a_ptd.m_rdata[RealIdx::treatment_timer][a_idx] > 0.0);
+    return (   (a_ptd.m_idata[IntIdx::hosp_i][a_idx] >= 0)
+            && (a_ptd.m_idata[IntIdx::hosp_j][a_idx] >= 0) );
 }
 
 #endif

@@ -519,6 +519,8 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,    /*!< Number 
         auto home_j_ptr = soa.GetIntData(IntIdx::home_j).data();
         auto work_i_ptr = soa.GetIntData(IntIdx::work_i).data();
         auto work_j_ptr = soa.GetIntData(IntIdx::work_j).data();
+        auto hosp_i_ptr = soa.GetIntData(IntIdx::hosp_i).data();
+        auto hosp_j_ptr = soa.GetIntData(IntIdx::hosp_j).data();
         auto nborhood_ptr = soa.GetIntData(IntIdx::nborhood).data();
         auto school_ptr = soa.GetIntData(IntIdx::school).data();
         auto workgroup_ptr = soa.GetIntData(IntIdx::workgroup).data();
@@ -529,13 +531,13 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,    /*!< Number 
         int n_disease = m_num_diseases;
 
         GpuArray<int*,ExaEpi::max_num_diseases> status_ptrs;
-        GpuArray<ParticleReal*,ExaEpi::max_num_diseases> counter_ptrs;
+        GpuArray<ParticleReal*,ExaEpi::max_num_diseases> counter_ptrs, timer_ptrs;
         for (int d = 0; d < n_disease; d++) {
             status_ptrs[d] = soa.GetIntData(i_RT+i0(d)+IntIdxDisease::status).data();
             counter_ptrs[d] = soa.GetRealData(r_RT+r0(d)+RealIdxDisease::disease_counter).data();
+            timer_ptrs[d] = soa.GetRealData(r_RT+r0(d)+RealIdxDisease::treatment_timer).data();
         }
 
-        auto timer_ptr = soa.GetRealData(RealIdx::treatment_timer).data();
         auto dx = ParticleGeom(0).CellSizeArray();
         auto my_proc = ParallelDescriptor::MyProc();
 
@@ -647,14 +649,16 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,    /*!< Number 
                 for (int d = 0; d < n_disease; d++) {
                     status_ptrs[d][ip] = 0;
                     counter_ptrs[d][ip] = 0.0_rt;
+                    timer_ptrs[d][ip] = 0.0_rt;
                 }
-                timer_ptr[ip] = 0.0_rt;
                 age_group_ptr[ip] = age_group;
                 family_ptr[ip] = family_id_start + (ii / family_size);
                 home_i_ptr[ip] = i;
                 home_j_ptr[ip] = j;
                 work_i_ptr[ip] = i;
                 work_j_ptr[ip] = j;
+                hosp_i_ptr[ip] = -1;
+                hosp_j_ptr[ip] = -1;
                 nborhood_ptr[ip] = nborhood;
                 work_nborhood_ptr[ip] = 5*nborhood;
                 workgroup_ptr[ip] = 0;
@@ -767,6 +771,7 @@ void AgentContainer::moveAgentsToWork ()
             int gid = mfi.index();
             int tid = mfi.LocalTileIndex();
             auto& ptile = plev[std::make_pair(gid, tid)];
+            const auto& ptd = ptile.getParticleTileData();
             auto& aos   = ptile.GetArrayOfStructs();
             ParticleType* pstruct = &(aos[0]);
             const size_t np = aos.numParticles();
@@ -778,9 +783,11 @@ void AgentContainer::moveAgentsToWork ()
             amrex::ParallelFor( np,
             [=] AMREX_GPU_DEVICE (int ip) noexcept
             {
-                ParticleType& p = pstruct[ip];
-                p.pos(0) = (work_i_ptr[ip] + 0.5_prt)*dx[0];
-                p.pos(1) = (work_j_ptr[ip] + 0.5_prt)*dx[1];
+                if (!isHospitalized(ip, ptd)) {
+                    ParticleType& p = pstruct[ip];
+                    p.pos(0) = (work_i_ptr[ip] + 0.5_prt)*dx[0];
+                    p.pos(1) = (work_j_ptr[ip] + 0.5_prt)*dx[1];
+                }
             });
         }
     }
@@ -809,6 +816,7 @@ void AgentContainer::moveAgentsToHome ()
             int gid = mfi.index();
             int tid = mfi.LocalTileIndex();
             auto& ptile = plev[std::make_pair(gid, tid)];
+            const auto& ptd = ptile.getParticleTileData();
             auto& aos   = ptile.GetArrayOfStructs();
             ParticleType* pstruct = &(aos[0]);
             const size_t np = aos.numParticles();
@@ -820,9 +828,11 @@ void AgentContainer::moveAgentsToHome ()
             amrex::ParallelFor( np,
             [=] AMREX_GPU_DEVICE (int ip) noexcept
             {
-                ParticleType& p = pstruct[ip];
-                p.pos(0) = (home_i_ptr[ip] + 0.5_prt)*dx[0];
-                p.pos(1) = (home_j_ptr[ip] + 0.5_prt)*dx[1];
+                if (!isHospitalized(ip, ptd)) {
+                    ParticleType& p = pstruct[ip];
+                    p.pos(0) = (home_i_ptr[ip] + 0.5_prt)*dx[0];
+                    p.pos(1) = (home_j_ptr[ip] + 0.5_prt)*dx[1];
+                }
             });
         }
     }
@@ -850,6 +860,7 @@ void AgentContainer::moveRandomTravel ()
             int gid = mfi.index();
             int tid = mfi.LocalTileIndex();
             auto& ptile = plev[std::make_pair(gid, tid)];
+            const auto& ptd = ptile.getParticleTileData();
             auto& aos   = ptile.GetArrayOfStructs();
             ParticleType* pstruct = &(aos[0]);
             const size_t np = aos.numParticles();
@@ -857,11 +868,12 @@ void AgentContainer::moveRandomTravel ()
             amrex::ParallelForRNG( np,
             [=] AMREX_GPU_DEVICE (int i, RandomEngine const& engine) noexcept
             {
-                ParticleType& p = pstruct[i];
-
-                if (amrex::Random(engine) < 0.0001) {
-                    p.pos(0) = 3000*amrex::Random(engine);
-                    p.pos(1) = 3000*amrex::Random(engine);
+                if (!isHospitalized(i, ptd)) {
+                    ParticleType& p = pstruct[i];
+                    if (amrex::Random(engine) < 0.0001) {
+                        p.pos(0) = 3000*amrex::Random(engine);
+                        p.pos(1) = 3000*amrex::Random(engine);
+                    }
                 }
             });
         }
@@ -869,12 +881,47 @@ void AgentContainer::moveRandomTravel ()
 }
 
 /*! \brief Updates disease status of each agent */
-void AgentContainer::updateStatus (MFPtrVec& a_disease_stats /*!< Community-wise disease stats tracker */)
+void AgentContainer::updateStatus ( MultiFab& a_mask_behavior, /*!< masking behavior */
+                                    MFPtrVec& a_disease_stats /*!< Community-wise disease stats tracker */)
 {
     BL_PROFILE("AgentContainer::updateStatus");
 
-    for (int d = 0; d < m_num_diseases; d++) {
-        m_disease_status.updateAgents(*this, (*a_disease_stats[d]), d);
+    m_disease_status.updateAgents(*this, a_disease_stats);
+    m_hospital->treatAgents(*this, a_disease_stats);
+
+    // move hospitalized agents to their hospital location
+    for (int lev = 0; lev <= finestLevel(); ++lev)
+    {
+        const auto dx = Geom(lev).CellSizeArray();
+        auto& plev  = GetParticles(lev);
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (Gpu::notInLaunchRegion())
+#endif
+        for(MFIter mfi = MakeMFIter(lev, TilingIfNotGPU()); mfi.isValid(); ++mfi)
+        {
+            int gid = mfi.index();
+            int tid = mfi.LocalTileIndex();
+            auto& ptile = plev[std::make_pair(gid, tid)];
+            const auto& ptd = ptile.getParticleTileData();
+            auto& aos   = ptile.GetArrayOfStructs();
+            ParticleType* pstruct = &(aos[0]);
+            const size_t np = aos.numParticles();
+
+            auto& soa = ptile.GetStructOfArrays();
+            auto hosp_i_ptr = soa.GetIntData(IntIdx::hosp_i).data();
+            auto hosp_j_ptr = soa.GetIntData(IntIdx::hosp_j).data();
+
+            amrex::ParallelFor( np,
+            [=] AMREX_GPU_DEVICE (int ip) noexcept
+            {
+                if (isHospitalized(ip, ptd)) {
+                    ParticleType& p = pstruct[ip];
+                    p.pos(0) = (hosp_i_ptr[ip] + 0.5_prt)*dx[0];
+                    p.pos(1) = (hosp_j_ptr[ip] + 0.5_prt)*dx[1];
+                }
+            });
+        }
     }
 }
 
@@ -1141,6 +1188,8 @@ void AgentContainer::interactDay ( MultiFab& a_mask_behavior /*!< Masking behavi
     if (haveInteractionModel(ExaEpi::InteractionNames::nborhood)) {
         m_interactions[ExaEpi::InteractionNames::nborhood]->interactAgents( *this, a_mask_behavior );
     }
+
+    m_hospital->interactAgents(*this, a_mask_behavior);
 }
 
 /*! \brief Interaction of agents during evening (after work) - social stuff */
