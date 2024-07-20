@@ -259,7 +259,7 @@ void runAgent ()
             }
 
             // Update agents' disease status
-            pc.updateStatus(mask_behavior, disease_stats);
+            pc.updateStatus(disease_stats);
 
             for (int d = 0; d < params.num_diseases; d++) {
                 auto counts = pc.getTotals(d);

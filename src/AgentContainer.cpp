@@ -881,8 +881,7 @@ void AgentContainer::moveRandomTravel ()
 }
 
 /*! \brief Updates disease status of each agent */
-void AgentContainer::updateStatus ( MultiFab& a_mask_behavior, /*!< masking behavior */
-                                    MFPtrVec& a_disease_stats /*!< Community-wise disease stats tracker */)
+void AgentContainer::updateStatus ( MFPtrVec& a_disease_stats /*!< Community-wise disease stats tracker */)
 {
     BL_PROFILE("AgentContainer::updateStatus");
 

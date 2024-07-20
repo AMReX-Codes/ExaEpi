@@ -312,7 +312,7 @@ public:
 
     void moveRandomTravel ();
 
-    void updateStatus (MultiFab&, MFPtrVec&);
+    void updateStatus (MFPtrVec&);
 
     void infectAgents ();
 
