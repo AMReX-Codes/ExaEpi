@@ -88,6 +88,7 @@ void writePlotFile (const AgentContainer& pc, /*!< Agent (particle) container */
         plt_varnames.push_back("Tract");
         plt_varnames.push_back("comm");
 
+#ifdef AMREX_USE_HDF5
         WriteSingleLevelPlotfileHDF5MultiDset(  amrex::Concatenate("plt", step, 5),
                                                 output_mf,
                                                 plt_varnames,
@@ -95,6 +96,14 @@ void writePlotFile (const AgentContainer& pc, /*!< Agent (particle) container */
                                                 cur_time,
                                                 step,
                                                 "ZLIB@3" );
+#else
+        WriteSingleLevelPlotfile(   amrex::Concatenate("plt", step, 5),
+                                    output_mf,
+                                    plt_varnames,
+                                    pc.ParticleGeom(0),
+                                    cur_time,
+                                    step );
+#endif
     }
 
     {
@@ -136,6 +145,7 @@ void writePlotFile (const AgentContainer& pc, /*!< Agent (particle) container */
             }
         }
 
+#ifdef AMREX_USE_HDF5
         pc.WritePlotFileHDF5(   amrex::Concatenate("plt", step, 5),
                                 "agents",
                                 write_real_comp,
@@ -143,6 +153,14 @@ void writePlotFile (const AgentContainer& pc, /*!< Agent (particle) container */
                                 real_varnames,
                                 int_varnames,
                                 "ZLIB@3" );
+#else
+        pc.WritePlotFile(   amrex::Concatenate("plt", step, 5),
+                            "agents",
+                            write_real_comp,
+                            write_int_comp,
+                            real_varnames,
+                            int_varnames );
+#endif
     }
 }
 

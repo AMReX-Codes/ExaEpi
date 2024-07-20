@@ -15,6 +15,11 @@ This demo uses CMake version 3.14 or higher. To build it:
 
 To build with GPU support, use the `-DAMReX_GPU_BACKEND=CUDA` CMake option.
 
+To write output as (compressed) HDF5, use the `-DAMReX_HDF5=TRUE` CMake option.
+Compression level can be altered in src/IO.cpp file. The environment variable
+HDF5_CHUNK_SIZE controls the chunk size if compression is used. A value of 
+around 100,000 is recommended to start.
+
 For convenience, a script for setting up the module environment for Perlmutter is
 provided in etc/perlmutter_environment.sh. To use it, do:
 
