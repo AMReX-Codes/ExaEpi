@@ -112,7 +112,7 @@ void DiseaseStatus<AC,ACT,ACTD,A>::updateAgents(AC& a_agents, /*!< Agent contain
             auto symptomatic_withdraw_compliance = a_agents.symptomaticWithdrawCompliance();
 
             // fraction of age group 30-64 who are under 50 (assuming uniform distribution)
-            static const Real u50frac = 0.57;
+            Real u50frac = 0.57_rt;
 
             int i_RT = IntIdx::nattribs;
             int r_RT = RealIdx::nattribs;
@@ -190,18 +190,18 @@ void DiseaseStatus<AC,ACT,ACTD,A>::updateAgents(AC& a_agents, /*!< Agent contain
                             return;
                         }
                         if (counter_ptr[i] == Math::ceil(incubation_period_ptr[i])) {
-                            int flag_ICU = 0, flag_vent = 0;
+                            int flag_ICU_i = 0, flag_vent_i = 0;
                             Real num_days = 0;
                             disease_parm_d->check_hospitalization( num_days,
-                                                                   flag_ICU,
-                                                                   flag_vent,
+                                                                   flag_ICU_i,
+                                                                   flag_vent_i,
                                                                    age_group_ptr[i],
                                                                    u50frac,
                                                                    engine );
                             timer_ptr[i] = ParticleReal(num_days);
                             if (timer_ptr[i] > 0) { flag_hosp_ptr[i] = 1; }
-                            if (flag_ICU) { flag_ICU_ptr[i] = 1; }
-                            if (flag_vent) { flag_vent_ptr[i] = 1; }
+                            if (flag_ICU_i) { flag_ICU_ptr[i] = 1; }
+                            if (flag_vent_i) { flag_vent_ptr[i] = 1; }
                         } else {
                             if (!isHospitalized(i,ptd)) {
                                 if (counter_ptr[i] >= (incubation_period_ptr[i] + infectious_period_ptr[i])) {
