@@ -328,8 +328,6 @@ public:
 
     void moveAgentsToHome ();
 
-    void moveAgentsOther ();
-
     /*! \brief Return bin pointer at a given mfi, tile and model name */
     inline amrex::DenseBins<PType>* getBins( const std::pair<int,int>& a_idx,
                                              const std::string& a_mod_name )

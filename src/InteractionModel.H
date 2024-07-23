@@ -4,7 +4,6 @@
 #ifndef _INTERACTION_MODEL_H_
 #define _INTERACTION_MODEL_H_
 
-#include <vector>
 #include <map>
 #include <string>
 
@@ -26,7 +25,6 @@ namespace ExaEpi
     {
         const std::string generic = "generic";
         const std::string home = "home";
-        const std::string hospital = "hospital";
         const std::string work = "work";
         const std::string school = "school";
         const std::string nborhood = "neighborhood";
