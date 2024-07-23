@@ -98,6 +98,12 @@ void HospitalModel<AC,ACT,ACTD,A>::treatAgents(AC& a_agents, /*!< Agent containe
             is_alive.resize(np);
             auto is_alive_ptr = is_alive.data();
 
+            Gpu::DeviceVector<int> flag_death, flag_hosp;
+            flag_death.resize(np);
+            flag_hosp.resize(np);
+            auto flag_death_ptr = flag_death.data();
+            auto flag_hosp_ptr = flag_hosp.data();
+
             ParallelFor( np, [=] AMREX_GPU_DEVICE (int i) noexcept
             {
                 // if status_ptr for any one disease is dead, they should all be dead
@@ -112,6 +118,9 @@ void HospitalModel<AC,ACT,ACTD,A>::treatAgents(AC& a_agents, /*!< Agent containe
                         AMREX_ALWAYS_ASSERT(status_ptrs[d][i] != Status::dead);
                     }
                 }
+
+                flag_death_ptr[i] = 0;
+                flag_hosp_ptr[i] = 0;
             });
             Gpu::synchronize();
 
@@ -121,8 +130,6 @@ void HospitalModel<AC,ACT,ACTD,A>::treatAgents(AC& a_agents, /*!< Agent containe
                 auto mean_immune_time = disease_parm_h->mean_immune_time;
                 auto immune_time_spread = disease_parm_h->immune_time_spread;
                 auto* disease_parm_d = a_agents.getDiseaseParameters_d(d);
-
-                auto ds_arr = (*a_dstats[d])[mfi].array();
 
                 ParallelForRNG( np,
                                 [=] AMREX_GPU_DEVICE (int i, RandomEngine const& engine)
@@ -153,11 +160,7 @@ void HospitalModel<AC,ACT,ACTD,A>::treatAgents(AC& a_agents, /*!< Agent containe
                                                         2.0_rt,
                                                         engine );
                         if (is_alive_ptr[i] == 0) {
-                            Gpu::Atomic::AddNoRet( &ds_arr(  home_i_ptr[i],
-                                                             home_j_ptr[i],
-                                                             0,
-                                                             DiseaseStats::death),
-                                                   1.0_rt );
+                            flag_death_ptr[i] = 1;
                             status_ptrs[d][i] = Status::dead;
                         } else {
                             // If alive, hospitalized patient recovers
@@ -168,11 +171,7 @@ void HospitalModel<AC,ACT,ACTD,A>::treatAgents(AC& a_agents, /*!< Agent containe
                             withdrawn_ptr[i] = 0;
                             timer_ptrs[d][i] = 0.0_rt;
                         }
-                        Gpu::Atomic::AddNoRet( &ds_arr(  home_i_ptr[i],
-                                                         home_j_ptr[i],
-                                                         0,
-                                                         DiseaseStats::hospitalization ),
-                                               -1.0_rt );
+                        flag_hosp_ptr[i] = 1;
                     }
                     if (timer_ptrs[d][i] == 10) {
                         disease_parm_d->check_survival( is_alive_ptr[i],
@@ -180,11 +179,7 @@ void HospitalModel<AC,ACT,ACTD,A>::treatAgents(AC& a_agents, /*!< Agent containe
                                                         1.0_rt,
                                                         engine );
                         if (is_alive_ptr[i] == 0) {
-                            Gpu::Atomic::AddNoRet( &ds_arr(  home_i_ptr[i],
-                                                             home_j_ptr[i],
-                                                             0,
-                                                             DiseaseStats::death),
-                                                   1.0_rt );
+                            flag_death_ptr[i] = 1;
                             status_ptrs[d][i] = Status::dead;
                         } else {
                             // If alive, hospitalized patient recovers
@@ -195,16 +190,7 @@ void HospitalModel<AC,ACT,ACTD,A>::treatAgents(AC& a_agents, /*!< Agent containe
                             withdrawn_ptr[i] = 0;
                             timer_ptrs[d][i] = 0.0_rt;
                         }
-                        Gpu::Atomic::AddNoRet( &ds_arr(  home_i_ptr[i],
-                                                         home_j_ptr[i],
-                                                         0,
-                                                         DiseaseStats::hospitalization ),
-                                               -1.0_rt );
-                        Gpu::Atomic::AddNoRet( &ds_arr(  home_i_ptr[i],
-                                                         home_j_ptr[i],
-                                                         0,
-                                                         DiseaseStats::ICU),
-                                               -1.0_rt );
+                        flag_hosp_ptr[i] = 2;
                     }
                     if (timer_ptrs[d][i] == 20) {
                         disease_parm_d->check_survival( is_alive_ptr[i],
@@ -212,11 +198,7 @@ void HospitalModel<AC,ACT,ACTD,A>::treatAgents(AC& a_agents, /*!< Agent containe
                                                         0.0_rt,
                                                         engine );
                         if (is_alive_ptr[i] == 0) {
-                            Gpu::Atomic::AddNoRet( &ds_arr(  home_i_ptr[i],
-                                                             home_j_ptr[i],
-                                                             0,
-                                                             DiseaseStats::death),
-                                                   1.0_rt );
+                            flag_death_ptr[i] = 1;
                             status_ptrs[d][i] = Status::dead;
                         } else {
                             // If alive, hospitalized patient recovers
@@ -227,21 +209,7 @@ void HospitalModel<AC,ACT,ACTD,A>::treatAgents(AC& a_agents, /*!< Agent containe
                             withdrawn_ptr[i] = 0;
                             timer_ptrs[d][i] = 0.0_rt;
                         }
-                        Gpu::Atomic::AddNoRet( &ds_arr(  home_i_ptr[i],
-                                                         home_j_ptr[i],
-                                                         0,
-                                                         DiseaseStats::hospitalization ),
-                                               -1.0_rt );
-                        Gpu::Atomic::AddNoRet( &ds_arr(  home_i_ptr[i],
-                                                         home_j_ptr[i],
-                                                         0,
-                                                         DiseaseStats::ICU ),
-                                               -1.0_rt );
-                        Gpu::Atomic::AddNoRet( &ds_arr(  home_i_ptr[i],
-                                                         home_j_ptr[i],
-                                                         0,
-                                                         DiseaseStats::ventilator ),
-                                               -1.0_rt );
+                        flag_hosp_ptr[i] = 3;
                     }
                 });
                 Gpu::synchronize();
@@ -281,6 +249,42 @@ void HospitalModel<AC,ACT,ACTD,A>::treatAgents(AC& a_agents, /*!< Agent containe
 
             });
             Gpu::synchronize();
+
+            for (int d = 0; d < n_disease; d++) {
+                auto ds_arr = (*a_dstats[d])[mfi].array();
+                ParallelFor( np, [=] AMREX_GPU_DEVICE (int i) noexcept
+                {
+                    if (flag_death_ptr[i] == 1) {
+                        Gpu::Atomic::AddNoRet( &ds_arr(  home_i_ptr[i],
+                                                         home_j_ptr[i],
+                                                         0,
+                                                         DiseaseStats::death),
+                                               1.0_rt );
+                    }
+                    if (flag_hosp_ptr[i] >= 1) {
+                        Gpu::Atomic::AddNoRet( &ds_arr(  home_i_ptr[i],
+                                                         home_j_ptr[i],
+                                                         0,
+                                                         DiseaseStats::hospitalization ),
+                                               -1.0_rt );
+                    }
+                    if (flag_hosp_ptr[i] >= 2) {
+                        Gpu::Atomic::AddNoRet( &ds_arr(  home_i_ptr[i],
+                                                         home_j_ptr[i],
+                                                         0,
+                                                         DiseaseStats::ICU),
+                                               -1.0_rt );
+                    }
+                    if (flag_hosp_ptr[i] == 3) {
+                        Gpu::Atomic::AddNoRet( &ds_arr(  home_i_ptr[i],
+                                                         home_j_ptr[i],
+                                                         0,
+                                                         DiseaseStats::ventilator ),
+                                               -1.0_rt );
+                    }
+                });
+                Gpu::synchronize();
+            }
 
         }
     }
