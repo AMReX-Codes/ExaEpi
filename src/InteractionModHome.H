@@ -72,7 +72,7 @@ static void binaryInteractionHome ( const int a_i, /*!< Index of infectious agen
         }
     }
 
-    AMREX_ALWAYS_ASSERT(a_j == a_thread);
+    AMREX_ASSERT(a_j == a_thread);
     a_prob_ptr[a_j] *= prob;
 }
 
