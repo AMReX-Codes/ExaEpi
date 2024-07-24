@@ -21,7 +21,8 @@ static void binaryInteractionWork ( const int a_i, /*!< Index of infectious agen
                                     const PTDType& a_ptd, /*!< Particle tile data */
                                     const DiseaseParm* const a_lparm, /*!< disease paramters */
                                     const Real a_work_scale, /*!< Work scale */
-                                    ParticleReal* const a_prob_ptr /*!< infection probability */)
+                                    ParticleReal* const a_prob_ptr, /*!< infection probability */
+                                    const int a_thread /*!< agent index of this thread */)
 {
     Real infect = a_lparm->infect;
     infect *= a_lparm->vac_eff;
@@ -43,7 +44,8 @@ static void binaryInteractionWork ( const int a_i, /*!< Index of infectious agen
         }
     }
 
-    Gpu::Atomic::Multiply(&a_prob_ptr[a_j], prob);
+    AMREX_ASSERT(a_j == a_thread);
+    a_prob_ptr[a_j] *= prob;
 }
 
 /*! \brief Class describing agent interactions at work */
@@ -162,7 +164,12 @@ void InteractionModWork<AC,ACT,ACTD,A>::interactAgents(AC& a_agents, /*!< Agent 
 
                         if ( isInfectious<ACTD>(j, ptd, d) ) {
                             Real work_scale = 1.0_prt;  // TODO this should vary based on cell
-                            binaryInteractionWork<ACTD>( j, i, ptd, lparm, work_scale, prob_ptr );
+                            binaryInteractionWork<ACTD>( j, i,
+                                                         ptd,
+                                                         lparm,
+                                                         work_scale,
+                                                         prob_ptr,
+                                                         i );
                         }
                     }
                 });
