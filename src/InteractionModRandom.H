@@ -76,7 +76,7 @@ class InteractionModRandom : public InteractionModel<AC,ACT,ACTD,A>
         virtual ~InteractionModRandom() = default;
 
         /*! \brief Simulate agent interaction for random travel */
-        void interactAgents( AC&, MultiFab&) {};
+        void interactAgents( AC&, MultiFab&) {}
 
         /*! \brief Simulate agent interaction for random travel */
         void interactAgents( AC&, MultiFab&, AC&);

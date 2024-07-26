@@ -872,8 +872,8 @@ void AgentContainer::moveRandomTravel (const iMultiFab& unit_mf)
                     random_travel_ptr[i] = i;
                     int random_unit = -1;
                     while (random_unit == -1) {
-                        int i_random = (int) i_max*amrex::Random(engine);
-                        int j_random = (int) j_max*amrex::Random(engine);
+                        int i_random = int( amrex::Real(i_max)*amrex::Random(engine));
+                        int j_random = int( amrex::Real(j_max)*amrex::Random(engine));
                         p.pos(0) = i_random;
                         p.pos(1) = j_random;
                         random_unit = unit_arr(i_random, j_random, 0);
@@ -903,7 +903,6 @@ void AgentContainer::returnRandomTravel (const AgentContainer& on_travel_pc)
             int gid = mfi.index();
             int tid = mfi.LocalTileIndex();
             auto& ptile = plev[std::make_pair(gid, tid)];
-            auto& aos   = ptile.GetArrayOfStructs();
             auto& soa   = ptile.GetStructOfArrays();
             auto random_travel_ptr = soa.GetIntData(IntIdx::random_travel).data();
 
