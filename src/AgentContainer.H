@@ -119,9 +119,10 @@ public:
             d_parm[d] = (DiseaseParm*)amrex::The_Arena()->alloc(sizeof(DiseaseParm));
 
             h_parm[d]->readContact();
+            // first read inputs common to all diseases
             h_parm[d]->readInputs("disease");
-            std::string key = "disease_" + m_disease_names[d];
-            h_parm[d]->readInputs(key);
+            // now read any disease-specific input, if available
+            h_parm[d]->readInputs(std::string("disease_"+m_disease_names[d]));
             h_parm[d]->Initialize();
 
 #ifdef AMREX_USE_GPU
