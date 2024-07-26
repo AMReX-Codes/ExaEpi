@@ -63,102 +63,102 @@ namespace Initialization
                           AgentContainer& pc            /*!< Agent container (particle container) */ )
     {
 
-    /* Allocate worker-flow matrix, only from units with nighttime
-     communities on this processor (Unit_on_proc[] flag) */
-    unsigned int** flow = (unsigned int **) amrex::The_Arena()->alloc(demo.Nunit*sizeof(unsigned int *));
-    for (int i = 0; i < demo.Nunit; i++) {
-        if (demo.Unit_on_proc[i]) {
-            flow[i] = (unsigned int *) amrex::The_Arena()->alloc(demo.Nunit*sizeof(unsigned int));
-            for (int j = 0; j < demo.Nunit; j++) flow[i][j] = 0;
-        }
-    }
-
-    VisMF::IO_Buffer io_buffer(VisMF::IO_Buffer_Size);
-
-    std::ifstream ifs;
-    ifs.rdbuf()->pubsetbuf(io_buffer.dataPtr(), io_buffer.size());
-
-    ifs.open(params.workerflow_filename.c_str(), std::ios::in|std::ios::binary);
-    if (!ifs.good()) {
-        amrex::FileOpenFailed(params.workerflow_filename);
-    }
-
-    const std::streamoff CURPOS = ifs.tellg();
-    ifs.seekg(0,std::ios::end);
-    const std::streamoff ENDPOS = ifs.tellg();
-    const long num_work = (ENDPOS - CURPOS) / (3*sizeof(unsigned int));
-
-    ifs.seekg(CURPOS, std::ios::beg);
-
-    for (int work = 0; work < num_work; ++work) {
-        unsigned int from, to, number;
-        ifs.read((char*)&from, sizeof(from));
-        ifs.read((char*)&to, sizeof(to));
-        ifs.read((char*)&number, sizeof(number));
-        if (from > 65334) {continue;}
-        int i = demo.myIDtoUnit[from];
-        if (demo.Unit_on_proc[i]) {
-            if (to > 65334) {continue;}
-            int j = demo.myIDtoUnit[to];
-            if (demo.Start[j+1] != demo.Start[j]) { // if there are communities in this unit
-                flow[i][j] = number;
+        /* Allocate worker-flow matrix, only from units with nighttime
+         communities on this processor (Unit_on_proc[] flag) */
+        unsigned int** flow = (unsigned int **) amrex::The_Arena()->alloc(demo.Nunit*sizeof(unsigned int *));
+        for (int i = 0; i < demo.Nunit; i++) {
+            if (demo.Unit_on_proc[i]) {
+                flow[i] = (unsigned int *) amrex::The_Arena()->alloc(demo.Nunit*sizeof(unsigned int));
+                for (int j = 0; j < demo.Nunit; j++) flow[i][j] = 0;
             }
         }
-    }
 
-    /* Convert to cumulative numbers to enable random selection */
-    for (int i = 0; i < demo.Nunit; i++) {
-        if (demo.Unit_on_proc[i]) {
-            for (int j = 1; j < demo.Nunit; j++) {
-                flow[i][j] += flow[i][j-1];
+        VisMF::IO_Buffer io_buffer(VisMF::IO_Buffer_Size);
+
+        std::ifstream ifs;
+        ifs.rdbuf()->pubsetbuf(io_buffer.dataPtr(), io_buffer.size());
+
+        ifs.open(params.workerflow_filename.c_str(), std::ios::in|std::ios::binary);
+        if (!ifs.good()) {
+            amrex::FileOpenFailed(params.workerflow_filename);
+        }
+
+        const std::streamoff CURPOS = ifs.tellg();
+        ifs.seekg(0,std::ios::end);
+        const std::streamoff ENDPOS = ifs.tellg();
+        const long num_work = (ENDPOS - CURPOS) / (3*sizeof(unsigned int));
+
+        ifs.seekg(CURPOS, std::ios::beg);
+
+        for (int work = 0; work < num_work; ++work) {
+            unsigned int from, to, number;
+            ifs.read((char*)&from, sizeof(from));
+            ifs.read((char*)&to, sizeof(to));
+            ifs.read((char*)&number, sizeof(number));
+            if (from > 65334) {continue;}
+            int i = demo.myIDtoUnit[from];
+            if (demo.Unit_on_proc[i]) {
+                if (to > 65334) {continue;}
+                int j = demo.myIDtoUnit[to];
+                if (demo.Start[j+1] != demo.Start[j]) { // if there are communities in this unit
+                    flow[i][j] = number;
+                }
             }
         }
-    }
 
-    /* These numbers were for the true population, and do not include
-       the roughly 2% of people who were on vacation or sick during the
-       Census 2000 reporting week.  We need to scale the worker flow to
-       the model tract residential populations, and might as well add
-       the 2% back in while we're at it.... */
-    for (int i = 0; i < demo.Nunit; i++) {
-        if (demo.Unit_on_proc[i] && demo.Population[i]) {
-            unsigned int number = (unsigned int) rint(((double) demo.Population[i]) / 2000.0);
-            double scale = 1.02 * (2000.0 * number) / ((double) demo.Population[i]);
-            for (int j = 0; j < demo.Nunit; j++) {
-                flow[i][j] = (unsigned int) rint((double) flow[i][j] * scale);
+        /* Convert to cumulative numbers to enable random selection */
+        for (int i = 0; i < demo.Nunit; i++) {
+            if (demo.Unit_on_proc[i]) {
+                for (int j = 1; j < demo.Nunit; j++) {
+                    flow[i][j] += flow[i][j-1];
+                }
             }
         }
-    }
 
-    const Box& domain = pc.Geom(0).Domain();
+        /* These numbers were for the true population, and do not include
+           the roughly 2% of people who were on vacation or sick during the
+           Census 2000 reporting week.  We need to scale the worker flow to
+           the model tract residential populations, and might as well add
+           the 2% back in while we're at it.... */
+        for (int i = 0; i < demo.Nunit; i++) {
+            if (demo.Unit_on_proc[i] && demo.Population[i]) {
+                unsigned int number = (unsigned int) rint(((double) demo.Population[i]) / 2000.0);
+                double scale = 1.02 * (2000.0 * number) / ((double) demo.Population[i]);
+                for (int j = 0; j < demo.Nunit; j++) {
+                    flow[i][j] = (unsigned int) rint((double) flow[i][j] * scale);
+                }
+            }
+        }
 
-    /* This is where workplaces should be assigned */
+        const Box& domain = pc.Geom(0).Domain();
+
+        /* This is where workplaces should be assigned */
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
 #endif
-    for (MFIter mfi(unit_mf, TilingIfNotGPU()); mfi.isValid(); ++mfi)
-    {
-        auto& agents_tile = pc.GetParticles(0)[std::make_pair(mfi.index(),mfi.LocalTileIndex())];
-        auto& soa = agents_tile.GetStructOfArrays();
-        auto age_group_ptr = soa.GetIntData(IntIdx::age_group).data();
-        auto home_i_ptr = soa.GetIntData(IntIdx::home_i).data();
-        auto home_j_ptr = soa.GetIntData(IntIdx::home_j).data();
-        auto work_i_ptr = soa.GetIntData(IntIdx::work_i).data();
-        auto work_j_ptr = soa.GetIntData(IntIdx::work_j).data();
-        auto workgroup_ptr = soa.GetIntData(IntIdx::workgroup).data();
-        auto np = soa.numParticles();
+        for (MFIter mfi(unit_mf, TilingIfNotGPU()); mfi.isValid(); ++mfi)
+        {
+            auto& agents_tile = pc.GetParticles(0)[std::make_pair(mfi.index(),mfi.LocalTileIndex())];
+            auto& soa = agents_tile.GetStructOfArrays();
+            auto age_group_ptr = soa.GetIntData(IntIdx::age_group).data();
+            auto home_i_ptr = soa.GetIntData(IntIdx::home_i).data();
+            auto home_j_ptr = soa.GetIntData(IntIdx::home_j).data();
+            auto work_i_ptr = soa.GetIntData(IntIdx::work_i).data();
+            auto work_j_ptr = soa.GetIntData(IntIdx::work_j).data();
+            auto workgroup_ptr = soa.GetIntData(IntIdx::workgroup).data();
+            auto np = soa.numParticles();
 
-        auto unit_arr = unit_mf[mfi].array();
-        auto comm_arr = comm_mf[mfi].array();
+            auto unit_arr = unit_mf[mfi].array();
+            auto comm_arr = comm_mf[mfi].array();
 
-        auto Population = demo.Population_d.data();
-        auto Start = demo.Start_d.data();
-        auto Ndaywork = demo.Ndaywork_d.data();
-        auto Ncommunity = demo.Ncommunity;
-        auto Nunit = demo.Nunit;
+            auto Population = demo.Population_d.data();
+            auto Start = demo.Start_d.data();
+            auto Ndaywork = demo.Ndaywork_d.data();
+            auto Ncommunity = demo.Ncommunity;
+            auto Nunit = demo.Nunit;
 
-        amrex::ParallelForRNG( np,
-            [=] AMREX_GPU_DEVICE (int ip, RandomEngine const& engine) noexcept
+            amrex::ParallelForRNG( np,
+                [=] AMREX_GPU_DEVICE (int ip, RandomEngine const& engine) noexcept
             {
                 auto from = unit_arr(home_i_ptr[ip], home_j_ptr[ip], 0);
 
@@ -202,14 +202,15 @@ namespace Initialization
                 }
             });
         }
-        assignTeachersAndWorkgroup(demo,unit_mf,comm_mf,pc);
+        assignTeachersAndWorkgroup(demo,unit_mf,pc);
     }
 
     void assignTeachersAndWorkgroup (const DemographicData& demo,  /*!< Demographic data */
                           const iMultiFab& unit_mf,     /*!< MultiFab with unit number at each grid cell */
-                          const iMultiFab& comm_mf,     /*!< MultiFab with community number at each grid cell */
                           AgentContainer& pc            /*!< Agent container (particle container) */ )
     {
+        const Box& domain = pc.Geom(0).Domain();
+
         auto total_teacher_unit = pc.getUnitTeacherCounts();
 
         auto total_teacher_counts = pc.getCommTeacherCounts();
@@ -236,6 +237,9 @@ namespace Initialization
         amrex::Gpu::DeviceVector<int> elem4_teacher_counts_mod(elem4_teacher_counts.size(),0);
         auto elem4_teacher_counts_ptr = elem4_teacher_counts_mod.data();
 
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (Gpu::notInLaunchRegion())
+#endif
         for (MFIter mfi(unit_mf, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
             auto& agents_tile = pc.GetParticles(0)[std::make_pair(mfi.index(),mfi.LocalTileIndex())];
             auto& soa = agents_tile.GetStructOfArrays();
@@ -245,18 +249,22 @@ namespace Initialization
             auto work_j_ptr = soa.GetIntData(IntIdx::work_j).data();
             auto school_ptr = soa.GetIntData(IntIdx::school).data();
 
-            auto unit_arr = unit_mf[mfi].array();
-            auto comm_arr = comm_mf[mfi].array();
             auto Ndaywork = demo.Ndaywork_d.data();
             auto Start = demo.Start_d.data();
+            auto Ncommunity = demo.Ncommunity;
 
             auto np = soa.numParticles();
             for (int ip = 0; ip < np; ++ip) {
-                int to = unit_arr(work_i_ptr[ip], work_j_ptr[ip],0);
+
+                int comm_to = (int) domain.index(IntVect(AMREX_D_DECL(work_i_ptr[ip],work_j_ptr[ip],0)));
+                if (comm_to >= Ncommunity) {
+                    continue;
+                }
+                int to = 0;
+                while (comm_to >= Start[to+1]) { to++; }
 
                 if (total_teacher_unit.data()[to] && (age_group_ptr[ip] == 2 || age_group_ptr[ip] == 3) && workgroup_ptr[ip] > 0)
                 {
-                    int comm_to = comm_arr(work_i_ptr[ip], work_j_ptr[ip],0);
                     int elem3_teacher  = elem3_teacher_counts_ptr[comm_to];
                     int elem4_teacher  = elem4_teacher_counts_ptr[comm_to];
                     int middle_teacher = middle_teacher_counts_ptr[comm_to];
