@@ -367,12 +367,12 @@ void runAgent ()
             }
 
             if ((params.random_travel_int > 0) && (i % params.random_travel_int == 0)) {
-                    pc.moveRandomTravel(unit_mf);
-                    using SrcData = AgentContainer::ParticleTileType::ConstParticleTileDataType;
-                    on_travel_pc.copyParticles(pc,
-                                               [=] AMREX_GPU_HOST_DEVICE (const SrcData& src, int ip) {
-                                                   return (src.m_idata[IntIdx::random_travel][ip] >= 0);
-                                               });
+                pc.moveRandomTravel(unit_mf);
+                using SrcData = AgentContainer::ParticleTileType::ConstParticleTileDataType;
+                on_travel_pc.copyParticles(pc,
+                                           [=] AMREX_GPU_HOST_DEVICE (const SrcData& src, int ip) {
+                                               return (src.m_idata[IntIdx::random_travel][ip] >= 0);
+                                           });
             }
 
             // Typical day
@@ -382,14 +382,14 @@ void runAgent ()
             pc.interactEvening(mask_behavior);
             pc.interactNight(mask_behavior);
 
-            if (params.random_travel_int > 0) {
+            if ((params.random_travel_int > 0) && (i % params.random_travel_int == 0)) {
                 pc.interactRandomTravel(mask_behavior, on_travel_pc);
             }
 
             // Infect agents based on their interactions
             pc.infectAgents();
 
-            if (params.random_travel_int > 0) {
+            if ((params.random_travel_int > 0) && (i % params.random_travel_int == 0)) {
                 on_travel_pc.moveAgentsToHome();
                 on_travel_pc.Redistribute();
                 pc.returnRandomTravel(on_travel_pc);
