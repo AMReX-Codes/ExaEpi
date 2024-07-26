@@ -913,7 +913,7 @@ void AgentContainer::returnRandomTravel (const AgentContainer& on_travel_pc)
             const auto& aos_travel   = ptile_travel.GetArrayOfStructs();
             //const ParticleType* pstruct_travel = &(aos_travel[0]);
             const size_t np_travel = aos_travel.numParticles();
-            auto& soa_travel= ptile.GetStructOfArrays();
+            auto& soa_travel= ptile_travel.GetStructOfArrays();
             auto random_travel_ptr_travel = soa_travel.GetIntData(IntIdx::random_travel).data();
 
             int r_RT = RealIdx::nattribs;
@@ -926,7 +926,7 @@ void AgentContainer::returnRandomTravel (const AgentContainer& on_travel_pc)
                     [=] AMREX_GPU_DEVICE (int i) noexcept
                     {
                         int dst_index = random_travel_ptr_travel[i];
-                        prob_ptr[dst_index] = prob_ptr_travel[i];
+                        prob_ptr[dst_index] += prob_ptr_travel[i];
                         AMREX_ALWAYS_ASSERT(random_travel_ptr[dst_index] = dst_index);
                         AMREX_ALWAYS_ASSERT(random_travel_ptr[dst_index] >= 0);
                         random_travel_ptr[dst_index] = -1;

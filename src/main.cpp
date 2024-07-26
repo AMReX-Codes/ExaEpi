@@ -383,14 +383,17 @@ void runAgent ()
             pc.interactNight(mask_behavior);
 
             if (params.random_travel_int > 0) {
-            pc.interactRandomTravel(mask_behavior, on_travel_pc);
+                pc.interactRandomTravel(mask_behavior, on_travel_pc);
             }
 
             // Infect agents based on their interactions
             pc.infectAgents();
 
             if (params.random_travel_int > 0) {
+                on_travel_pc.moveAgentsToHome();
+                on_travel_pc.Redistribute();
                 pc.returnRandomTravel(on_travel_pc);
+                on_travel_pc.clearParticles();
             }
 
             cur_time += 1.0_rt; // time step is one day
