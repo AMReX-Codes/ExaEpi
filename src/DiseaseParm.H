@@ -164,6 +164,10 @@ struct DiseaseParm
                                             amrex::Real(0.45),
                                             amrex::Real(1.26) };
 
+    void readContact ();
+
+    void readInputs (const std::string&);
+
     void Initialize ();
 
     void printMatrix ();
