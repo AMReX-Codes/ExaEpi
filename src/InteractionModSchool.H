@@ -84,7 +84,7 @@ class InteractionModSchool : public InteractionModel<AC,ACT,ACTD,A>
         virtual void interactAgents( AC&, MultiFab& );
 
         /*! \brief Simulate agent interaction at school */
-        virtual void interactAgents( AC&, MultiFab&, AC& ) {};
+        virtual void interactAgents( AC&, MultiFab&, AC& ) {}
 
     protected:
 

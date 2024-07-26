@@ -160,7 +160,6 @@ void InteractionModRandom<AC,ACT,ACTD,A>::interactAgents(AC& a_agents, /*!< Agen
             AMREX_ALWAYS_ASSERT(bins_ptr->numBins() >= 0);
             AMREX_ALWAYS_ASSERT(travel_bins_ptr->numBins() >= 0);
             auto inds = bins_ptr->permutationPtr();
-            auto offsets = bins_ptr->offsetsPtr();
             auto travel_inds = travel_bins_ptr->permutationPtr();
             auto travel_offsets = travel_bins_ptr->offsetsPtr();
 
@@ -227,7 +226,6 @@ void InteractionModRandom<AC,ACT,ACTD,A>::interactAgents(AC& a_agents, /*!< Agen
             auto inds = bins_ptr->permutationPtr();
             auto offsets = bins_ptr->offsetsPtr();
             auto travel_inds = travel_bins_ptr->permutationPtr();
-            auto travel_offsets = travel_bins_ptr->offsetsPtr();
 
             for (int d = 0; d < n_disease; d++) {
 

@@ -872,8 +872,8 @@ void AgentContainer::moveRandomTravel (const iMultiFab& unit_mf)
                     random_travel_ptr[i] = i;
                     int random_unit = -1;
                     while (random_unit == -1) {
-                        int i_random = i_max*amrex::Random(engine);
-                        int j_random = j_max*amrex::Random(engine);
+                        int i_random = (int) i_max*amrex::Random(engine);
+                        int j_random = (int) j_max*amrex::Random(engine);
                         p.pos(0) = i_random;
                         p.pos(1) = j_random;
                         random_unit = unit_arr(i_random, j_random, 0);
@@ -904,14 +904,11 @@ void AgentContainer::returnRandomTravel (const AgentContainer& on_travel_pc)
             int tid = mfi.LocalTileIndex();
             auto& ptile = plev[std::make_pair(gid, tid)];
             auto& aos   = ptile.GetArrayOfStructs();
-            //ParticleType* pstruct = &(aos[0]);
-            const size_t np = aos.numParticles();
             auto& soa   = ptile.GetStructOfArrays();
             auto random_travel_ptr = soa.GetIntData(IntIdx::random_travel).data();
 
             const auto& ptile_travel = plev_travel.at(std::make_pair(gid, tid));
             const auto& aos_travel   = ptile_travel.GetArrayOfStructs();
-            //const ParticleType* pstruct_travel = &(aos_travel[0]);
             const size_t np_travel = aos_travel.numParticles();
             auto& soa_travel= ptile_travel.GetStructOfArrays();
             auto random_travel_ptr_travel = soa_travel.GetIntData(IntIdx::random_travel).data();
