@@ -173,7 +173,7 @@ void HospitalModel<AC,ACT,ACTD,A>::treatAgents(AC& a_agents, /*!< Agent containe
                         }
                         flag_hosp_ptr[i] = 1;
                     }
-                    if (timer_ptrs[d][i] == 10) {
+                    if (timer_ptrs[d][i] == disease_parm_d->m_t_hosp_offset) {
                         disease_parm_d->check_survival( is_alive_ptr[i],
                                                         age_group_ptr[i],
                                                         1.0_rt,
@@ -192,7 +192,7 @@ void HospitalModel<AC,ACT,ACTD,A>::treatAgents(AC& a_agents, /*!< Agent containe
                         }
                         flag_hosp_ptr[i] = 2;
                     }
-                    if (timer_ptrs[d][i] == 20) {
+                    if (timer_ptrs[d][i] == 2*disease_parm_d->m_t_hosp_offset) {
                         disease_parm_d->check_survival( is_alive_ptr[i],
                                                         age_group_ptr[i],
                                                         0.0_rt,

@@ -178,6 +178,9 @@ public:
                 pp.queryarr("hospitalization_days", t_hosp, 0, AgeGroups_Hosp::total);
                 for (int i = 0; i < AgeGroups_Hosp::total; i++) {
                     h_parm[d]->m_t_hosp[i] = t_hosp[i];
+                    if (t_hosp[i] > h_parm[d]->m_t_hosp_offset) {
+                        h_parm[d]->m_t_hosp_offset = t_hosp[i] + 1;
+                    }
                 }
 
                 amrex::Vector<amrex::Real> CHR(AgeGroups::total);
@@ -253,6 +256,9 @@ public:
                 pp.queryarr("hospitalization_days", t_hosp, 0, AgeGroups_Hosp::total);
                 for (int i = 0; i < AgeGroups_Hosp::total; i++) {
                     h_parm[d]->m_t_hosp[i] = t_hosp[i];
+                    if (t_hosp[i] > h_parm[d]->m_t_hosp_offset) {
+                        h_parm[d]->m_t_hosp_offset = t_hosp[i] + 1;
+                    }
                 }
 
                 amrex::Vector<amrex::Real> CHR(AgeGroups::total);

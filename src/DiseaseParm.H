@@ -135,6 +135,9 @@ struct DiseaseParm
     amrex::Real m_t_hosp[AgeGroups_Hosp::total] = { amrex::Real(3), /* under 50 */
                                                     amrex::Real(8), /* ages 50-64 */
                                                     amrex::Real(7)  /* over 65 */ };
+    /*! Offset to separate the timers for hospital, ICU, and ventilator;
+     * needs to be greater than the maximum of #DiseaseParm::m_t_hosp */
+    amrex::Real m_t_hosp_offset = 10;
 
     /*! sick -> hospital probabilities */
     amrex::Real m_CHR[AgeGroups::total] = { amrex::Real(.0104),
@@ -195,10 +198,10 @@ struct DiseaseParm
                 a_t_hosp = m_t_hosp[AgeGroups_Hosp::a50to64];
             }
             if (amrex::Random(a_reng) < m_CIC[a_age_grp]) {
-                a_t_hosp += 10;  // move to ICU
+                a_t_hosp += m_t_hosp_offset;  // move to ICU
                 a_ICU = 1;
                 if (amrex::Random(a_reng) < m_CVE[a_age_grp]) {
-                    a_t_hosp += 10;  // put on ventilator
+                    a_t_hosp += m_t_hosp_offset;  // put on ventilator
                     a_ventilator = 1;
                 }
             }
