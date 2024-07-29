@@ -39,23 +39,24 @@ static void binaryInteractionNborhood ( const int a_i, /*!< Index of infectious 
     //infect *= j_mask;
     ParticleReal prob = 1.0_prt;
 
+    /* define neighbordhood based on whether agent is in home or work community */
     int nborhood_ai = nborhood_ptr[a_i];
     int nborhood_aj = nborhood_ptr[a_j];
-
     if (a_at_work_ptr) {
         nborhood_ai = (age_group_ptr[a_i] <= 1) ? nborhood_ptr[a_i] : work_nborhood_ptr[a_i];
         nborhood_aj = (age_group_ptr[a_j] <= 1) ? nborhood_ptr[a_j] : work_nborhood_ptr[a_j];
     }
 
-    // school = 0 means child not going to school (school < 0 not defined anywhere for children)
-    // Should always be in the same community = same cell
+    // school < 0 means a child normally attends school, but not today
+    /* Should always be in the same community = same cell */
+    // /* Neighborhood? */
     if (nborhood_ai == nborhood_aj) {
         if (school_ptr[a_i] < 0 ) { // not attending school, use _SC contacts
             prob *= 1.0_prt - infect * a_lparm->xmit_hood_SC[age_group_ptr[a_j]] * a_social_scale;
         } else {
             prob *= 1.0_prt - infect * a_lparm->xmit_hood[age_group_ptr[a_j]] * a_social_scale;
         }
-    } else { // Community?
+    } else { // /* Community? */
         if (school_ptr[a_i] < 0) { // not attending school, use _SC contacts
             prob *= 1.0_prt - infect * a_lparm->xmit_comm_SC[age_group_ptr[a_j]] * a_social_scale;
         } else {
@@ -138,6 +139,7 @@ void InteractionModNborhood<AC,ACT,ACTD,A>::interactAgents( AC& a_agents, /*!< A
         {
             auto pair_ind = std::make_pair(mfi.index(), mfi.LocalTileIndex());
             auto bins_ptr = a_agents.getBins(pair_ind, ExaEpi::InteractionNames::nborhood);
+
             auto flag_at_work = a_agents.isAtWork(); /*! Flag to indicate if agents are at work */
             auto& ptile = a_agents.ParticlesAt(lev, mfi);
             const auto& ptd = ptile.getParticleTileData();
