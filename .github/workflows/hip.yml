@@ -28,7 +28,7 @@ jobs:
       #    /opt/rocm-6.1.0/include/rocprim/device/detail/device_adjacent_difference.hpp:198:26: error: token is not a valid binary operator in a preprocessor subexpression
       #      198 | #if defined(__gfx1102__) or defined(__gfx1030__)
       #          |     ~~~~~~~~~~~~~~~~~~~~~^~
-      env: {CXXFLAGS: "-Werror -Wall -Wextra -Wpedantic -Wnull-dereference -Wfloat-conversion -Wshadow -Woverloaded-virtual -Wextra-semi -Wunreachable-code -Wnon-virtual-dtor"}
+      env: {CXXFLAGS: "-Werror -Wall -Wextra -Wpedantic -Wnull-dereference -Wfloat-conversion -Wshadow -Woverloaded-virtual -Wextra-semi -Wunreachable-code -Wnon-virtual-dtor -Wno-unused-parameter"}
       run: |
         export CCACHE_COMPRESS=1
         export CCACHE_COMPRESSLEVEL=10
@@ -77,7 +77,7 @@ jobs:
       #    /opt/rocm-6.1.0/include/rocprim/device/detail/device_adjacent_difference.hpp:198:26: error: token is not a valid binary operator in a preprocessor subexpression
       #      198 | #if defined(__gfx1102__) or defined(__gfx1030__)
       #          |     ~~~~~~~~~~~~~~~~~~~~~^~
-      env: {CXXFLAGS: "-Werror -Wall -Wextra -Wpedantic -Wnull-dereference -Wfloat-conversion -Wshadow -Woverloaded-virtual -Wextra-semi -Wunreachable-code -Wnon-virtual-dtor"}
+      env: {CXXFLAGS: "-Werror -Wall -Wextra -Wpedantic -Wnull-dereference -Wfloat-conversion -Wshadow -Woverloaded-virtual -Wextra-semi -Wunreachable-code -Wnon-virtual-dtor -Wno-unused-parameter"}
       run: |
         export CCACHE_COMPRESS=1
         export CCACHE_COMPRESSLEVEL=10

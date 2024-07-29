@@ -15,7 +15,8 @@ sudo apt-get install -y \
     environment-modules \
     gnupg               \
     pkg-config          \
-    wget
+    wget                \
+    libhdf5-openmpi-dev
 
 echo 'deb [trusted=yes] https://developer.download.nvidia.com/hpc-sdk/ubuntu/amd64 /' | \
   sudo tee /etc/apt/sources.list.d/nvhpc.list

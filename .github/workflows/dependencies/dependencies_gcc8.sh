@@ -14,4 +14,5 @@ sudo apt-get install -y --no-install-recommends \
     build-essential    \
     g++-8 gfortran-8   \
     libopenmpi-dev     \
-    openmpi-bin
+    openmpi-bin        \
+    libhdf5-openmpi-dev
