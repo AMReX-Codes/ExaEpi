@@ -1,11 +1,14 @@
+Utilities
+#########
+
 Output Format
 =============
-
 ExaEpi writes data on two levels: individual data and community data.
 
 Individual data fields
 ----------------------
-Individual datasets have more fields written on day 0 that are constant across the simulation. Data is either written as an ``int`` or a ``real``.
+Individual datasets have more fields written on day 0 that are constant across the simulation.
+Data is either written as an ``int`` or a ``real``.
 
 - Day 0 only (constant)
 
@@ -81,11 +84,14 @@ All data is written as a real, although all data should be integers. If any comm
 
 Reading output
 ==============
-Output is read in different ways, depending on I/O format selected. If ``-DAMReX_HDF5`` flag is set to ``TRUE`` when compiling, HDF5 will be used. Otherwise, the default AMReX plotfile will be written.
+Output is read in different ways, depending on I/O format selected.
+If ``-DAMReX_HDF5`` flag is set to ``TRUE`` when compiling, HDF5 will be used. 
+Otherwise, the default AMReX plotfile will be written.
 
 AMReX plotfile
 --------------
-Any library that has functionality for AMReX plotfiles can be used: see `AMReX documentation <https://amrex-codes.github.io/amrex/docs_html/Visualization_Chapter.html#chap-visualization>`__ for more.
+Any library that has functionality for AMReX plotfiles can be used: 
+see `AMReX documentation <https://amrex-codes.github.io/amrex/docs_html/Visualization_Chapter.html#chap-visualization>`__ for more.
 
 We suggest using yt with Python:
 
@@ -166,4 +172,9 @@ We provide a few processing scripts for visualization and data aggregation.
 
 Visualization
 -------------
-There is
+There are some visualization scripts located in ``utilities/plotMovie``.
+Primarily, ``generate_frames.py`` allows one to generate still frames from
+either native AMReX output or HDF5 output, plotting infections (or an arbitrary
+function on community-level data) spatially across a given map (as a .shx file).
+Some of these shapefiles (for USA, California, and the Bay Area) are located in
+the ``data/`` directory. See the script file and its comments for further details.
