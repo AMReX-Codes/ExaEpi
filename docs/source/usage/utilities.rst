@@ -178,3 +178,11 @@ either native AMReX output or HDF5 output, plotting infections (or an arbitrary
 function on community-level data) spatially across a given map (as a .shx file).
 Some of these shapefiles (for USA, California, and the Bay Area) are located in
 the ``data/`` directory. See the script file and its comments for further details.
+
+Data Processing
+---------------
+To aggregate data written to HDF5 output, whether by county or census tract,
+we have some functions designed to aid processing in ``utilities/hfd5_process.py``.
+These functions allow grouping of data and counting various conditions of individuals,
+such as counting total number of infections in each census tract in each age group
+over all days in a simulation. See the script file and its comments for further details.
