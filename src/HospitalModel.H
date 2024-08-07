@@ -98,11 +98,9 @@ void HospitalModel<AC,ACT,ACTD,A>::treatAgents(AC& a_agents, /*!< Agent containe
             is_alive.resize(np);
             auto is_alive_ptr = is_alive.data();
 
-            Gpu::DeviceVector<int> flag_death, flag_hosp;
-            flag_death.resize(np);
-            flag_hosp.resize(np);
-            auto flag_death_ptr = flag_death.data();
-            auto flag_hosp_ptr = flag_hosp.data();
+            Gpu::DeviceVector<int> flag_status;
+            flag_status.resize(np);
+            auto flag_status_ptr = flag_status.data();
 
             ParallelFor( np, [=] AMREX_GPU_DEVICE (int i) noexcept
             {
@@ -119,8 +117,7 @@ void HospitalModel<AC,ACT,ACTD,A>::treatAgents(AC& a_agents, /*!< Agent containe
                     }
                 }
 
-                flag_death_ptr[i] = 0;
-                flag_hosp_ptr[i] = 0;
+                flag_status_ptr[i] = 0; // 0: nothing changed on this day
             });
             Gpu::synchronize();
 
@@ -159,8 +156,9 @@ void HospitalModel<AC,ACT,ACTD,A>::treatAgents(AC& a_agents, /*!< Agent containe
                                                         age_group_ptr[i],
                                                         2.0_rt,
                                                         engine );
+                        flag_status_ptr[i] = DiseaseStats::hospitalization + 1;
                         if (is_alive_ptr[i] == 0) {
-                            flag_death_ptr[i] = 1;
+                            flag_status_ptr[i] *= -1;
                             status_ptrs[d][i] = Status::dead;
                         } else {
                             // If alive, hospitalized patient recovers
@@ -171,15 +169,15 @@ void HospitalModel<AC,ACT,ACTD,A>::treatAgents(AC& a_agents, /*!< Agent containe
                             withdrawn_ptr[i] = 0;
                             timer_ptrs[d][i] = 0.0_rt;
                         }
-                        flag_hosp_ptr[i] = 1;
                     }
                     if (timer_ptrs[d][i] == disease_parm_d->m_t_hosp_offset) {
                         disease_parm_d->check_survival( is_alive_ptr[i],
                                                         age_group_ptr[i],
                                                         1.0_rt,
                                                         engine );
+                        flag_status_ptr[i] = DiseaseStats::ICU + 1;
                         if (is_alive_ptr[i] == 0) {
-                            flag_death_ptr[i] = 1;
+                            flag_status_ptr[i] *= -1;
                             status_ptrs[d][i] = Status::dead;
                         } else {
                             // If alive, hospitalized patient recovers
@@ -190,15 +188,15 @@ void HospitalModel<AC,ACT,ACTD,A>::treatAgents(AC& a_agents, /*!< Agent containe
                             withdrawn_ptr[i] = 0;
                             timer_ptrs[d][i] = 0.0_rt;
                         }
-                        flag_hosp_ptr[i] = 2;
                     }
                     if (timer_ptrs[d][i] == 2*disease_parm_d->m_t_hosp_offset) {
                         disease_parm_d->check_survival( is_alive_ptr[i],
                                                         age_group_ptr[i],
                                                         0.0_rt,
                                                         engine );
+                        flag_status_ptr[i] = DiseaseStats::ventilator + 1;
                         if (is_alive_ptr[i] == 0) {
-                            flag_death_ptr[i] = 1;
+                            flag_status_ptr[i] *= -1;
                             status_ptrs[d][i] = Status::dead;
                         } else {
                             // If alive, hospitalized patient recovers
@@ -209,7 +207,6 @@ void HospitalModel<AC,ACT,ACTD,A>::treatAgents(AC& a_agents, /*!< Agent containe
                             withdrawn_ptr[i] = 0;
                             timer_ptrs[d][i] = 0.0_rt;
                         }
-                        flag_hosp_ptr[i] = 3;
                     }
                 });
                 Gpu::synchronize();
@@ -254,28 +251,28 @@ void HospitalModel<AC,ACT,ACTD,A>::treatAgents(AC& a_agents, /*!< Agent containe
                 auto ds_arr = (*a_dstats[d])[mfi].array();
                 ParallelFor( np, [=] AMREX_GPU_DEVICE (int i) noexcept
                 {
-                    if (flag_death_ptr[i] == 1) {
+                    if (flag_status_ptr[i] < 0) {
                         Gpu::Atomic::AddNoRet( &ds_arr(  home_i_ptr[i],
                                                          home_j_ptr[i],
                                                          0,
                                                          DiseaseStats::death),
                                                1.0_rt );
                     }
-                    if (flag_hosp_ptr[i] >= 1) {
+                    if (std::abs(flag_status_ptr[i]) > DiseaseStats::hospitalization) {
                         Gpu::Atomic::AddNoRet( &ds_arr(  home_i_ptr[i],
                                                          home_j_ptr[i],
                                                          0,
                                                          DiseaseStats::hospitalization ),
                                                -1.0_rt );
                     }
-                    if (flag_hosp_ptr[i] >= 2) {
+                    if (std::abs(flag_status_ptr[i]) > DiseaseStats::ICU) {
                         Gpu::Atomic::AddNoRet( &ds_arr(  home_i_ptr[i],
                                                          home_j_ptr[i],
                                                          0,
                                                          DiseaseStats::ICU),
                                                -1.0_rt );
                     }
-                    if (flag_hosp_ptr[i] == 3) {
+                    if (std::abs(flag_status_ptr[i]) > DiseaseStats::ventilator) {
                         Gpu::Atomic::AddNoRet( &ds_arr(  home_i_ptr[i],
                                                          home_j_ptr[i],
                                                          0,
