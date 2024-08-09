@@ -120,7 +120,7 @@ def get_gdf(prefix: str):
     All files must be present and must begin with prefix
     """
 
-    # Below code requires a .shx file. Building .shx file 
+    # Below code requires a .shx file. Building .shx file
     # can be done by running code inside a
     # with fiona.Env(SHAPE_RESTORE_SHX = "YES"):
     # block (remember to import fiona explicitly)

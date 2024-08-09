@@ -85,12 +85,12 @@ All data is written as a real, although all data should be integers. If any comm
 Reading output
 ==============
 Output is read in different ways, depending on I/O format selected.
-If ``-DAMReX_HDF5`` flag is set to ``TRUE`` when compiling, HDF5 will be used. 
+If ``-DAMReX_HDF5`` flag is set to ``TRUE`` when compiling, HDF5 will be used.
 Otherwise, the default AMReX plotfile will be written.
 
 AMReX plotfile
 --------------
-Any library that has functionality for AMReX plotfiles can be used: 
+Any library that has functionality for AMReX plotfiles can be used:
 see `AMReX documentation <https://amrex-codes.github.io/amrex/docs_html/Visualization_Chapter.html#chap-visualization>`__ for more.
 
 We suggest using yt with Python:
