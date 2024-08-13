@@ -146,6 +146,7 @@ namespace Initialization
             auto work_i_ptr = soa.GetIntData(IntIdx::work_i).data();
             auto work_j_ptr = soa.GetIntData(IntIdx::work_j).data();
             auto workgroup_ptr = soa.GetIntData(IntIdx::workgroup).data();
+            auto work_nborhood_ptr = soa.GetIntData(IntIdx::work_nborhood).data();
             auto np = soa.numParticles();
 
             auto unit_arr = unit_mf[mfi].array();
@@ -198,6 +199,7 @@ namespace Initialization
 
                     if (number) {
                         workgroup_ptr[ip] = 1 + amrex::Random_int(number, engine);
+                        work_nborhood_ptr[ip] = workgroup_ptr[ip] % 4; // each workgroup is assigned to a neighborhood as well
                     }
                 }
             });
@@ -248,6 +250,7 @@ namespace Initialization
             auto work_i_ptr = soa.GetIntData(IntIdx::work_i).data();
             auto work_j_ptr = soa.GetIntData(IntIdx::work_j).data();
             auto school_ptr = soa.GetIntData(IntIdx::school).data();
+            auto work_nborhood_ptr = soa.GetIntData(IntIdx::work_nborhood).data();
 
             auto Ndaywork = demo.Ndaywork_d.data();
             auto Start = demo.Start_d.data();
@@ -290,24 +293,29 @@ namespace Initialization
                         {
                             int choice = amrex::Random_int(total_available);
                             if (choice < available_slots[0]) {
-                                school_ptr[ip] = 3;  // elementary 3 school
+                                school_ptr[ip] = 3;  // elementary school for kids in Neighbordhood 1 & 2
                                 workgroup_ptr[ip] = 3 ;
+                                work_nborhood_ptr[ip] = 1; // assuming the first elementary school is located in Neighbordhood 1
                                 elem3_teacher_counts_ptr[comm_to]++;
                             } else if (choice < available_slots[0] + available_slots[1]) {
-                                school_ptr[ip] = 4;  // elementary 4 school
+                                school_ptr[ip] = 4;  // elementary school for kids in Neighbordhood 3 & 4
                                 workgroup_ptr[ip] = 4 ;
+                                work_nborhood_ptr[ip] = 3; // assuming the first elementary school is located in Neighbordhood 3
                                 elem4_teacher_counts_ptr[comm_to]++;
                             } else if (choice < available_slots[0] + available_slots[1] + available_slots[2]) {
-                                school_ptr[ip] = 2;  // middle school
+                                school_ptr[ip] = 2;  // middle school for kids in all Neighbordhoods (1 through 4)
                                 workgroup_ptr[ip] = 2 ;
+                                work_nborhood_ptr[ip] = 3; // assuming the middle school is located in Neighbordhood 2
                                 middle_teacher_counts_ptr[comm_to]++;
                             } else if (choice < available_slots[0] + available_slots[1] + available_slots[2] + available_slots[3]) {
-                                school_ptr[ip] = 1;  // high school
+                                school_ptr[ip] = 1;  // high school for kids in all Neighbordhoods (1 through 4)
                                 workgroup_ptr[ip] = 1 ;
+                                work_nborhood_ptr[ip] = 4; // assuming the high school is located in Neighbordhood 4
                                 high_teacher_counts_ptr[comm_to]++;
                             } else if (choice < total_available) {
                                 school_ptr[ip] = 5;  // day care
                                 workgroup_ptr[ip] = 5 ;
+                                work_nborhood_ptr[ip] = 1; // deal with daycare/playgroups later
                                 daycr_teacher_counts_ptr[comm_to]++;
                             }
                         }
@@ -319,6 +327,7 @@ namespace Initialization
 
                         if (number) {
                             workgroup_ptr[ip] = 6 + amrex::Random_int(number);
+                            work_nborhood_ptr[ip] = workgroup_ptr[ip] % 4; // each workgroup is assigned to a neighborhood as well
                         }
 
                     }
