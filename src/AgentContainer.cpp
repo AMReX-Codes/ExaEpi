@@ -660,7 +660,7 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,    /*!< Number 
                 hosp_i_ptr[ip] = -1;
                 hosp_j_ptr[ip] = -1;
                 nborhood_ptr[ip] = nborhood;
-                work_nborhood_ptr[ip] = 5*nborhood;
+                work_nborhood_ptr[ip] = nborhood;
                 workgroup_ptr[ip] = 0;
 
                 if (age_group == 0) {
@@ -668,7 +668,7 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,    /*!< Number 
                 } else if (age_group == 1) {
                     school_ptr[ip] = assign_school(nborhood, engine);
                 } else {
-                    school_ptr[ip] = -1;
+                    school_ptr[ip] = 0; // only use negative values to indicate school closed
                 }
 
                 // Increment the appropriate student counter based on the school assignment
