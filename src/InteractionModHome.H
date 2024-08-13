@@ -22,7 +22,8 @@ static void binaryInteractionHome ( const int a_i, /*!< Index of infectious agen
                                     const PTDType& a_ptd, /*!< Particle tile data */
                                     const DiseaseParm* const a_lparm,  /*!< disease paramters */
                                     const Real a_social_scale, /*!< Social scale */
-                                    ParticleReal* const a_prob_ptr /*!< infection probability */)
+                                    ParticleReal* const a_prob_ptr, /*!< infection probability */
+                                    const int a_thread /*!< agent index of this thread */)
 {
     Real infect = a_lparm->infect;
     infect *= a_lparm->vac_eff;
@@ -71,7 +72,8 @@ static void binaryInteractionHome ( const int a_i, /*!< Index of infectious agen
         }
     }
 
-    Gpu::Atomic::Multiply(&a_prob_ptr[a_j], prob);
+    AMREX_ASSERT(a_j == a_thread);
+    a_prob_ptr[a_j] *= prob;
 }
 
 /*! \brief Class describing agent interactions at home */
@@ -183,7 +185,7 @@ void InteractionModHome<AC,ACT,ACTD,A>::interactAgents(AC& a_agents, /*!< Agent 
                     if ( isHospitalized(i, ptd) )  { return; }
 
                     //Real i_mask = mask_arr(home_i_ptr[i], home_j_ptr[i], 0);
-                    for (unsigned int jj = cell_start; jj < cell_stop; ++jj) {
+                    for (auto jj = cell_start; jj < cell_stop; ++jj) {
 
                         auto j = inds[jj];
                         AMREX_ALWAYS_ASSERT( (Long) j < np);
@@ -194,7 +196,12 @@ void InteractionModHome<AC,ACT,ACTD,A>::interactAgents(AC& a_agents, /*!< Agent 
 
                         if ( isInfectious<ACTD>(j, ptd, d) ) {
                             Real social_scale = 1.0_prt;  // TODO this should vary based on cell
-                            binaryInteractionHome<ACTD>( j, i, ptd, lparm, social_scale, prob_ptr );
+                            binaryInteractionHome<ACTD>( j, i,
+                                                         ptd,
+                                                         lparm,
+                                                         social_scale,
+                                                         prob_ptr,
+                                                         i );
                         }
                     }
                 });

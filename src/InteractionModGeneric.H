@@ -102,7 +102,7 @@ void InteractionModGeneric<AC,ACT,ACTD,A>::interactAgents( AC& a_agents, /*!< Ag
 
                     // compute the number of infected in this cell
                     int num_infected[2] = {0, 0};
-                    for (unsigned int i = cell_start; i < cell_stop; ++i) {
+                    for (auto i = cell_start; i < cell_stop; ++i) {
                         auto pindex = inds[i];
                         if (status_ptr[pindex] == 1) {
                             ++num_infected[strain_ptr[pindex]];
@@ -110,7 +110,7 @@ void InteractionModGeneric<AC,ACT,ACTD,A>::interactAgents( AC& a_agents, /*!< Ag
                     }
 
                     // second pass - infection prob is propto num_infected
-                    for (unsigned int i = cell_start; i < cell_stop; ++i) {
+                    for (auto i = cell_start; i < cell_stop; ++i) {
                         auto pindex = inds[i];
                         if ( status_ptr[pindex] != Status::infected &&
                              status_ptr[pindex] != Status::immune) {
