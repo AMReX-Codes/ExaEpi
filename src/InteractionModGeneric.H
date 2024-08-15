@@ -23,7 +23,7 @@ class InteractionModGeneric : public InteractionModel<AC,ACT,ACTD,A>
         virtual ~InteractionModGeneric() = default;
 
         /*! \brief Simulate agent interaction with a simple generic model */
-        virtual void interactAgents( AC&, MultiFab& );
+        virtual void interactAgents( AC&, MultiFab& ) override;
 
     protected:
 

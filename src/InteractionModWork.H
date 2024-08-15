@@ -61,7 +61,7 @@ class InteractionModWork : public InteractionModel<AC,ACT,ACTD,A>
         virtual ~InteractionModWork() = default;
 
         /*! \brief Simulate agent interaction at work */
-        virtual void interactAgents( AC&, MultiFab& );
+        virtual void interactAgents( AC&, MultiFab& ) override;
 
     protected:
 

@@ -82,7 +82,7 @@ class InteractionModNborhood : public InteractionModel<AC,ACT,ACTD,A>
         virtual ~InteractionModNborhood() = default;
 
         /*! \brief Simulate agent interaction in the neighborhood/community */
-        virtual void interactAgents( AC&, MultiFab& );
+        virtual void interactAgents( AC&, MultiFab& ) override;
 
     protected:
 

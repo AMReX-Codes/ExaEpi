@@ -89,7 +89,7 @@ class InteractionModHome : public InteractionModel<AC,ACT,ACTD,A>
         virtual ~InteractionModHome() = default;
 
         /*! \brief Simulate agent interaction at home */
-        virtual void interactAgents( AC&, MultiFab& );
+        virtual void interactAgents( AC&, MultiFab& ) override;
 
     protected:
 

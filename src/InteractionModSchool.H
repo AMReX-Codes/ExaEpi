@@ -80,7 +80,7 @@ class InteractionModSchool : public InteractionModel<AC,ACT,ACTD,A>
         virtual ~InteractionModSchool() = default;
 
         /*! \brief Simulate agent interaction at school */
-        virtual void interactAgents( AC&, MultiFab& );
+        virtual void interactAgents( AC&, MultiFab& ) override;
 
     protected:
 
