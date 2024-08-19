@@ -140,10 +140,10 @@ The following inputs specify the disease parameters:
     one entry for each disease strain.
 * ``disease.vac_eff`` (`float`, example: ``0.4``)
     The vaccine efficacy - the probability of transmission will be multiplied by one minus this factor
-* ``disease.mean_immune_time`` (`float`, default: 180)
+* ``disease.immune_length_mean`` (`float`, default: 180)
     The mean amount of time *in days* agents are immune post-infection
-* ``disease.immune_time_spread`` (`float`, default: 60)
-    The spread associated with the above mean, each agent will draw uniformly from mean +/- spread
+* ``disease.immune_length_std`` (`float`, default: 60)
+    The standard deviation associated with the above mean, i.e. the length is drawn from a normal distribution
 * ``disease.incubation_length_mean`` (`float`, default: ``3.0``)
     Mean length of the incubation period in days. Before this, agents have no symptoms and are not infectious.
 * ``disease.infectious_length_mean`` (`float`, default: ``6.0``)

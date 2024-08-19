@@ -18,8 +18,8 @@ agent.aggregated_diag_prefix = "cases"
 #agent.shelter_start = 7
 #agent.shelter_length = 30
 #agent.shelter_compliance = 0.85
-#agent.mean_immune_time = 180
-#agent.immune_time_spread = 60
+#agent.immune_length_mean = 180
+#agent.immune_length_std = 60
 
 contact.pSC  = 0.2
 contact.pCO  = 1.45

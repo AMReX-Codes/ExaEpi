@@ -60,8 +60,8 @@ void DiseaseParm::readInputs ( const std::string& a_pp_str /*!< Parmparse string
     pp.query("infectious_length_std", infectious_length_std);
     pp.query("symptomdev_length_std", symptomdev_length_std);
 
-    pp.query("mean_immune_time", mean_immune_time);
-    pp.query("immune_time_spread", immune_time_spread);
+    pp.query("immune_length_mean", immune_length_mean);
+    pp.query("immune_length_std", immune_length_std);
 
     amrex::Vector<amrex::Real> t_hosp(AgeGroups_Hosp::total);
     for (int i = 0; i < AgeGroups_Hosp::total; i++) {

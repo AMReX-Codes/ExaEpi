@@ -126,8 +126,8 @@ struct DiseaseParm
     amrex::Real infectious_length_std = 1.0;   /*!< std dev (in days) for the above */
     amrex::Real symptomdev_length_std = 1.0;   /*!< std dev (in days) for the above */
 
-    amrex::Real mean_immune_time = 30*6;  /*! mean immunity time in days*/
-    amrex::Real immune_time_spread = 30*2;  /*! spread in immunity time in days*/
+    amrex::Real immune_length_mean = 30*6;  /*! mean immunity time in days*/
+    amrex::Real immune_length_std = 30*2;  /*! spread in immunity time in days*/
 
     /*! number of hospitalization days by age group (#AgeGroups_Hosp); note that the
      *  age groups here are under 50, 50-64, and over 65, and *not* the age groups
