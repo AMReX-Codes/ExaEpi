@@ -139,7 +139,7 @@ The following inputs specify the disease parameters:
     The relative infectiousness of asymptomatic individuals. There must be
     one entry for each disease strain.
 * ``disease.vac_eff`` (`float`, example: ``0.4``)
-    The vaccine efficacy - the probability of transmission will be multiplied by this factor
+    The vaccine efficacy - the probability of transmission will be multiplied by one minus this factor
 * ``disease.mean_immune_time`` (`float`, default: 180)
     The mean amount of time *in days* agents are immune post-infection
 * ``disease.immune_time_spread`` (`float`, default: 60)

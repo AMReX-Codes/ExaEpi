@@ -25,7 +25,7 @@ static void binaryInteractionWork ( const int a_i, /*!< Index of infectious agen
                                     const int a_thread /*!< agent index of this thread */)
 {
     Real infect = a_lparm->infect;
-    infect *= a_lparm->vac_eff;
+    infect *= (1.0_rt - a_lparm->vac_eff);
 
     auto work_i_ptr = a_ptd.m_idata[IntIdx::work_i];
     auto workgroup_ptr = a_ptd.m_idata[IntIdx::workgroup];
