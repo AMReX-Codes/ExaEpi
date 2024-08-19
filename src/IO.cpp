@@ -110,13 +110,14 @@ void writePlotFile (const AgentContainer& pc, /*!< Agent (particle) container */
         Vector<int> write_real_comp = {}, write_int_comp = {};
         Vector<std::string> real_varnames = {}, int_varnames = {};
         // non-disease-specific attributes
-        real_varnames.push_back("treatment_timer"); write_real_comp.push_back(1);
         int_varnames.push_back ("age_group"); write_int_comp.push_back(static_cast<int>(step==0));
         int_varnames.push_back ("family"); write_int_comp.push_back(static_cast<int>(step==0));
         int_varnames.push_back ("home_i"); write_int_comp.push_back(static_cast<int>(step==0));
         int_varnames.push_back ("home_j"); write_int_comp.push_back(static_cast<int>(step==0));
         int_varnames.push_back ("work_i"); write_int_comp.push_back(static_cast<int>(step==0));
         int_varnames.push_back ("work_j"); write_int_comp.push_back(static_cast<int>(step==0));
+        int_varnames.push_back ("hosp_i"); write_int_comp.push_back(static_cast<int>(step==0));
+        int_varnames.push_back ("hosp_j"); write_int_comp.push_back(static_cast<int>(step==0));
         int_varnames.push_back ("nborhood"); write_int_comp.push_back(static_cast<int>(step==0));
         int_varnames.push_back ("school"); write_int_comp.push_back(static_cast<int>(step==0));
         int_varnames.push_back ("workgroup"); write_int_comp.push_back(static_cast<int>(step==0));
@@ -125,6 +126,7 @@ void writePlotFile (const AgentContainer& pc, /*!< Agent (particle) container */
         int_varnames.push_back ("random_travel"); write_int_comp.push_back(1);
         // disease-specific (runtime-added) attributes
         if (num_diseases == 1) {
+            real_varnames.push_back("treatment_timer"); write_real_comp.push_back(1);
             real_varnames.push_back("disease_counter"); write_real_comp.push_back(1);
             real_varnames.push_back("infection_prob"); write_real_comp.push_back(1);
             real_varnames.push_back("incubation_period"); write_real_comp.push_back(static_cast<int>(step==0));
@@ -135,6 +137,7 @@ void writePlotFile (const AgentContainer& pc, /*!< Agent (particle) container */
             int_varnames.push_back ("symptomatic"); write_int_comp.push_back(1);
         } else {
             for (int d = 0; d < num_diseases; d++) {
+                real_varnames.push_back(disease_names[d]+"treatment_timer"); write_real_comp.push_back(1);
                 real_varnames.push_back(disease_names[d]+"_disease_counter"); write_real_comp.push_back(1);
                 real_varnames.push_back(disease_names[d]+"_infection_prob"); write_real_comp.push_back(1);
                 real_varnames.push_back(disease_names[d]+"_incubation_period"); write_real_comp.push_back(static_cast<int>(step==0));

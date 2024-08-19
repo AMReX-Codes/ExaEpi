@@ -57,4 +57,10 @@ or by adding arguments with ``-D<OPTION>=<VALUE>`` to the first CMake call, e.g.
 
 .. code-block:: bash
 
-   cmake -S . -B build -DAMReX_GPU_BACKEND=CUDA
+   cmake -S . -B build -DAMReX_GPU_BACKEND=CUDA -DAMReX_HDF5=TRUE
+
+Some of the options available are:
+
+- ``-DAMReX_GPU_BACKEND=CUDA``: to build with GPU support.
+
+- ``-DAMReX_HDF5=TRUE``: to write output as (compressed) HDF5. Parallel HDF5 is required, and the `HDF5_CHUNK_SIZE` environment variable should be set to a reasonable number before running the compiled code; 100,000 is recommended. For example, run ``export HDF5_CHUNK_SIZE=100000`` before running the agent.

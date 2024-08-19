@@ -17,9 +17,7 @@ namespace ExaEpi
 struct RealIdx
 {
     enum {
-        /* Disease counter starts after infection. */
-        treatment_timer = 0,    /*!< Timer since hospital admission */
-        nattribs                /*!< number of real-type attribute*/
+        nattribs = 0 /*!< number of real-type attribute*/
     };
 };
 
@@ -28,7 +26,8 @@ struct RealIdxDisease
 {
     enum {
         /* Disease counter starts after infection. */
-        disease_counter = 0,    /*!< Counter since start of infection */
+        treatment_timer = 0,    /*!< Timer since hospital admission */
+        disease_counter,        /*!< Counter since start of infection */
         prob,                   /*!< Probability of infection */
         incubation_period,      /*!< Time until infectious */
         infectious_period,      /*!< Length of time infectious */
@@ -47,6 +46,8 @@ struct IntIdx
         home_j          /*!< home location index */,
         work_i          /*!< work location index */,
         work_j          /*!< work location index */,
+        hosp_i          /*!< hosp location index */,
+        hosp_j          /*!< hosp location index */,
         nborhood,       /*!< home neighborhood ID */
         school,         /*!< school type (elementary, middle, high, none) */
         workgroup,      /*!< workgroup ID */
@@ -75,10 +76,34 @@ struct SchoolType
         total = 0,   /*!< All School type */
         high,    /*!< High School */
         middle,      /*!< Middle School */
-        elem_3,      /*!< Elementary School Neighbordhood 1 */
-        elem_4,      /*!< Elementary School Neighbordhood 2 */
+        elem_3,      /*!< Elementary School Neighbordhood 1 & 2 */
+        elem_4,      /*!< Elementary School Neighbordhood 3 & 4 */
         day_care,     /*!< Day care + Playground */
         total_school_type
+    };
+};
+
+/*! \brief Age Group */
+struct AgeGroups
+{
+    enum {
+        u5 = 0, /*!< Under 5 */
+        a5to17,  /*!< 5-17 */
+        a18to29, /*!< 18-29 */
+        a30to64, /*!< 30-64 */
+        o65,    /*!< over 65 */
+        total   /*!< number of age groups */
+    };
+};
+
+/*! \brief Age Groups for Hospitalization Days */
+struct AgeGroups_Hosp
+{
+    enum {
+        u50 = 0, /*!< Under 50 */
+        a50to64, /*!< Ages 50-64 */
+        o65,     /*!< 65 and over */
+        total    /*!< number of age groups */
     };
 };
 
@@ -91,6 +116,17 @@ struct Status
         immune,      /*!< no longer infected, immune. lasts 6 months. */
         susceptible, /*!< no longer infected, no longer immnune */
         dead         /*!< passed away */
+    };
+};
+
+/*! \brief Disease statistics */
+struct DiseaseStats
+{
+    enum {
+        hospitalization = 0, /*!< number of hospitalizations */
+        ICU,                 /*!< number of ICU cases */
+        ventilator,          /*!< number of ventilator cases */
+        death                /*!< number of deaths */
     };
 };
 
@@ -108,7 +144,7 @@ int r0 ( const int a_d /*!< Disease index */)
     return a_d*RealIdxDisease::nattribs;
 }
 
-/*! \brief Disease status */
+/*! \brief Disease symptom status */
 struct SymptomStatus
 {
     enum {
@@ -172,7 +208,8 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE
 bool isHospitalized ( const int      a_idx, /*!< Agent index */
                       const PTDType& a_ptd  /*!< Particle tile data */ )
 {
-    return (a_ptd.m_rdata[RealIdx::treatment_timer][a_idx] > 0.0);
+    return (   (a_ptd.m_idata[IntIdx::hosp_i][a_idx] >= 0)
+            && (a_ptd.m_idata[IntIdx::hosp_j][a_idx] >= 0) );
 }
 
 #endif

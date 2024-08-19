@@ -8,6 +8,96 @@
 
 using namespace amrex::literals;
 
+/*! \brief Read contact coefficients  from input file */
+void DiseaseParm::readContact ()
+{
+    std::string key = "contact";
+    amrex::ParmParse pp(key);
+    pp.query("pSC", pSC);
+    pp.query("pCO", pCO);
+    pp.query("pNH", pNH);
+    pp.query("pWO", pWO);
+    pp.query("pFA", pFA);
+    pp.query("pBAR", pBAR);
+}
+
+/*! \brief Read disease inputs from input file */
+void DiseaseParm::readInputs ( const std::string& a_pp_str /*!< Parmparse string */)
+{
+    amrex::ParmParse pp(a_pp_str);
+    pp.query("nstrain", nstrain);
+    AMREX_ASSERT(nstrain <= 2);
+    pp.query("reinfect_prob", reinfect_prob);
+
+    amrex::Vector<amrex::Real> t_p_trans(nstrain);
+    amrex::Vector<amrex::Real> t_p_asymp(nstrain);
+    amrex::Vector<amrex::Real> t_reduced_inf(nstrain);
+
+    // set correct default
+    for (int i = 0; i < nstrain; i++) {
+        t_p_trans[i] = p_trans[i];
+        t_p_asymp[i] = p_asymp[i];
+        t_reduced_inf[i] = reduced_inf[i];
+    }
+
+    pp.queryarr("p_trans", t_p_trans, 0, nstrain);
+    pp.queryarr("p_asymp", t_p_asymp, 0, nstrain);
+    pp.queryarr("reduced_inf", t_reduced_inf, 0, nstrain);
+
+    for (int i = 0; i < nstrain; ++i) {
+        p_trans[i] = t_p_trans[i];
+        p_asymp[i] = t_p_asymp[i];
+        reduced_inf[i] = t_reduced_inf[i];
+    }
+
+    pp.query("vac_eff", vac_eff);
+
+    pp.query("incubation_length_mean", incubation_length_mean);
+    pp.query("infectious_length_mean", infectious_length_mean);
+    pp.query("symptomdev_length_mean", symptomdev_length_mean);
+
+    pp.query("incubation_length_std", incubation_length_std);
+    pp.query("infectious_length_std", infectious_length_std);
+    pp.query("symptomdev_length_std", symptomdev_length_std);
+
+    pp.query("mean_immune_time", mean_immune_time);
+    pp.query("immune_time_spread", immune_time_spread);
+
+    amrex::Vector<amrex::Real> t_hosp(AgeGroups_Hosp::total);
+    for (int i = 0; i < AgeGroups_Hosp::total; i++) {
+        t_hosp[i] = m_t_hosp[i];
+    }
+    pp.queryarr("hospitalization_days", t_hosp, 0, AgeGroups_Hosp::total);
+    for (int i = 0; i < AgeGroups_Hosp::total; i++) {
+        m_t_hosp[i] = t_hosp[i];
+        if (t_hosp[i] > m_t_hosp_offset) {
+            m_t_hosp_offset = t_hosp[i] + 1;
+        }
+    }
+
+    amrex::Vector<amrex::Real> CHR(AgeGroups::total);
+    amrex::Vector<amrex::Real> CIC(AgeGroups::total);
+    amrex::Vector<amrex::Real> CVE(AgeGroups::total);
+    amrex::Vector<amrex::Real> CVF(AgeGroups::total);
+    for (int i = 0; i < AgeGroups::total; i++) {
+        CHR[i] = m_CHR[i];
+        CIC[i] = m_CIC[i];
+        CVE[i] = m_CVE[i];
+        CVF[i] = m_CVF[i];
+    }
+    pp.queryarr("CHR", CHR, 0, AgeGroups::total);
+    pp.queryarr("CIC", CHR, 0, AgeGroups::total);
+    pp.queryarr("CVE", CHR, 0, AgeGroups::total);
+    pp.queryarr("CVF", CHR, 0, AgeGroups::total);
+    for (int i = 0; i < AgeGroups::total; i++) {
+        m_CHR[i] = CHR[i];
+        m_CIC[i] = CIC[i];
+        m_CVE[i] = CVE[i];
+        m_CVF[i] = CVF[i];
+    }
+}
+
+
 /*! \brief Initialize disease parameters
 
     Compute transmission probabilities for various situations based on disease

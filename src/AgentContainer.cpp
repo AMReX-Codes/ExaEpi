@@ -519,6 +519,8 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,    /*!< Number 
         auto home_j_ptr = soa.GetIntData(IntIdx::home_j).data();
         auto work_i_ptr = soa.GetIntData(IntIdx::work_i).data();
         auto work_j_ptr = soa.GetIntData(IntIdx::work_j).data();
+        auto hosp_i_ptr = soa.GetIntData(IntIdx::hosp_i).data();
+        auto hosp_j_ptr = soa.GetIntData(IntIdx::hosp_j).data();
         auto nborhood_ptr = soa.GetIntData(IntIdx::nborhood).data();
         auto school_ptr = soa.GetIntData(IntIdx::school).data();
         auto workgroup_ptr = soa.GetIntData(IntIdx::workgroup).data();
@@ -530,13 +532,13 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,    /*!< Number 
         int n_disease = m_num_diseases;
 
         GpuArray<int*,ExaEpi::max_num_diseases> status_ptrs;
-        GpuArray<ParticleReal*,ExaEpi::max_num_diseases> counter_ptrs;
+        GpuArray<ParticleReal*,ExaEpi::max_num_diseases> counter_ptrs, timer_ptrs;
         for (int d = 0; d < n_disease; d++) {
             status_ptrs[d] = soa.GetIntData(i_RT+i0(d)+IntIdxDisease::status).data();
             counter_ptrs[d] = soa.GetRealData(r_RT+r0(d)+RealIdxDisease::disease_counter).data();
+            timer_ptrs[d] = soa.GetRealData(r_RT+r0(d)+RealIdxDisease::treatment_timer).data();
         }
 
-        auto timer_ptr = soa.GetRealData(RealIdx::treatment_timer).data();
         auto dx = ParticleGeom(0).CellSizeArray();
         auto my_proc = ParallelDescriptor::MyProc();
 
@@ -648,16 +650,18 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,    /*!< Number 
                 for (int d = 0; d < n_disease; d++) {
                     status_ptrs[d][ip] = 0;
                     counter_ptrs[d][ip] = 0.0_rt;
+                    timer_ptrs[d][ip] = 0.0_rt;
                 }
-                timer_ptr[ip] = 0.0_rt;
                 age_group_ptr[ip] = age_group;
                 family_ptr[ip] = family_id_start + (ii / family_size);
                 home_i_ptr[ip] = i;
                 home_j_ptr[ip] = j;
                 work_i_ptr[ip] = i;
                 work_j_ptr[ip] = j;
+                hosp_i_ptr[ip] = -1;
+                hosp_j_ptr[ip] = -1;
                 nborhood_ptr[ip] = nborhood;
-                work_nborhood_ptr[ip] = 5*nborhood;
+                work_nborhood_ptr[ip] = nborhood;
                 workgroup_ptr[ip] = 0;
                 random_travel_ptr[ip] = -1;
 
@@ -666,7 +670,7 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,    /*!< Number 
                 } else if (age_group == 1) {
                     school_ptr[ip] = assign_school(nborhood, engine);
                 } else {
-                    school_ptr[ip] = -1;
+                    school_ptr[ip] = 0; // only use negative values to indicate school closed
                 }
 
                 // Increment the appropriate student counter based on the school assignment
@@ -769,6 +773,7 @@ void AgentContainer::moveAgentsToWork ()
             int gid = mfi.index();
             int tid = mfi.LocalTileIndex();
             auto& ptile = plev[std::make_pair(gid, tid)];
+            const auto& ptd = ptile.getParticleTileData();
             auto& aos   = ptile.GetArrayOfStructs();
             ParticleType* pstruct = &(aos[0]);
             const size_t np = aos.numParticles();
@@ -780,9 +785,11 @@ void AgentContainer::moveAgentsToWork ()
             amrex::ParallelFor( np,
             [=] AMREX_GPU_DEVICE (int ip) noexcept
             {
-                ParticleType& p = pstruct[ip];
-                p.pos(0) = (work_i_ptr[ip] + 0.5_prt)*dx[0];
-                p.pos(1) = (work_j_ptr[ip] + 0.5_prt)*dx[1];
+                if (!isHospitalized(ip, ptd)) {
+                    ParticleType& p = pstruct[ip];
+                    p.pos(0) = (work_i_ptr[ip] + 0.5_prt)*dx[0];
+                    p.pos(1) = (work_j_ptr[ip] + 0.5_prt)*dx[1];
+                }
             });
         }
     }
@@ -811,6 +818,7 @@ void AgentContainer::moveAgentsToHome ()
             int gid = mfi.index();
             int tid = mfi.LocalTileIndex();
             auto& ptile = plev[std::make_pair(gid, tid)];
+            const auto& ptd = ptile.getParticleTileData();
             auto& aos   = ptile.GetArrayOfStructs();
             ParticleType* pstruct = &(aos[0]);
             const size_t np = aos.numParticles();
@@ -822,9 +830,11 @@ void AgentContainer::moveAgentsToHome ()
             amrex::ParallelFor( np,
             [=] AMREX_GPU_DEVICE (int ip) noexcept
             {
-                ParticleType& p = pstruct[ip];
-                p.pos(0) = (home_i_ptr[ip] + 0.5_prt)*dx[0];
-                p.pos(1) = (home_j_ptr[ip] + 0.5_prt)*dx[1];
+                if (!isHospitalized(ip, ptd)) {
+                    ParticleType& p = pstruct[ip];
+                    p.pos(0) = (home_i_ptr[ip] + 0.5_prt)*dx[0];
+                    p.pos(1) = (home_j_ptr[ip] + 0.5_prt)*dx[1];
+                }
             });
         }
     }
@@ -856,6 +866,7 @@ void AgentContainer::moveRandomTravel (const iMultiFab& unit_mf)
             int gid = mfi.index();
             int tid = mfi.LocalTileIndex();
             auto& ptile = plev[std::make_pair(gid, tid)];
+            const auto& ptd = ptile.getParticleTileData();
             auto& aos   = ptile.GetArrayOfStructs();
             ParticleType* pstruct = &(aos[0]);
             const size_t np = aos.numParticles();
@@ -866,17 +877,19 @@ void AgentContainer::moveRandomTravel (const iMultiFab& unit_mf)
             amrex::ParallelForRNG( np,
             [=] AMREX_GPU_DEVICE (int i, RandomEngine const& engine) noexcept
             {
-                ParticleType& p = pstruct[i];
-                if (withdrawn_ptr[i] == 1) {return ;}
-                if (amrex::Random(engine) < 0.0001) {
-                    random_travel_ptr[i] = i;
-                    int random_unit = -1;
-                    while (random_unit == -1) {
-                        int i_random = int( amrex::Real(i_max)*amrex::Random(engine));
-                        int j_random = int( amrex::Real(j_max)*amrex::Random(engine));
-                        p.pos(0) = i_random;
-                        p.pos(1) = j_random;
-                        random_unit = unit_arr(i_random, j_random, 0);
+                if (!isHospitalized(i, ptd)) {
+                    ParticleType& p = pstruct[i];
+                    if (withdrawn_ptr[i] == 1) {return ;}
+                    if (amrex::Random(engine) < 0.0001) {
+                        random_travel_ptr[i] = i;
+                        int random_unit = -1;
+                        while (random_unit == -1) {
+                            int i_random = int( amrex::Real(i_max)*amrex::Random(engine));
+                            int j_random = int( amrex::Real(j_max)*amrex::Random(engine));
+                            p.pos(0) = i_random;
+                            p.pos(1) = j_random;
+                            random_unit = unit_arr(i_random, j_random, 0);
+                        }
                     }
                 }
             });
@@ -932,34 +945,18 @@ void AgentContainer::returnRandomTravel (const AgentContainer& on_travel_pc)
     }
 }
 
-/*! \brief Updates disease status of each agent at a given step and also updates a MultiFab
-    that tracks disease statistics (hospitalization, ICU, ventilator, and death) in a community.
-
-    At a given step, update the disease status of each agent based on the following overall logic:
-    + If agent status is #Status::never or #Status::susceptible, do nothing
-    + If agent status is #Status::infected, then
-      + Increment its counter by 1 day
-      + If counter is within incubation period, do nothing more
-      + Else, use hospitalization probabilities (by age group)
-        to decide if agent is hospitalized. If yes, use age group to set hospital timer. Also, use
-        age-group-wise probabilities to move agent to ICU and then to ventilator. Adjust timer
-        accordingly.
-      + Update the community-wise disease stats tracker MultiFab according to hospitalization/ICU/vent
-        status (using the agent's home community)
-      + Else (beyond 3 days), count down hospital timer if agent is hospitalized. At end of hospital
-        stay, determine if agent is #Status dead or #Status::immune. For non-hospitalized agents,
-        set them to #Status::immune after incubation length + infection length days.
-
-    The input argument is a MultiFab with 4 components corresponding to "hospitalizations", "ICU",
-    "ventilator", and "death". It contains the cumulative totals of these quantities for each
-    community as the simulation progresses.
-*/
-void AgentContainer::updateStatus (MFPtrVec& a_disease_stats /*!< Community-wise disease stats tracker */)
+/*! \brief Updates disease status of each agent */
+void AgentContainer::updateStatus ( MFPtrVec& a_disease_stats /*!< Community-wise disease stats tracker */)
 {
     BL_PROFILE("AgentContainer::updateStatus");
 
+    m_disease_status.updateAgents(*this, a_disease_stats);
+    m_hospital->treatAgents(*this, a_disease_stats);
+
+    // move hospitalized agents to their hospital location
     for (int lev = 0; lev <= finestLevel(); ++lev)
     {
+        const auto dx = Geom(lev).CellSizeArray();
         auto& plev  = GetParticles(lev);
 
 #ifdef AMREX_USE_OMP
@@ -970,209 +967,24 @@ void AgentContainer::updateStatus (MFPtrVec& a_disease_stats /*!< Community-wise
             int gid = mfi.index();
             int tid = mfi.LocalTileIndex();
             auto& ptile = plev[std::make_pair(gid, tid)];
-            auto& soa   = ptile.GetStructOfArrays();
-            const auto np = ptile.numParticles();
+            const auto& ptd = ptile.getParticleTileData();
+            auto& aos   = ptile.GetArrayOfStructs();
+            ParticleType* pstruct = &(aos[0]);
+            const size_t np = aos.numParticles();
 
-            auto age_group_ptr = soa.GetIntData(IntIdx::age_group).data();
-            auto home_i_ptr = soa.GetIntData(IntIdx::home_i).data();
-            auto home_j_ptr = soa.GetIntData(IntIdx::home_j).data();
-            auto withdrawn_ptr = soa.GetIntData(IntIdx::withdrawn).data();
-            auto timer_ptr = soa.GetRealData(RealIdx::treatment_timer).data();
+            auto& soa = ptile.GetStructOfArrays();
+            auto hosp_i_ptr = soa.GetIntData(IntIdx::hosp_i).data();
+            auto hosp_j_ptr = soa.GetIntData(IntIdx::hosp_j).data();
 
-            int i_RT = IntIdx::nattribs;
-            int r_RT = RealIdx::nattribs;
-            int n_disease = m_num_diseases;
-
-            for (int d = 0; d < n_disease; d++) {
-
-                auto status_ptr      = soa.GetIntData(i_RT+i0(d)+IntIdxDisease::status).data();
-                auto symptomatic_ptr = soa.GetIntData(i_RT+i0(d)+IntIdxDisease::symptomatic).data();
-
-                auto counter_ptr           = soa.GetRealData(r_RT+r0(d)+RealIdxDisease::disease_counter).data();
-                auto prob_ptr              = soa.GetRealData(r_RT+r0(d)+RealIdxDisease::prob).data();
-                auto incubation_period_ptr = soa.GetRealData(r_RT+r0(d)+RealIdxDisease::incubation_period).data();
-                auto infectious_period_ptr = soa.GetRealData(r_RT+r0(d)+RealIdxDisease::infectious_period).data();
-                auto symptomdev_period_ptr = soa.GetRealData(r_RT+r0(d)+RealIdxDisease::symptomdev_period).data();
-
-                auto* lparm = d_parm[d];
-                auto ds_arr = (*a_disease_stats[d])[mfi].array();
-
-                struct DiseaseStats
-                {
-                    enum {
-                        hospitalization = 0,
-                        ICU,
-                        ventilator,
-                        death
-                    };
-                };
-
-                auto symptomatic_withdraw = m_symptomatic_withdraw;
-                auto symptomatic_withdraw_compliance = m_symptomatic_withdraw_compliance;
-
-                auto mean_immune_time = h_parm[d]->mean_immune_time;
-                auto immune_time_spread = h_parm[d]->immune_time_spread;
-
-                // Track hospitalization, ICU, ventilator, and fatalities
-                Real CHR[] = {.0104_rt, .0104_rt, .070_rt, .28_rt, 1.0_rt};  // sick -> hospital probabilities
-                Real CIC[] = {.24_rt, .24_rt, .24_rt, .36_rt, .35_rt};      // hospital -> ICU probabilities
-                Real CVE[] = {.12_rt, .12_rt, .12_rt, .22_rt, .22_rt};      // ICU -> ventilator probabilities
-                Real CVF[] = {.20_rt, .20_rt, .20_rt, 0.45_rt, 1.26_rt};    // ventilator -> dead probilities
-                amrex::ParallelForRNG( np,
-                                       [=] AMREX_GPU_DEVICE (int i, amrex::RandomEngine const& engine) noexcept
-                {
-                    prob_ptr[i] = 1.0_rt;
-                    if ( status_ptr[i] == Status::never ||
-                         status_ptr[i] == Status::susceptible ) {
-                        return;
-                    }
-                    else if (status_ptr[i] == Status::immune) {
-                        counter_ptr[i] -= 1.0_rt;
-                        if (counter_ptr[i] < 0.0_rt) {
-                            counter_ptr[i] = 0.0_rt;
-                            timer_ptr[i] = 0.0_rt;
-                            status_ptr[i] = Status::susceptible;
-                            return;
-                        }
-                    }
-                    else if (status_ptr[i] == Status::infected) {
-                        counter_ptr[i] += 1;
-                        if (counter_ptr[i] == 1) {
-                            if (amrex::Random(engine) < lparm->p_asymp[0]) {
-                                symptomatic_ptr[i] = SymptomStatus::asymptomatic;
-                            } else {
-                                symptomatic_ptr[i] = SymptomStatus::presymptomatic;
-                            }
-                        }
-                        if (counter_ptr[i] == amrex::Math::floor(symptomdev_period_ptr[i])) {
-                            if (symptomatic_ptr[i] != SymptomStatus::asymptomatic) {
-                                symptomatic_ptr[i] = SymptomStatus::symptomatic;
-                            }
-                            if (    (symptomatic_ptr[i] == SymptomStatus::symptomatic)
-                                &&  (symptomatic_withdraw)
-                                &&  (amrex::Random(engine) < symptomatic_withdraw_compliance)) {
-                                withdrawn_ptr[i] = 1;
-                            }
-                        }
-                        if (counter_ptr[i] < incubation_period_ptr[i]) {
-                            // incubation phase
-                            return;
-                        }
-                        if (counter_ptr[i] == amrex::Math::ceil(incubation_period_ptr[i])) {
-                            // decide if hospitalized
-                            Real p_hosp = CHR[age_group_ptr[i]];
-                            if (amrex::Random(engine) < p_hosp) {
-                                if ((age_group_ptr[i]) < 3) {  // age groups 0-4, 5-18, 19-29
-                                    timer_ptr[i] = 3;  // Ages 0-49 hospitalized for 3.1 days
-                                }
-                                else if (age_group_ptr[i] == 4) {
-                                    timer_ptr[i] = 7;  // Age 65+ hospitalized for 6.5 days
-                                }
-                                else if (amrex::Random(engine) < 0.57) {
-                                    timer_ptr[i] = 3;  // Proportion of 30-64 that is under 50
-                                }
-                                else {
-                                    timer_ptr[i] = 8;  // Age 50-64 hospitalized for 7.8 days
-                                }
-                                amrex::Gpu::Atomic::AddNoRet(
-                                    &ds_arr(home_i_ptr[i], home_j_ptr[i], 0,
-                                            DiseaseStats::hospitalization), 1.0_rt);
-                                if (amrex::Random(engine) < CIC[age_group_ptr[i]]) {
-                                    //std::printf("putting h in icu \n");
-                                    timer_ptr[i] += 10;  // move to ICU
-                                    amrex::Gpu::Atomic::AddNoRet(
-                                        &ds_arr(home_i_ptr[i], home_j_ptr[i], 0,
-                                                DiseaseStats::ICU), 1.0_rt);
-                                    if (amrex::Random(engine) < CVE[age_group_ptr[i]]) {
-                                        //std::printf("putting icu on v \n");
-                                        amrex::Gpu::Atomic::AddNoRet(
-                                        &ds_arr(home_i_ptr[i], home_j_ptr[i], 0,
-                                                DiseaseStats::ventilator), 1.0_rt);
-                                        timer_ptr[i] += 10;  // put on ventilator
-                                    }
-                                }
-                            }
-                        } else {
-                            if (timer_ptr[i] > 0.0_rt) {
-                                // do hospital things
-                                timer_ptr[i] -= 1.0_rt;
-                                if (timer_ptr[i] == 0) {
-                                    if (CVF[age_group_ptr[i]] > 2.0_rt) {
-                                        if (amrex::Random(engine) < (CVF[age_group_ptr[i]] - 2.0_rt)) {
-                                            amrex::Gpu::Atomic::AddNoRet(
-                                                &ds_arr(home_i_ptr[i], home_j_ptr[i], 0,
-                                                        DiseaseStats::death), 1.0_rt);
-                                            status_ptr[i] = Status::dead;
-                                        }
-                                    }
-                                    amrex::Gpu::Atomic::AddNoRet(
-                                                                 &ds_arr(home_i_ptr[i], home_j_ptr[i], 0,
-                                                                         DiseaseStats::hospitalization), -1.0_rt);
-                                    if (status_ptr[i] != Status::dead) {
-                                        status_ptr[i] = Status::immune;  // If alive, hospitalized patient recovers
-                                        counter_ptr[i] = (mean_immune_time - immune_time_spread) + 2.0_rt*immune_time_spread*amrex::Random(engine);
-                                        symptomatic_ptr[i] = SymptomStatus::presymptomatic;
-                                        withdrawn_ptr[i] = 0;
-                                    }
-                                }
-                                if (timer_ptr[i] == 10) {
-                                    if (CVF[age_group_ptr[i]] > 1.0_rt) {
-                                        if (amrex::Random(engine) < (CVF[age_group_ptr[i]] - 1.0_rt)) {
-                                            amrex::Gpu::Atomic::AddNoRet(
-                                                &ds_arr(home_i_ptr[i], home_j_ptr[i], 0,
-                                                        DiseaseStats::death), 1.0_rt);
-                                            status_ptr[i] = Status::dead;
-                                        }
-                                    }
-                                    amrex::Gpu::Atomic::AddNoRet(
-                                                                 &ds_arr(home_i_ptr[i], home_j_ptr[i], 0,
-                                                                         DiseaseStats::hospitalization), -1.0_rt);
-                                    amrex::Gpu::Atomic::AddNoRet(
-                                                                 &ds_arr(home_i_ptr[i], home_j_ptr[i], 0,
-                                                                         DiseaseStats::ICU), -1.0_rt);
-                                    if (status_ptr[i] != Status::dead) {
-                                        status_ptr[i] = Status::immune;  // If alive, ICU patient recovers
-                                        counter_ptr[i] = (mean_immune_time - immune_time_spread) + 2.0_rt*immune_time_spread*amrex::Random(engine);
-                                        symptomatic_ptr[i] = SymptomStatus::presymptomatic;
-                                        withdrawn_ptr[i] = 0;
-                                    }
-                                }
-                                if (timer_ptr[i] == 20) {
-                                    if (amrex::Random(engine) < CVF[age_group_ptr[i]]) {
-                                        amrex::Gpu::Atomic::AddNoRet(
-                                            &ds_arr(home_i_ptr[i], home_j_ptr[i], 0,
-                                                    DiseaseStats::death), 1.0_rt);
-                                        status_ptr[i] = Status::dead;
-                                    }
-                                    amrex::Gpu::Atomic::AddNoRet(
-                                                                 &ds_arr(home_i_ptr[i], home_j_ptr[i], 0,
-                                                                         DiseaseStats::hospitalization), -1.0_rt);
-                                    amrex::Gpu::Atomic::AddNoRet(
-                                                                 &ds_arr(home_i_ptr[i], home_j_ptr[i], 0,
-                                                                         DiseaseStats::ICU), -1.0_rt);
-                                    amrex::Gpu::Atomic::AddNoRet(
-                                                                 &ds_arr(home_i_ptr[i], home_j_ptr[i], 0,
-                                                                         DiseaseStats::ventilator), -1.0_rt);
-                                    if (status_ptr[i] != Status::dead) {
-                                        status_ptr[i] = Status::immune;  // If alive, ventilated patient recovers
-                                    counter_ptr[i] = (mean_immune_time - immune_time_spread) + 2.0_rt*immune_time_spread*amrex::Random(engine);
-                                    symptomatic_ptr[i] = SymptomStatus::presymptomatic;
-                                    withdrawn_ptr[i] = 0;
-                                    }
-                                }
-                            }
-                            else { // not hospitalized, recover once not infectious
-                                if (counter_ptr[i] >= (incubation_period_ptr[i] + infectious_period_ptr[i])) {
-                                    status_ptr[i] = Status::immune;
-                                    counter_ptr[i] = (mean_immune_time - immune_time_spread) + 2.0_rt*immune_time_spread*amrex::Random(engine);
-                                    symptomatic_ptr[i] = SymptomStatus::presymptomatic;
-                                    withdrawn_ptr[i] = 0;
-                                }
-                            }
-                        }
-                    }
-                });
-            }
+            amrex::ParallelFor( np,
+            [=] AMREX_GPU_DEVICE (int ip) noexcept
+            {
+                if (isHospitalized(ip, ptd)) {
+                    ParticleType& p = pstruct[ip];
+                    p.pos(0) = (hosp_i_ptr[ip] + 0.5_prt)*dx[0];
+                    p.pos(1) = (hosp_j_ptr[ip] + 0.5_prt)*dx[1];
+                }
+            });
         }
     }
 }
@@ -1440,6 +1252,8 @@ void AgentContainer::interactDay ( MultiFab& a_mask_behavior /*!< Masking behavi
     if (haveInteractionModel(ExaEpi::InteractionNames::nborhood)) {
         m_interactions[ExaEpi::InteractionNames::nborhood]->interactAgents( *this, a_mask_behavior );
     }
+
+    m_hospital->interactAgents(*this, a_mask_behavior);
 }
 
 /*! \brief Interaction of agents during evening (after work) - social stuff */
