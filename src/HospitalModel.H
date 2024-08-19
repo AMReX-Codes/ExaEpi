@@ -163,8 +163,7 @@ void HospitalModel<AC,ACT,ACTD,A>::treatAgents(AC& a_agents, /*!< Agent containe
                         } else {
                             // If alive, hospitalized patient recovers
                             status_ptrs[d][i] = Status::immune;
-                            counter_ptrs[d][i] = (mean_immune_time - immune_time_spread)
-                                             + 2.0_rt*immune_time_spread*Random(engine);
+                            counter_ptrs[d][i] = amrex::RandomNormal(mean_immune_time, immune_time_spread, engine);
                             symptomatic_ptrs[d][i] = SymptomStatus::presymptomatic;
                             withdrawn_ptr[i] = 0;
                             timer_ptrs[d][i] = 0.0_rt;

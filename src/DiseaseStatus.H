@@ -206,8 +206,7 @@ void DiseaseStatus<AC,ACT,ACTD,A>::updateAgents(AC& a_agents, /*!< Agent contain
                             if (!isHospitalized(i,ptd)) {
                                 if (counter_ptr[i] >= (incubation_period_ptr[i] + infectious_period_ptr[i])) {
                                     status_ptr[i] = Status::immune;
-                                    counter_ptr[i] = (mean_immune_time - immune_time_spread)
-                                                     + 2.0_rt*immune_time_spread*Random(engine);
+                                    counter_ptr[i] = amrex::RandomNormal(mean_immune_time, immune_time_spread, engine);
                                     symptomatic_ptr[i] = SymptomStatus::presymptomatic;
                                     withdrawn_ptr[i] = 0;
                                 }
