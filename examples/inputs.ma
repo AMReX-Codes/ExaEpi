@@ -33,4 +33,4 @@ disease.p_trans = 0.20
 disease.p_asymp = 0.40
 disease.reduced_inf = 0.75
 
-disease.symptomdev_length_mean = 3.0
+disease.incubation_length_mean = 3.0

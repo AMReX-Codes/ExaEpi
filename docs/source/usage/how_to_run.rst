@@ -144,17 +144,17 @@ The following inputs specify the disease parameters:
     The mean amount of time *in days* agents are immune post-infection
 * ``disease.immune_length_std`` (`float`, default: 60)
     The standard deviation associated with the above mean, i.e. the length is drawn from a normal distribution
-* ``disease.incubation_length_mean`` (`float`, default: ``3.0``)
-    Mean length of the incubation period in days. Before this, agents have no symptoms and are not infectious.
+* ``disease.latent_length_mean`` (`float`, default: ``3.0``)
+    Mean length of time from exposure until agent becomes infectious in days.
 * ``disease.infectious_length_mean`` (`float`, default: ``6.0``)
-    Mean length of the infectious period in days. This counter starts once the incubation phase is over. Before tihs, agents are symptomatic and can spread the disease.
-* ``disease.symptomdev_length_mean`` (`float`, default: ``5.0``)
-    Mean length of the time from exposure until symptoms develop in days. During the symptomatic-but-not-infectious stage agents  may self-withdraw, but they cannot spread the illness.
-* ``disease.incubation_length_std`` (`float`, default: ``1.0``)
-    Standard deviation of the incubation period in days.
+    Mean length of the infectious period in days. This counter starts once the latent phase is over.
+* ``disease.incubation_length_mean`` (`float`, default: ``5.0``)
+    Mean length of the time from exposure until symptoms develop in days.
+* ``disease.latent_length_std`` (`float`, default: ``1.0``)
+    Standard deviation of the latent period in days.
 * ``disease.infectious_length_std`` (`float`, default: ``1.0``)
     Standard deviation of the infectious period in days.
-* ``disease.symptomdev_length_std`` (`float`, default: ``1.0``)
+* ``disease.incubation_length_std`` (`float`, default: ``1.0``)
     Standard deviation of the time until symptom development in days.
 * ``disease.hospitalization_days`` (`list of float`, default: ``3.0 8.0 7.0``)
     Number of hospitalization days for age groups: under 50, 50-64, 65 and over.

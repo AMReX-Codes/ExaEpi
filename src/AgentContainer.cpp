@@ -1037,9 +1037,9 @@ void AgentContainer::infectAgents ()
                         if (amrex::Random(engine) < prob_ptr[i]) {
                             status_ptr[i] = Status::infected;
                             counter_ptr[i] = 0.0_rt;
-                            incubation_period_ptr[i] = amrex::RandomNormal(lparm->incubation_length_mean, lparm->incubation_length_std, engine);
+                            incubation_period_ptr[i] = amrex::RandomNormal(lparm->latent_length_mean, lparm->latent_length_std, engine);
                             infectious_period_ptr[i] = amrex::RandomNormal(lparm->infectious_length_mean, lparm->infectious_length_std, engine);
-                            symptomdev_period_ptr[i] = amrex::RandomNormal(lparm->symptomdev_length_mean, lparm->symptomdev_length_std, engine);
+                            symptomdev_period_ptr[i] = amrex::RandomNormal(lparm->incubation_length_mean, lparm->incubation_length_std, engine);
                             return;
                         }
                     }

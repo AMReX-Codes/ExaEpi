@@ -52,13 +52,13 @@ void DiseaseParm::readInputs ( const std::string& a_pp_str /*!< Parmparse string
 
     pp.query("vac_eff", vac_eff);
 
-    pp.query("incubation_length_mean", incubation_length_mean);
+    pp.query("latent_length_mean", latent_length_mean);
     pp.query("infectious_length_mean", infectious_length_mean);
-    pp.query("symptomdev_length_mean", symptomdev_length_mean);
+    pp.query("incubation_length_mean", incubation_length_mean);
 
-    pp.query("incubation_length_std", incubation_length_std);
+    pp.query("latent_length_std", latent_length_std);
     pp.query("infectious_length_std", infectious_length_std);
-    pp.query("symptomdev_length_std", symptomdev_length_std);
+    pp.query("incubation_length_std", incubation_length_std);
 
     pp.query("immune_length_mean", immune_length_mean);
     pp.query("immune_length_std", immune_length_std);
