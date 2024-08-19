@@ -76,10 +76,10 @@ class InteractionModRandom : public InteractionModel<AC,ACT,ACTD,A>
         virtual ~InteractionModRandom() = default;
 
         /*! \brief Simulate agent interaction for random travel */
-        void interactAgents( AC&, MultiFab&) {}
+        void interactAgents( AC&, MultiFab&) override {}
 
         /*! \brief Simulate agent interaction for random travel */
-        void interactAgents( AC&, MultiFab&, AC&);
+        void interactAgents( AC&, MultiFab&, AC&) override ;
 
     protected:
 
@@ -183,7 +183,7 @@ void InteractionModRandom<AC,ACT,ACTD,A>::interactAgents(AC& a_agents, /*!< Agen
                     if ( notSusceptible<ACTD>(i, ptd, d) )  { return; }
 
                     //Real i_mask = mask_arr(home_i_ptr[i], home_j_ptr[i], 0);
-                    for (unsigned int jj = cell_start; jj < cell_stop; ++jj) {
+                    for (auto jj = cell_start; jj < cell_stop; ++jj) {
 
                         auto j = travel_inds[jj];
                         AMREX_ALWAYS_ASSERT( (Long) j < np);
@@ -247,7 +247,7 @@ void InteractionModRandom<AC,ACT,ACTD,A>::interactAgents(AC& a_agents, /*!< Agen
                     if ( notSusceptible<ACTD>(i, ptd, d) )  { return; }
 
                     //Real i_mask = mask_arr(home_i_ptr[i], home_j_ptr[i], 0);
-                    for (unsigned int jj = cell_start; jj < cell_stop; ++jj) {
+                    for (auto jj = cell_start; jj < cell_stop; ++jj) {
 
                         auto j = inds[jj];
                         AMREX_ALWAYS_ASSERT( (Long) j < np);
