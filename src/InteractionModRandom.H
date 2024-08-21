@@ -88,37 +88,7 @@ class InteractionModRandom : public InteractionModel<AC,ACT,ACTD,A>
     private:
 };
 
-/*! Simulate the interactions between agents at home and compute
-    the infection probability for each agent:
-
-    + Create bins of agents if not already created (see
-      #amrex::GetParticleBin, #amrex::DenseBins):
-      + The bin size is 1 cell
-      + #amrex::GetParticleBin maps a particle to its bin index
-      + amrex::DenseBins::build() creates the bin-sorted array of particle indices and
-        the offset array for each bin (where the offset of a bin is its starting location
-        in the bin-sorted array of particle indices).
-
-    + For each agent *i* in the bin-sorted array of agents:
-      + Find its bin and the range of indices in the bin-sorted array for agents in its bin
-      + If the agent is #Status::immune, do nothing.
-      + If the agent is #Status::infected with the number of days infected (RealIdxDisease::disease_counter)
-        less than the incubation length, do nothing.
-      + Else, for each agent *j* in the same bin:
-        + If the agent is #Status::immune, do nothing.
-        + If the agent is #Status::infected with the number of days infected (RealIdxDisease::disease_counter)
-          less than the incubation length, do nothing.
-        + Else if *i* is not infected and *j* is infected, compute probability of *i* getting infected
-          from *j* (see below).
-
-    Summary of how the probability of agent A getting infected from agent B is computed:
-    + Compute infection probability reduction factor from vaccine efficacy (#DiseaseParm::vac_eff)
-    + Within family - if their IntIdx::nborhood and IntIdx::family indices are same,
-      and the agents are at home:
-      + If B is a child, use the appropriate transmission probability (#DiseaseParm::xmit_child_SC or
-        #DiseaseParm::xmit_child) depending on whether B goes to school or not (#IntIdx::school)
-      + If B is an adult, use the appropriate transmission probability (#DiseaseParm::xmit_adult_SC or
-        #DiseaseParm::xmit_adult) depending on whether B works at a school or not (#IntIdx::school)
+/*! Simulate the interactions for agents on random travel
 */
 template <typename AC, typename ACT, typename ACTD, typename A>
 void InteractionModRandom<AC,ACT,ACTD,A>::interactAgents(AC& a_agents, /*!< Agent container */
