@@ -455,9 +455,9 @@ namespace Initialization
                     } else {
                         status_ptr[pindex] = Status::infected;
                         counter_ptr[pindex] = 0;
-                        incubation_period_ptr[pindex] = amrex::RandomNormal(lparm->incubation_length_mean, lparm->incubation_length_std, engine);
+                        incubation_period_ptr[pindex] = amrex::RandomNormal(lparm->latent_length_mean, lparm->latent_length_std, engine);
                         infectious_period_ptr[pindex] = amrex::RandomNormal(lparm->infectious_length_mean, lparm->infectious_length_std, engine);
-                        symptomdev_period_ptr[pindex] = amrex::RandomNormal(lparm->symptomdev_length_mean, lparm->symptomdev_length_std, engine);
+                        symptomdev_period_ptr[pindex] = amrex::RandomNormal(lparm->incubation_length_mean, lparm->incubation_length_std, engine);
                         ++ni;
                     }
                 }

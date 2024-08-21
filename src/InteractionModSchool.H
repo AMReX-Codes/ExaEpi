@@ -25,7 +25,7 @@ static void binaryInteractionSchool ( const int a_i, /*!< Index of infectious ag
                                       const int a_thread /*!< agent index of this thread */)
 {
     Real infect = a_lparm->infect;
-    infect *= a_lparm->vac_eff;
+    infect *= (1.0_rt - a_lparm->vac_eff);
 
     auto age_group_ptr = a_ptd.m_idata[IntIdx::age_group];
     auto nborhood_ptr = a_ptd.m_idata[IntIdx::nborhood];

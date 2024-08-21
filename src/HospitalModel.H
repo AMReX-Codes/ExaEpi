@@ -127,8 +127,8 @@ void HospitalModel<AC,ACT,ACTD,A>::treatAgents(AC& a_agents, /*!< Agent containe
             for (int d = 0; d < n_disease; d++) {
 
                 auto* disease_parm_h = a_agents.getDiseaseParameters_h(d);
-                auto mean_immune_time = disease_parm_h->mean_immune_time;
-                auto immune_time_spread = disease_parm_h->immune_time_spread;
+                auto immune_length_mean = disease_parm_h->immune_length_mean;
+                auto immune_length_std = disease_parm_h->immune_length_std;
                 auto* disease_parm_d = a_agents.getDiseaseParameters_d(d);
 
                 ParallelForRNG( np,
@@ -166,8 +166,7 @@ void HospitalModel<AC,ACT,ACTD,A>::treatAgents(AC& a_agents, /*!< Agent containe
                         } else {
                             // If alive, hospitalized patient recovers
                             status_ptrs[d][i] = Status::immune;
-                            counter_ptrs[d][i] = (mean_immune_time - immune_time_spread)
-                                             + 2.0_rt*immune_time_spread*Random(engine);
+                            counter_ptrs[d][i] = amrex::RandomNormal(immune_length_mean, immune_length_std, engine);
                             symptomatic_ptrs[d][i] = SymptomStatus::presymptomatic;
                             withdrawn_ptr[i] = 0;
                             timer_ptrs[d][i] = 0.0_rt;
@@ -185,8 +184,8 @@ void HospitalModel<AC,ACT,ACTD,A>::treatAgents(AC& a_agents, /*!< Agent containe
                         } else {
                             // If alive, hospitalized patient recovers
                             status_ptrs[d][i] = Status::immune;
-                            counter_ptrs[d][i] = (mean_immune_time - immune_time_spread)
-                                             + 2.0_rt*immune_time_spread*Random(engine);
+                            counter_ptrs[d][i] = (immune_length_mean - immune_length_std)
+                                             + 2.0_rt*immune_length_std*Random(engine);
                             symptomatic_ptrs[d][i] = SymptomStatus::presymptomatic;
                             withdrawn_ptr[i] = 0;
                             timer_ptrs[d][i] = 0.0_rt;
@@ -204,8 +203,8 @@ void HospitalModel<AC,ACT,ACTD,A>::treatAgents(AC& a_agents, /*!< Agent containe
                         } else {
                             // If alive, hospitalized patient recovers
                             status_ptrs[d][i] = Status::immune;
-                            counter_ptrs[d][i] = (mean_immune_time - immune_time_spread)
-                                             + 2.0_rt*immune_time_spread*Random(engine);
+                            counter_ptrs[d][i] = (immune_length_mean - immune_length_std)
+                                             + 2.0_rt*immune_length_std*Random(engine);
                             symptomatic_ptrs[d][i] = SymptomStatus::presymptomatic;
                             withdrawn_ptr[i] = 0;
                             timer_ptrs[d][i] = 0.0_rt;
