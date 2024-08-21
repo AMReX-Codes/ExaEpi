@@ -31,8 +31,9 @@ static void binaryInteractionSchool ( const int a_i, /*!< Index of infectious ag
     auto nborhood_ptr = a_ptd.m_idata[IntIdx::nborhood];
     auto school_ptr = a_ptd.m_idata[IntIdx::school];
     auto withdrawn_ptr = a_ptd.m_idata[IntIdx::withdrawn];
-
     if (withdrawn_ptr[a_i] || withdrawn_ptr[a_j]) { return; }
+    auto random_travel_ptr = a_ptd.m_idata[IntIdx::random_travel];
+    if ((random_travel_ptr[a_i] >= 0) || (random_travel_ptr[a_j] >= 0)) {return;}
 
     //infect *= i_mask;
     //infect *= j_mask;
@@ -81,6 +82,11 @@ class InteractionModSchool : public InteractionModel<AC,ACT,ACTD,A>
 
         /*! \brief Simulate agent interaction at school */
         virtual void interactAgents( AC&, MultiFab& ) override;
+
+        /*! \brief Simulate agent interaction at school */
+        virtual void interactAgents( AC&, MultiFab&, AC& ) override {
+            amrex::Abort("Do not use this interface for this interaction model");
+        }
 
     protected:
 

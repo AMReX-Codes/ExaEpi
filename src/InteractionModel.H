@@ -29,6 +29,7 @@ namespace ExaEpi
         const std::string school = "school";
         const std::string nborhood = "neighborhood";
         const std::string transit = "transit";
+        const std::string random = "random";
     }
 }
 
@@ -56,6 +57,9 @@ class InteractionModel
 
         /*! \brief Interact agents for a model */
         virtual void interactAgents(AC&, MultiFab&) = 0;
+
+        /*! \brief Interact agents for a model */
+        virtual void interactAgents(AC&, MultiFab&, AC&) = 0;
 
     protected:
 

@@ -80,6 +80,7 @@ public:
           student_counts(a_ba, a_dmap, SchoolType::total_school_type, 0)
     {
         BL_PROFILE("AgentContainer::AgentContainer");
+
         m_num_diseases = a_num_diseases;
         AMREX_ASSERT(m_num_diseases < ExaEpi::max_num_diseases);
         m_disease_names = a_disease_names;
@@ -107,6 +108,7 @@ public:
             m_interactions[InteractionNames::work] = new InteractionModWork<PCType,PTileType,PTDType,PType>;
             m_interactions[InteractionNames::school] = new InteractionModSchool<PCType,PTileType,PTDType,PType>;
             m_interactions[InteractionNames::nborhood] = new InteractionModNborhood<PCType,PTileType,PTDType,PType>;
+            m_interactions[InteractionNames::random] = new InteractionModRandom<PCType,PTileType, PTDType, PType>;
 
             m_hospital = std::make_unique<HospitalModel<PCType,PTileType,PTDType,PType>>();
         }
@@ -155,9 +157,13 @@ public:
 
     void interactNight(amrex::MultiFab&);
 
+    void interactRandomTravel(amrex::MultiFab&, AgentContainer& on_travel_pc);
+
     void moveAgentsRandomWalk ();
 
-    void moveRandomTravel ();
+    void moveRandomTravel (const amrex::iMultiFab& unit_mf);
+
+    void returnRandomTravel (const AgentContainer& on_travel_pc);
 
     void updateStatus (MFPtrVec&);
 
@@ -188,6 +194,8 @@ public:
         } else if (a_mod_name == ExaEpi::InteractionNames::nborhood) {
             if (m_at_work) { return &m_bins_work[a_idx]; }
             else           { return &m_bins_home[a_idx]; }
+        } else if (a_mod_name == ExaEpi::InteractionNames::random) {
+            return &m_bins_random[a_idx];
         } else {
             amrex::Abort("Invalid a_mod_name!");
             return nullptr;
@@ -276,6 +284,9 @@ protected:
     /*! Map of work bins (of agents) indexed by MultiFab iterator and tile index;
         see AgentContainer::interactAgentsHomeWork() */
     std::map<std::pair<int, int>, amrex::DenseBins<PType> > m_bins_work;
+    /*! Map of random travel bins (of agents) indexed by MultiFab iterator and tile index;
+        see AgentContainer::interactAgentsRandom() */
+    std::map<std::pair<int, int>, amrex::DenseBins<PType> > m_bins_random;
 
     std::map<std::string,IntModel*> m_interactions; /*!< Map of interaction models */
     std::unique_ptr<HospitalModel<PCType,PTileType,PTDType,PType>> m_hospital; /*!< hospital model */

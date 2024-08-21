@@ -35,6 +35,8 @@ static void binaryInteractionNborhood ( const int a_i, /*!< Index of infectious 
     auto work_nborhood_ptr = a_ptd.m_idata[IntIdx::work_nborhood];
 
     if (withdrawn_ptr[a_i] || withdrawn_ptr[a_j]) { return; }
+    auto random_travel_ptr = a_ptd.m_idata[IntIdx::random_travel];
+    if ((random_travel_ptr[a_i] >= 0) || (random_travel_ptr[a_j] >= 0)) {return;}
 
     //infect *= i_mask;
     //infect *= j_mask;
@@ -83,6 +85,11 @@ class InteractionModNborhood : public InteractionModel<AC,ACT,ACTD,A>
 
         /*! \brief Simulate agent interaction in the neighborhood/community */
         virtual void interactAgents( AC&, MultiFab& ) override;
+
+        /*! \brief Simulate agent interaction in the neighborhood/community */
+        virtual void interactAgents( AC&, MultiFab&, AC& ) override {
+            amrex::Abort("Do not use this interface for this interaction model");
+        }
 
     protected:
 

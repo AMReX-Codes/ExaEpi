@@ -30,8 +30,9 @@ static void binaryInteractionWork ( const int a_i, /*!< Index of infectious agen
     auto work_i_ptr = a_ptd.m_idata[IntIdx::work_i];
     auto workgroup_ptr = a_ptd.m_idata[IntIdx::workgroup];
     auto withdrawn_ptr = a_ptd.m_idata[IntIdx::withdrawn];
-
     if (withdrawn_ptr[a_i] || withdrawn_ptr[a_j]) { return; }
+    auto random_travel_ptr = a_ptd.m_idata[IntIdx::random_travel];
+    if ((random_travel_ptr[a_i] >= 0) || (random_travel_ptr[a_j] >= 0)) {return;}
 
     //infect *= i_mask;
     //infect *= j_mask;
@@ -62,6 +63,11 @@ class InteractionModWork : public InteractionModel<AC,ACT,ACTD,A>
 
         /*! \brief Simulate agent interaction at work */
         virtual void interactAgents( AC&, MultiFab& ) override;
+
+        /*! \brief Simulate agent interaction at work */
+        virtual void interactAgents( AC&, MultiFab&, AC& ) override {
+            amrex::Abort("Do not use this interface for this interaction model");
+        }
 
     protected:
 
