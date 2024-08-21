@@ -84,7 +84,9 @@ class InteractionModSchool : public InteractionModel<AC,ACT,ACTD,A>
         virtual void interactAgents( AC&, MultiFab& ) override;
 
         /*! \brief Simulate agent interaction at school */
-        virtual void interactAgents( AC&, MultiFab&, AC& ) override {}
+        virtual void interactAgents( AC&, MultiFab&, AC& ) override {
+            amrex::Abort("Do not use this interface for this interaction model");
+        }
 
     protected:
 

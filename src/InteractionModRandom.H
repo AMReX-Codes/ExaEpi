@@ -76,7 +76,9 @@ class InteractionModRandom : public InteractionModel<AC,ACT,ACTD,A>
         virtual ~InteractionModRandom() = default;
 
         /*! \brief Simulate agent interaction for random travel */
-        void interactAgents( AC&, MultiFab&) override {}
+        void interactAgents( AC&, MultiFab&) override {
+            amrex::Abort("Do not use this interface for this interaction model");
+        }
 
         /*! \brief Simulate agent interaction for random travel */
         void interactAgents( AC&, MultiFab&, AC&) override ;
