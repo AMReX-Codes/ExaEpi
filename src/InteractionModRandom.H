@@ -141,9 +141,7 @@ void InteractionModRandom<AC,ACT,ACTD,A>::interactAgents(AC& a_agents, /*!< Agen
                 //auto mask_arr = a_mask[mfi].array();
                 auto lparm = a_agents.getDiseaseParameters_d(d);
 
-                ParallelForRNG( bins_ptr->numItems(),
-                                [=] AMREX_GPU_DEVICE (int ii, RandomEngine const& /*engine*/)
-                                noexcept
+                ParallelFor( bins_ptr->numItems(), [=] AMREX_GPU_DEVICE (int ii) noexcept
                 {
                     auto i = inds[ii];
                     int i_cell = binner(pstruct_ptr[i]);
@@ -205,9 +203,7 @@ void InteractionModRandom<AC,ACT,ACTD,A>::interactAgents(AC& a_agents, /*!< Agen
                 //auto mask_arr = a_mask[mfi].array();
                 auto lparm = a_agents.getDiseaseParameters_d(d);
 
-                ParallelForRNG( travel_bins_ptr->numItems(),
-                                [=] AMREX_GPU_DEVICE (int ii, RandomEngine const& /*engine*/)
-                                noexcept
+                ParallelFor( travel_bins_ptr->numItems(), [=] AMREX_GPU_DEVICE (int ii) noexcept
                 {
                     auto i = travel_inds[ii];
                     int i_cell = binner(pstruct_ptr[i]);
