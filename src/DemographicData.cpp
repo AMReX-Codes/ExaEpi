@@ -95,6 +95,8 @@ void DemographicData::InitFromFile (const std::string& fname /*!< Name of file c
         lis >> N5[i] >> N17[i] >> N29[i] >> N64[i] >> N65plus[i];
         lis >> H1[i] >> H2[i] >> H3[i] >> H4[i] >> H5[i] >> H6[i] >> H7[i];
         myIDtoUnit[myID[i]] = i;
+	if(CountyPop.find(FIPS[i]) ==CountyPop.end()) CountyPop[FIPS[i]]= Population[i];
+	else CountyPop[FIPS[i]] += Population[i];
 
         /*   How many 2000-person communities does this require?   */
         int ncomm = (int) std::rint(((double) Population[i]) / 2000.0);

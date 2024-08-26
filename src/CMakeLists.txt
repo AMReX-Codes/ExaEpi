@@ -6,6 +6,8 @@ set(_sources
          AgentContainer.cpp
          CaseData.H
          CaseData.cpp
+	 AirTravelFlow.H
+	 AirTravelFlow.cpp
          DiseaseParm.H
          DiseaseParm.cpp
          DemographicData.H
@@ -19,6 +21,7 @@ set(_sources
          InteractionModHome.H
          InteractionModNborhood.H
          InteractionModRandom.H
+         InteractionModAirTravel.H
          InteractionModSchool.H
          InteractionModWork.H
          InteractionModelLibrary.H

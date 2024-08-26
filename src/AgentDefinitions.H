@@ -54,6 +54,7 @@ struct IntIdx
         work_nborhood,  /*!< work neighborhood ID */
         withdrawn,      /*!< quarantine status */
         random_travel,  /*!< on long distance travel? */
+        air_travel,     /*!< on long distance travel by Air */
         nattribs        /*!< number of integer-type attribute */
     };
 };

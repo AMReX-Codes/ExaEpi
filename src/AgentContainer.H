@@ -23,6 +23,7 @@
 #include "DiseaseStatus.H"
 #include "HospitalModel.H"
 #include "InteractionModelLibrary.H"
+#include "AirTravelFlow.H"
 
 /*! \brief Assigns school by taking a random number between 0 and 100, and using
  *  default distribution to choose elementary/middle/high school. */
@@ -109,6 +110,7 @@ public:
             m_interactions[InteractionNames::school] = new InteractionModSchool<PCType,PTileType,PTDType,PType>;
             m_interactions[InteractionNames::nborhood] = new InteractionModNborhood<PCType,PTileType,PTDType,PType>;
             m_interactions[InteractionNames::random] = new InteractionModRandom<PCType,PTileType, PTDType, PType>;
+            m_interactions[InteractionNames::airTravel] = new InteractionModAirTravel<PCType,PTileType, PTDType, PType>;
 
             m_hospital = std::make_unique<HospitalModel<PCType,PTileType,PTDType,PType>>();
         }
@@ -159,11 +161,16 @@ public:
 
     void interactRandomTravel(amrex::MultiFab&, AgentContainer& on_travel_pc);
 
+    void interactAirTravel(amrex::MultiFab&, AgentContainer& on_travel_pc);
+
     void moveAgentsRandomWalk ();
 
     void moveRandomTravel (const amrex::iMultiFab& unit_mf);
+    void moveAirTravel (const amrex::iMultiFab& unit_mf, AirTravelFlow& air, DemographicData& demo);
 
     void returnRandomTravel (const AgentContainer& on_travel_pc);
+
+    void returnAirTravel (const AgentContainer& on_travel_pc);
 
     void updateStatus (MFPtrVec&);
 
@@ -194,7 +201,7 @@ public:
         } else if (a_mod_name == ExaEpi::InteractionNames::nborhood) {
             if (m_at_work) { return &m_bins_work[a_idx]; }
             else           { return &m_bins_home[a_idx]; }
-        } else if (a_mod_name == ExaEpi::InteractionNames::random) {
+        } else if (a_mod_name == ExaEpi::InteractionNames::random || a_mod_name == ExaEpi::InteractionNames::airTravel) {
             return &m_bins_random[a_idx];
         } else {
             amrex::Abort("Invalid a_mod_name!");
@@ -245,6 +252,36 @@ public:
         return comm_teacher_counts_total_d;
     }
 
+    void setAirTravelProbs(AirTravelFlow& airData, DemographicData& demo){
+        air_travel_prob.resize(demo.Nunit);
+	unitToAirport.resize(demo.Nunit);
+    	for (int i = 0; i < demo.Nunit; ++i) {
+                auto FIPS = demo.FIPS_d.data();
+		int fips= FIPS[i];
+		air_travel_prob[i]= airData.travel_prob[fips];
+                unitToAirport[i]= airData.airportMap[fips];
+		airData.airportRangeCounties[airData.airportMap[fips]].push_back(i);
+
+
+        	//amrex::Print() <<  " UNIT  " << i << " FIPS " << FIPS[i] << " air_travel_prob " << air_travel_prob[i] << "\n ";
+#if 0
+		string orgAirportCode= airportMap[fips];
+		int desCount= travel_path_prob[orgAirportCode].size();
+		
+		for(int offset=travel_prob_offset[i]; offset<travel_prob_offset[i+1]; offset++){
+
+		}
+        	amrex::Print() << myID[i] << " " << Population[i] << " " << Ndaywork[i] << " " << FIPS[i] << " " << Tract[i] << " ";
+		travel_to_prob[i]= airData.travel_prob_to[fips];
+#endif
+	}
+
+
+        //Gpu::copy(Gpu::hostToDevice, travel_prob.begin(), travel_prob.end(), travel_prob_d.begin());
+        //Gpu::copy(Gpu::hostToDevice, travel_to_prob.begin(), travel_to_prob.end(), travel_to_prob_d.begin());
+        //Gpu::copy(Gpu::hostToDevice, travel_to_offset.begin(), travel_path_prob.end(), travel_path_offset_d.begin());
+    }
+
     /*! \brief return the symptomatic withdrawal status */
     inline int symptomaticWithdraw() const {
         return m_symptomatic_withdraw;
@@ -265,6 +302,14 @@ protected:
     amrex::Gpu::DeviceVector<int> comm_teacher_counts_elem3_d;
     amrex::Gpu::DeviceVector<int> comm_teacher_counts_elem4_d;
     amrex::Gpu::DeviceVector<int> comm_teacher_counts_daycr_d;
+    amrex::Vector<float> air_travel_prob;
+    amrex::Vector<float> air_travel_to_prob;
+    amrex::Vector<float> air_travel_to_offset;
+    amrex::Vector<std::string> unitToAirport;            /*!< Airport of each hub */
+    amrex::Gpu::DeviceVector<float> air_travel_prob_d;
+    amrex::Gpu::DeviceVector<float> air_travel_to_prob_d;
+    amrex::Gpu::DeviceVector<float> air_travel_to_offset_d;
+
     std::vector<long> student_teacher_ratios = {20, 20, 20, 20, 20, 1000000000}; // ignore daycare teachers since daycare interaction isnt handled yet!
 
     int m_num_diseases; /*!< Number of diseases */

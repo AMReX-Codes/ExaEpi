@@ -28,6 +28,7 @@ struct TestParams
     int plot_int;                       /*!< plot interval (see ExaEpi::IO::writePlotFile) */
     int random_travel_int;              /*!< steps between random travel events
                                              (see AgentContainer::moveRandomTravel) */
+    int air_travel_int;              /*!< steps between air travel events */
     short ic_type;                      /*!< initialization type (see ExaEpi::ICType) */
 
     int num_diseases;   /*!< Number of diseases to track */
@@ -64,6 +65,9 @@ struct TestParams
         The case data file is an ASCII text file with three columns of numbers:
         FIPS code, current number of cases, and cumulative number of cases till date. */
     std::vector<std::string> case_filename;
+
+    std::string air_traffic_filename;
+    std::string airports_filename;
 
     int aggregated_diag_int;            /*!< interval for writing aggregated diagnostic data
                                              (see: ExaEpi::IO::writeFIPSData) */

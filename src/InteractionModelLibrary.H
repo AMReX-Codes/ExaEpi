@@ -9,6 +9,7 @@
 #include "InteractionModHome.H"
 #include "InteractionModNborhood.H"
 #include "InteractionModRandom.H"
+#include "InteractionModAirTravel.H"
 #include "InteractionModSchool.H"
 #include "InteractionModWork.H"
 

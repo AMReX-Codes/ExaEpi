@@ -9,6 +9,7 @@
 
 #include "AgentContainer.H"
 #include "CaseData.H"
+#include "AirTravelFlow.H"
 #include "DemographicData.H"
 #include "Initialization.H"
 #include "IO.H"
@@ -111,6 +112,13 @@ void runAgent ()
         }
     }
 
+    AirTravelFlow air;
+    if ((params.air_travel_int > 0){
+    	air.ReadAirports(params.airports_filename, demo);
+    	air.ReadAirTravelFlow(params.air_traffic_filename);
+    	air.ComputeTravelProbs(demo);
+    }
+
     Geometry geom = ExaEpi::Utils::get_geometry(demo, params);
 
     BoxArray ba;
@@ -188,6 +196,7 @@ void runAgent ()
 
     AgentContainer pc(geom, dm, ba, params.num_diseases, params.disease_names);
     AgentContainer on_travel_pc(geom, dm, ba, params.num_diseases, params.disease_names);
+    if ((params.air_travel_int > 0) pc.setAirTravelProbs(air, demo);
 
     {
         BL_PROFILE_REGION("Initialization");
@@ -375,6 +384,15 @@ void runAgent ()
                                            });
             }
 
+	    if ((params.air_travel_int > 0) && (i % params.air_travel_int == 0)) {
+            	pc.moveAirTravel(unit_mf, air, demo);
+                using SrcData = AgentContainer::ParticleTileType::ConstParticleTileDataType;
+                on_travel_pc.copyParticles(pc,
+                                           [=] AMREX_GPU_HOST_DEVICE (const SrcData& src, int ip) {
+                                               return (src.m_idata[IntIdx::air_travel][ip] >= 0);
+                                           });
+	    }
+
             // Typical day
             pc.morningCommute(mask_behavior);
             pc.interactDay(mask_behavior);
@@ -385,16 +403,29 @@ void runAgent ()
             if ((params.random_travel_int > 0) && (i % params.random_travel_int == 0)) {
                 pc.interactRandomTravel(mask_behavior, on_travel_pc);
             }
+	    if ((params.air_travel_int > 0) && (i % params.air_travel_int == 0)) {
+            	pc.interactAirTravel(mask_behavior, on_travel_pc);
+	    }
 
             // Infect agents based on their interactions
             pc.infectAgents();
 
-            if ((params.random_travel_int > 0) && (i % params.random_travel_int == 0)) {
+	    if ((params.random_travel_int > 0) && (i % params.random_travel_int == 0) || 
+		   (params.air_travel_int > 0) && (i % params.air_travel_int == 0)){
                 on_travel_pc.moveAgentsToHome();
                 on_travel_pc.Redistribute();
+	    }
+
+            if ((params.random_travel_int > 0) && (i % params.random_travel_int == 0)) {
                 pc.returnRandomTravel(on_travel_pc);
-                on_travel_pc.clearParticles();
             }
+	    if ((params.air_travel_int > 0) && (i % params.air_travel_int == 0)){
+                pc.returnAirTravel(on_travel_pc);
+	    }
+	    if ((params.random_travel_int > 0) && (i % params.random_travel_int == 0) || 
+		   (params.air_travel_int > 0) && (i % params.air_travel_int == 0)){
+                on_travel_pc.clearParticles();
+	    }
 
             cur_time += 1.0_rt; // time step is one day
         }
