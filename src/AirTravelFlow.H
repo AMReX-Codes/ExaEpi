@@ -16,7 +16,7 @@ typedef std::map<std::string, std::map<std::string, float> > airTravelType;
 struct AirTravelFlow 
 {
     /*! \brief Null constructor */
-    AirTravelFlow (){}; 
+    AirTravelFlow (){}
 
     AirTravelFlow (const::std::string fname);
 

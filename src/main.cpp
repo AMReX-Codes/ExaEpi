@@ -113,7 +113,7 @@ void runAgent ()
     }
 
     AirTravelFlow air;
-    if ((params.air_travel_int > 0){
+    if (params.air_travel_int > 0){
     	air.ReadAirports(params.airports_filename, demo);
     	air.ReadAirTravelFlow(params.air_traffic_filename);
     	air.ComputeTravelProbs(demo);
@@ -196,7 +196,7 @@ void runAgent ()
 
     AgentContainer pc(geom, dm, ba, params.num_diseases, params.disease_names);
     AgentContainer on_travel_pc(geom, dm, ba, params.num_diseases, params.disease_names);
-    if ((params.air_travel_int > 0) pc.setAirTravelProbs(air, demo);
+    if (params.air_travel_int > 0) pc.setAirTravelProbs(air, demo);
 
     {
         BL_PROFILE_REGION("Initialization");
@@ -410,8 +410,7 @@ void runAgent ()
             // Infect agents based on their interactions
             pc.infectAgents();
 
-	    if ((params.random_travel_int > 0) && (i % params.random_travel_int == 0) || 
-		   (params.air_travel_int > 0) && (i % params.air_travel_int == 0)){
+	    if ((params.random_travel_int > 0 && i % params.random_travel_int == 0) || (params.air_travel_int > 0 && i % params.air_travel_int == 0)){
                 on_travel_pc.moveAgentsToHome();
                 on_travel_pc.Redistribute();
 	    }
@@ -422,8 +421,7 @@ void runAgent ()
 	    if ((params.air_travel_int > 0) && (i % params.air_travel_int == 0)){
                 pc.returnAirTravel(on_travel_pc);
 	    }
-	    if ((params.random_travel_int > 0) && (i % params.random_travel_int == 0) || 
-		   (params.air_travel_int > 0) && (i % params.air_travel_int == 0)){
+	    if ((params.random_travel_int > 0 && i % params.random_travel_int == 0) || (params.air_travel_int > 0 && i % params.air_travel_int == 0)){
                 on_travel_pc.clearParticles();
 	    }
 
