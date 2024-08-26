@@ -13,7 +13,7 @@ def get_cross_table(data_dir: str):
     particles, counties = get_home_and_work_counties(data_dir)
 
     # Create a table of counts of particles from a given home who work
-    # at a given county 
+    # at a given county
     table = pd.pivot_table(pd.DataFrame(particles.T, columns=['home', 'outside county']),
                            index = 'outside county', columns = 'home', aggfunc = len, fill_value=0)
 
