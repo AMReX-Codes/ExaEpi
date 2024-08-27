@@ -196,7 +196,6 @@ void runAgent ()
 
     AgentContainer pc(geom, dm, ba, params.num_diseases, params.disease_names);
     AgentContainer on_travel_pc(geom, dm, ba, params.num_diseases, params.disease_names);
-    if (params.air_travel_int > 0) pc.setAirTravelProbs(air, demo);
 
     {
         BL_PROFILE_REGION("Initialization");

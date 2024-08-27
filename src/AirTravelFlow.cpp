@@ -29,23 +29,40 @@ void AirTravelFlow::ReadAirports(const std::string fname, DemographicData& demo)
     std::istringstream is(fileCharPtrString, std::istringstream::in);
     
     std::string line;
-    int airports=0;
+    n_counties_with_airports=0;
     if(!is.eof()) { 
         getline(is, line); 
         std::istringstream lis(line);
-        lis >> airports;
+        lis >> n_counties_with_airports;
     }
     
     int FIPS = 0;
     std::string airportCode =  "";
     int i=0;
-    while (airports>i++) {
+    int air_i=0;
+    while (n_counties_with_airports>i) {
         std::getline(is, line);
         std::istringstream lis(line);
         lis >> FIPS >> airportCode;
-        airportMap[FIPS]= airportCode;
-	if(airportRangePop.find(airportCode)==airportRangePop.end()) airportRangePop[airportCode]= demo.CountyPop[FIPS];
-	airportRangePop[airportCode]+= demo.CountyPop[FIPS];
+        FIPS_to_airport[FIPS]= airportCode;
+        if(inAirportRangePop.find(airportCode) == inAirportRangePop.end()){//the first time we see this airport
+		airport_id[airportCode]=air_i;
+		id_to_airport[air_i++]= airportCode;
+		inAirportRangePop[airportCode]= demo.CountyPop[FIPS];
+	}else {
+		inAirportRangePop[airportCode]+= demo.CountyPop[FIPS];
+	}
+        i++;
+    }
+    //now convert the FIPS_to_airport map to vectors to offload to the GPU
+    for(int i=0; i<n_counties_with_airports; i++){
+	int fips= demo.FIPS[i];
+        FIPS_to_county[fips]= i;
+    }
+    for(int i=0; i<demo.Nunit; i++){
+        int fips= demo.FIPS[i];
+        std::string airportCode= FIPS_to_airport[fips];
+	inAirportRangeUnitMap[airportCode].push_back(i);
     }
 }
 
@@ -62,43 +79,53 @@ void AirTravelFlow::ReadAirTravelFlow (const std::string fname /*!< Filename to 
     std::istringstream is(fileCharPtrString, std::istringstream::in);
 
     std::string line;
-    int airports=0;
-    int connections=0;
+    nairports=0;
+    nconnections=0;
     if(!is.eof()) {
         getline(is, line);
 	std::istringstream lis(line);
-        lis >> airports >> connections;
-        //printf("AIRPORTS %d CONNECTION %d\n", airports, connections);
+        lis >> nairports >> nconnections;
+        //amrex::Print() << "AIRPORTS " << nairports<< "  CONNECTION "<< nconnections <<"\n";
     }
-    if(!connections) return;
+    if(!nairports) return;
+    if(!nconnections) return;
 
-    FIPS_hubs.resize(connections);
-    Size_hubs.resize(connections);
-    num_org_passengers.resize(connections);
-    num_dest_passengers.resize(connections);
-
-    FIPS_hubs_d.resize(connections);
-    Size_hubs_d.resize(connections);
-    num_org_passengers.resize(connections);
-    num_dest_passengers.resize(connections);
-    
     std::string dest = "";
     std::string org =  "";
     int pax = 0;
     int c=0;
-    while (connections>c++) {
+    while (nconnections>c++) {
         std::getline(is, line);
         std::istringstream lis(line);
         lis >> dest >> org >> pax;
-	travel_path_prob[org][dest]= pax;
+        //amrex::Print() << "ORIGIN AIRPORT " << org<< "  DEST AIRPORT "<< dest <<" PASSENGERS "<< pax<<"\n";
+	destAirportMap[org].push_back(dest);
+        int pax_per_day= (int)(pax/365);
+	travel_path_prob[org][dest]= pax_per_day;//just initialize, will be finalized later in ComputeTravelProbs(DemographicData& demo)
 
-	if(originPax.find(org)== originPax.end()) originPax[org]= (int)  (pax/365);
-	else originPax[org]+= (int)(pax/365);
+	if(originPax.find(org)== originPax.end()) originPax[org]= pax_per_day;
+	else originPax[org]+= pax_per_day;
 
-	if(destPax.find(dest)== destPax.end()) destPax[dest]= (int)  (pax/365);
-	else destPax[dest]+= (int)(pax/365);
-
+	if(destPax.find(dest)== destPax.end()) destPax[dest]= pax_per_day;
+	else destPax[dest]+= pax_per_day;
     }
+}
+
+void AirTravelFlow::ComputeTravelProbs(DemographicData& demo){
+    air_travel_prob.resize(demo.Nunit);
+    assigned_airport.resize(demo.Nunit);
+    for(int i=0; i<demo.Nunit; i++){
+	int fips=demo.FIPS[i];
+	if(originPax.find(FIPS_to_airport[fips]) == originPax.end()) air_travel_prob[i]=0;
+	else air_travel_prob[i]= (float)originPax[FIPS_to_airport[fips]]/inAirportRangePop[FIPS_to_airport[fips]];
+	//amrex::Print() <<" Unit "<<i<<" FIPS "<<fips<< " travel prob "<<air_travel_prob[i]<<"\n";
+	if(FIPS_to_airport.find(fips) != FIPS_to_airport.end()){
+		std::string airportCode= FIPS_to_airport[fips];
+		assigned_airport[i]= airport_id[airportCode];
+	}else assigned_airport[i]= -1;//a unit that does not have any airport assigned to it
+    }
+
+{
     //now we calculate the chance of traveling to a destination airport from an original one
     for(airTravelType::iterator it= travel_path_prob.begin(); it!= travel_path_prob.end(); it++)
     {
@@ -109,26 +136,59 @@ void AirTravelFlow::ReadAirTravelFlow (const std::string fname /*!< Filename to 
 		std::string dest= it1->first;
 		sum+=  travel_path_prob[org][dest];
 	}
-	
- 	std::string prev_dest="";
+        //compute chance for each path (we will sort these paths and compute prefix sums later)	
 	for(std::map<std::string, float>::iterator it1= it->second.begin(); it1!= it->second.end(); it1++){
 		std::string dest= it1->first;
-		if(it1 == it->second.begin())travel_path_prob[org][dest]= travel_path_prob[org][dest]/sum;
-		else {
-			travel_path_prob[org][dest]= travel_path_prob[org][prev_dest] + travel_path_prob[org][dest]/sum;
-			prev_dest=dest;
-		}
+		travel_path_prob[org][dest]= travel_path_prob[org][dest]/sum;
+		//amrex::Print() <<" Original Airport "<< org<< " Dest Airport "<< dest<< " travel path prob threshold "<< travel_path_prob[org][dest]<<"\n";
 	}
     }
+    //pack the travel_path_prob map to 3 vectors that can be offloaded to the GPU
+    dest_airports_offset.resize(nairports+1);
+    dest_airports.resize(nconnections);
+    dest_airports_prob.resize(nconnections);
+    int curOffset=0;
+    for(int i=0; i<nairports; i++){
+	dest_airports_offset[i]= curOffset;	
+	std::string airport= id_to_airport[i]; 
+	int numDest= destAirportMap[airport].size();
+	for(int j=0; j<numDest; j++){
+		std::string destAirport= destAirportMap[airport][j];
+		dest_airports[curOffset]= airport_id[destAirport];
+		if(j==0) dest_airports_prob[curOffset]= travel_path_prob[airport][destAirport];
+		else dest_airports_prob[curOffset]= dest_airports_prob[curOffset-1]+ travel_path_prob[airport][destAirport];
+		//amrex::Print() <<" Original Airport "<< airport<<" Dest Airport "<< destAirport<< " travel path prob threshold "<< dest_airports_prob[curOffset]<<"\n";
+		curOffset++;	
+	}
+    }
+    dest_airports_offset[nairports]= curOffset;
 }
 
-void AirTravelFlow::ComputeTravelProbs(DemographicData& demo){
-    for(std::map<int, int>::iterator it= demo.CountyPop.begin(); it!= demo.CountyPop.end(); it++){
-	travel_prob[it->first]= (float)originPax[airportMap[it->first]]/airportRangePop[airportMap[it->first]];
-	travel_to_prob[it->first]= (float)destPax[airportMap[it->first]]/airportRangePop[airportMap[it->first]];
+{
+    //create 3 vectors of the arrivalUnits map that can be offloaded to the GPU 
+    arrivalUnits_offset.resize(nairports+1);
+    arrivalUnits.resize(demo.Nunit);
+    arrivalUnits_prob.resize(demo.Nunit);
+    int curOffset=0;
+    for(int i=0; i<nairports; i++){
+	arrivalUnits_offset[i]= curOffset;
+	std::string airport= id_to_airport[i]; 
+        int nUnits= inAirportRangeUnitMap[airport].size();
+	//all units served by this airport
+	for(int j=0; j<nUnits; j++){
+		int fips= demo.FIPS[j];
+		int destUnit= inAirportRangeUnitMap[airport][j];
+		arrivalUnits[curOffset]= destUnit;
+		if(j==0)arrivalUnits_prob[curOffset]= (float)demo.Population[destUnit]/inAirportRangePop[airport];
+		else arrivalUnits_prob[curOffset]=  arrivalUnits_prob[curOffset-1] + (float)demo.Population[destUnit]/inAirportRangePop[airport]; 
+		//amrex::Print() <<" At Airport "<< airport <<" prob threshold to visit unit "<< destUnit<<" is "<< arrivalUnits_prob[curOffset] <<"\n";
+		curOffset++;
+	}
     }
+    arrivalUnits_offset[nairports]= curOffset;
+}
+
     CopyDataToDevice();
-    amrex::Gpu::streamSynchronize();
 }
 
 /*! \brief Prints case data to screen
@@ -139,24 +199,3 @@ void AirTravelFlow::ComputeTravelProbs(DemographicData& demo){
 void AirTravelFlow::Print () const {
 }
 
-/*! \brief Copy a vector from host to device */
-void AirTravelFlow::CopyToDeviceAsync( const amrex::Vector<int>& h_vec,  /*!< Host vector */
-                                  amrex::Gpu::DeviceVector<int>& d_vec  /*!< Device vector */) {
-    d_vec.resize(0);
-    d_vec.resize(h_vec.size());
-    Gpu::copyAsync(Gpu::hostToDevice, h_vec.begin(), h_vec.end(), d_vec.begin());
-}
-
-/*! \brief Copy a vector from device to host */
-void AirTravelFlow::CopyToHostAsync( const amrex::Gpu::DeviceVector<int>& d_vec, /*!< Device vector */
-                                amrex::Vector<int>& h_vec /*!< Host vector */) {
-    h_vec.resize(0);
-    h_vec.resize(d_vec.size());
-    Gpu::copyAsync(Gpu::deviceToHost, d_vec.begin(), d_vec.end(), h_vec.begin());
-}
-
-/*! \brief Copy all member data from host to device */
-void AirTravelFlow::CopyDataToDevice () {
-    CopyToDeviceAsync(FIPS_hubs, FIPS_hubs_d);
-    CopyToDeviceAsync(Size_hubs, Size_hubs_d);
-}

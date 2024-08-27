@@ -252,36 +252,6 @@ public:
         return comm_teacher_counts_total_d;
     }
 
-    void setAirTravelProbs(AirTravelFlow& airData, DemographicData& demo){
-        air_travel_prob.resize(demo.Nunit);
-	unitToAirport.resize(demo.Nunit);
-    	for (int i = 0; i < demo.Nunit; ++i) {
-                auto FIPS = demo.FIPS_d.data();
-		int fips= FIPS[i];
-		air_travel_prob[i]= airData.travel_prob[fips];
-                unitToAirport[i]= airData.airportMap[fips];
-		airData.airportRangeCounties[airData.airportMap[fips]].push_back(i);
-
-
-        	//amrex::Print() <<  " UNIT  " << i << " FIPS " << FIPS[i] << " air_travel_prob " << air_travel_prob[i] << "\n ";
-#if 0
-		string orgAirportCode= airportMap[fips];
-		int desCount= travel_path_prob[orgAirportCode].size();
-		
-		for(int offset=travel_prob_offset[i]; offset<travel_prob_offset[i+1]; offset++){
-
-		}
-        	amrex::Print() << myID[i] << " " << Population[i] << " " << Ndaywork[i] << " " << FIPS[i] << " " << Tract[i] << " ";
-		travel_to_prob[i]= airData.travel_prob_to[fips];
-#endif
-	}
-
-
-        //Gpu::copy(Gpu::hostToDevice, travel_prob.begin(), travel_prob.end(), travel_prob_d.begin());
-        //Gpu::copy(Gpu::hostToDevice, travel_to_prob.begin(), travel_to_prob.end(), travel_to_prob_d.begin());
-        //Gpu::copy(Gpu::hostToDevice, travel_to_offset.begin(), travel_path_prob.end(), travel_path_offset_d.begin());
-    }
-
     /*! \brief return the symptomatic withdrawal status */
     inline int symptomaticWithdraw() const {
         return m_symptomatic_withdraw;
@@ -302,13 +272,6 @@ protected:
     amrex::Gpu::DeviceVector<int> comm_teacher_counts_elem3_d;
     amrex::Gpu::DeviceVector<int> comm_teacher_counts_elem4_d;
     amrex::Gpu::DeviceVector<int> comm_teacher_counts_daycr_d;
-    amrex::Vector<float> air_travel_prob;
-    amrex::Vector<float> air_travel_to_prob;
-    amrex::Vector<float> air_travel_to_offset;
-    amrex::Vector<std::string> unitToAirport;            /*!< Airport of each hub */
-    amrex::Gpu::DeviceVector<float> air_travel_prob_d;
-    amrex::Gpu::DeviceVector<float> air_travel_to_prob_d;
-    amrex::Gpu::DeviceVector<float> air_travel_to_offset_d;
 
     std::vector<long> student_teacher_ratios = {20, 20, 20, 20, 20, 1000000000}; // ignore daycare teachers since daycare interaction isnt handled yet!
 

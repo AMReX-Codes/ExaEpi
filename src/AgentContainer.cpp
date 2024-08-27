@@ -374,9 +374,6 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,    /*!< Number 
     comm_teacher_counts_elem3_d.resize(Ncommunity, 0);
     comm_teacher_counts_elem4_d.resize(Ncommunity, 0);
     comm_teacher_counts_daycr_d.resize(Ncommunity, 0);
-    air_travel_prob.resize(Nunit, 0);
-    air_travel_to_prob.resize(Nunit, 0);
-    air_travel_to_offset.resize(Nunit*10, 0);
 
     amrex::Gpu::DeviceVector<long> student_teacher_ratios_d(student_teacher_ratios.size());
     amrex::Gpu::copy(amrex::Gpu::hostToDevice, student_teacher_ratios.begin(), student_teacher_ratios.end(), student_teacher_ratios_d.begin());
@@ -909,7 +906,6 @@ void AgentContainer::moveAirTravel (const iMultiFab& unit_mf, AirTravelFlow& air
 
     const Box& domain = Geom(0).Domain();
     int i_max = domain.length(0);
-    int j_max = domain.length(1);
     for (int lev = 0; lev <= finestLevel(); ++lev)
     {
         auto& plev  = GetParticles(lev);
@@ -934,47 +930,53 @@ void AgentContainer::moveAirTravel (const iMultiFab& unit_mf, AirTravelFlow& air
             auto home_i_ptr = soa.GetIntData(IntIdx::home_i).data();
             auto home_j_ptr = soa.GetIntData(IntIdx::home_j).data();
             auto Start = demo.Start.data();
-            int unit = unit_arr(home_i_ptr[0], home_j_ptr[0], 0);  
-            float travelProb= air_travel_prob[unit];
-	    std::string destAirport="";
-	    int comm_to_i=-1, comm_to_j=-1;
-
-	    auto destAirports= air.travel_path_prob.find(unitToAirport[unit]);
-	    //now go through all options for the destination (probability is in prefix sum format)
-/*
-	    for(auto it= destAirports->second.begin(); it!= destAirports->second.end(); it++){
-	    		std::string dest= it->first;
-			float probRange= it->second; 
-			if(random < probRange) {
-				destAirport=dest;
-				break;
-			}
-	    }
-*/
- 	    destAirport= destAirports->second.begin()->first;
-	    if(destAirport !=""){
-			auto destUnits= air.airportRangeCounties.find(destAirport);
-			int randIdx= amrex::Random_int(destUnits->second.size());
-			int destUnit= destUnits->second[randIdx];
-			int comm_to = Start[destUnit] + amrex::Random_int(Start[destUnit+1] - Start[destUnit]);
-			comm_to_i= comm_to%i_max;
-			comm_to_j= comm_to/i_max;
-	   }
+	    auto air_travel_prob_ptr= air.air_travel_prob_d.data();
+	    auto dest_airports_ptr= air.dest_airports_d.data();
+	    auto dest_airports_offset_ptr= air.dest_airports_offset_d.data();
+	    auto dest_airports_prob_ptr= air.dest_airports_prob_d.data();
+	    auto arrivalUnits_ptr= air.arrivalUnits_d.data();
+	    auto arrivalUnits_offset_ptr= air.arrivalUnits_offset_d.data();
+	    auto arrivalUnits_prob_ptr= air.arrivalUnits_prob_d.data();
+	    auto assigned_airport_ptr= air.assigned_airport_d.data();
 
             amrex::ParallelForRNG( np,
             [=] AMREX_GPU_DEVICE (int i, RandomEngine const& engine) noexcept
             {
+                int unit = unit_arr(home_i_ptr[i], home_j_ptr[i], 0);
                 if (!isHospitalized(i, ptd) && random_travel_ptr[i] <0 && air_travel_ptr[i] <0) {
-                    ParticleType& p = pstruct[i];
                     if (withdrawn_ptr[i] == 1) {return ;}
-                    if (amrex::Random(engine) < travelProb) {
-	                air_travel_ptr[i] = i;
-                      	p.pos(0) = comm_to_i;
-                        p.pos(1) = comm_to_j;
+                    if (amrex::Random(engine) < air_travel_prob_ptr[unit]) {
+                        //now go through all options for the destination airports (probability is in prefix sum format)
+                        float random= amrex::Random(engine);
+			int orgAirport= assigned_airport_ptr[unit];
+                        int destAirport=-1;
+                        for(int idx= dest_airports_offset_ptr[orgAirport]; idx<dest_airports_offset_ptr[orgAirport+1]; idx++){
+                                float probRange= dest_airports_prob_ptr[idx];
+                                if(random < probRange) {
+                                        destAirport=dest_airports_ptr[idx];
+                                        break;
+                                }
+                        }
+                        if(destAirport !=-1){
+				int destUnit=-1;
+                        	float random1= amrex::Random(engine);
+                        	for(int idx= arrivalUnits_offset_ptr[destAirport]; idx<arrivalUnits_offset_ptr[destAirport+1]; idx++){
+					if(random1 < arrivalUnits_prob_ptr[idx]) {
+						destUnit=arrivalUnits_ptr[idx];
+						break;
+					}
+				}
+				if(destUnit !=-1){
+                                	int comm_to = Start[destUnit] + amrex::Random_int(Start[destUnit+1] - Start[destUnit], engine);
+                                	air_travel_ptr[i] = i;
+                    			ParticleType& p = pstruct[i];
+                                	p.pos(0) = comm_to%i_max;
+                                	p.pos(1) = comm_to/i_max;
+				}
+                        }
                     }
                 }
             });
-
         }
     }
 }
