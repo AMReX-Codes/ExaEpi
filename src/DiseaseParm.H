@@ -113,7 +113,7 @@ struct DiseaseParm
 
     amrex::Real reinfect_prob = amrex::Real(0.0); /*!< Reinfection probability */
 
-    amrex::Real vac_eff = amrex::Real(1.0); /*!< Vaccine efficacy */
+    amrex::Real vac_eff = amrex::Real(0.0); /*!< Vaccine efficacy */
 
     amrex::Real Child_compliance, /*!< Child compliance with masking ?? */
                 Child_HH_closure; /*!< Multiplier for household contacts during school closure */
