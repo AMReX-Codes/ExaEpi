@@ -1074,6 +1074,7 @@ void AgentContainer::infectAgents ()
             int gid = mfi.index();
             int tid = mfi.LocalTileIndex();
             auto& ptile = plev[std::make_pair(gid, tid)];
+            const auto& ptd = ptile.getParticleTileData();
             auto& soa   = ptile.GetStructOfArrays();
             const auto np = ptile.numParticles();
 
@@ -1093,10 +1094,21 @@ void AgentContainer::infectAgents ()
 
                 auto* lparm = d_parm[d];
 
+                Gpu::DeviceVector<ParticleReal> coimmunity, cosusceptibility;
+                coimmunity.resize(np);
+                cosusceptibility.resize(np);
+
+                m_disease_coupling->getCoimmunity( coimmunity, d, ptd );
+                m_disease_coupling->getCosusceptibility( cosusceptibility, d, ptd );
+
+                auto ci_arr = coimmunity.data();
+                auto cs_arr = cosusceptibility.data();
+
                 amrex::ParallelForRNG( np,
                 [=] AMREX_GPU_DEVICE (int i, amrex::RandomEngine const& engine) noexcept
                 {
-                    prob_ptr[i] = 1.0_rt - prob_ptr[i];
+                    prob_ptr[i] = 1.0_rt - prob_ptr[i]/cs_arr[i]; // this is probability of being infected
+                    prob_ptr[i] *= (1.0_rt - ci_arr[i]); // scale by (1 - net immunity)
                     if ( status_ptr[i] == Status::never ||
                          status_ptr[i] == Status::susceptible ) {
                         if (amrex::Random(engine) < prob_ptr[i]) {

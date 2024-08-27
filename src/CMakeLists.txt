@@ -6,6 +6,7 @@ set(_sources
          AgentContainer.cpp
          CaseData.H
          CaseData.cpp
+         DiseaseCoupling.H
          DiseaseParm.H
          DiseaseParm.cpp
          DemographicData.H

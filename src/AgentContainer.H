@@ -20,6 +20,7 @@
 #include "AgentDefinitions.H"
 #include "DemographicData.H"
 #include "DiseaseParm.H"
+#include "DiseaseCoupling.H"
 #include "DiseaseStatus.H"
 #include "HospitalModel.H"
 #include "InteractionModelLibrary.H"
@@ -133,6 +134,10 @@ public:
             std::memcpy(d_parm[d], h_parm[d], sizeof(DiseaseParm));
 #endif
         }
+
+        m_disease_coupling = std::make_unique<DiseaseCouplingParm<PTDType>>(m_num_diseases);
+        m_disease_coupling->ReadInputs("disease_coupling");
+
     }
 
     void initAgentsDemo (amrex::iMultiFab& /*num_residents*/,
@@ -275,8 +280,10 @@ protected:
     amrex::Real m_shelter_compliance = 0.95_rt; /*!< Shelter-in-place compliance rate */
     amrex::Real m_symptomatic_withdraw_compliance = 0.95_rt; /*!< Symptomatic withdrawal compliance rate */
 
-    std::vector<DiseaseParm*> h_parm;    /*!< Disease parameters */
-    std::vector<DiseaseParm*> d_parm;    /*!< Disease parameters (GPU device) */
+    std::vector<DiseaseParm*> h_parm; /*!< Disease parameters */
+    std::vector<DiseaseParm*> d_parm; /*!< Disease parameters (GPU device) */
+
+    std::unique_ptr<DiseaseCouplingParm<PTDType>> m_disease_coupling;
 
     /*! Map of home bins (of agents) indexed by MultiFab iterator and tile index;
         see AgentContainer::interactAgentsHomeWork() */
