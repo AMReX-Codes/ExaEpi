@@ -27,15 +27,15 @@ void AirTravelFlow::ReadAirports(const std::string fname, DemographicData& demo)
     ParallelDescriptor::ReadAndBcastFile(fname, fileCharPtr);
     std::string fileCharPtrString(fileCharPtr.dataPtr());
     std::istringstream is(fileCharPtrString, std::istringstream::in);
-    
+
     std::string line;
     n_counties_with_airports=0;
-    if(!is.eof()) { 
-        getline(is, line); 
+    if(!is.eof()) {
+        getline(is, line);
         std::istringstream lis(line);
         lis >> n_counties_with_airports;
     }
-    
+
     int FIPS = 0;
     std::string airportCode =  "";
     int i=0;
@@ -136,7 +136,7 @@ void AirTravelFlow::ComputeTravelProbs(DemographicData& demo){
 		std::string dest= it1->first;
 		sum+=  travel_path_prob[org][dest];
 	}
-        //compute chance for each path (we will sort these paths and compute prefix sums later)	
+        //compute chance for each path (we will sort these paths and compute prefix sums later)
 	for(std::map<std::string, float>::iterator it1= it->second.begin(); it1!= it->second.end(); it1++){
 		std::string dest= it1->first;
 		travel_path_prob[org][dest]= travel_path_prob[org][dest]/sum;
@@ -149,8 +149,8 @@ void AirTravelFlow::ComputeTravelProbs(DemographicData& demo){
     dest_airports_prob.resize(nconnections);
     int curOffset=0;
     for(int i=0; i<nairports; i++){
-	dest_airports_offset[i]= curOffset;	
-	std::string airport= id_to_airport[i]; 
+	dest_airports_offset[i]= curOffset;
+	std::string airport= id_to_airport[i];
 	int numDest= destAirportMap[airport].size();
 	for(int j=0; j<numDest; j++){
 		std::string destAirport= destAirportMap[airport][j];
@@ -158,7 +158,7 @@ void AirTravelFlow::ComputeTravelProbs(DemographicData& demo){
 		if(j==0) dest_airports_prob[curOffset]= travel_path_prob[airport][destAirport];
 		else dest_airports_prob[curOffset]= dest_airports_prob[curOffset-1]+ travel_path_prob[airport][destAirport];
 		//amrex::Print() <<" Original Airport "<< airport<<" Dest Airport "<< destAirport<< " travel path prob threshold "<< dest_airports_prob[curOffset]<<"\n";
-		curOffset++;	
+		curOffset++;
 	}
         dest_airports_prob[numDest-1]=1.0;//to avoid rounding error, we set the last option prob to 1.0
     }
@@ -166,14 +166,14 @@ void AirTravelFlow::ComputeTravelProbs(DemographicData& demo){
 }
 
 {
-    //create 3 vectors of the arrivalUnits map that can be offloaded to the GPU 
+    //create 3 vectors of the arrivalUnits map that can be offloaded to the GPU
     arrivalUnits_offset.resize(nairports+1);
     arrivalUnits.resize(demo.Nunit);
     arrivalUnits_prob.resize(demo.Nunit);
     int curOffset=0;
     for(int i=0; i<nairports; i++){
 	arrivalUnits_offset[i]= curOffset;
-	std::string airport= id_to_airport[i]; 
+	std::string airport= id_to_airport[i];
         int nUnits= inAirportRangeUnitMap[airport].size();
 	//all units served by this airport
 	for(int j=0; j<nUnits; j++){
@@ -181,7 +181,7 @@ void AirTravelFlow::ComputeTravelProbs(DemographicData& demo){
 		int destUnit= inAirportRangeUnitMap[airport][j];
 		arrivalUnits[curOffset]= destUnit;
 		if(j==0)arrivalUnits_prob[curOffset]= (float)demo.Population[destUnit]/inAirportRangePop[airport];
-		else arrivalUnits_prob[curOffset]=  arrivalUnits_prob[curOffset-1] + (float)demo.Population[destUnit]/inAirportRangePop[airport]; 
+		else arrivalUnits_prob[curOffset]=  arrivalUnits_prob[curOffset-1] + (float)demo.Population[destUnit]/inAirportRangePop[airport];
 		//amrex::Print() <<" At Airport "<< airport <<" prob threshold to visit unit "<< destUnit<<" is "<< arrivalUnits_prob[curOffset] <<"\n";
 		curOffset++;
 	}
@@ -200,4 +200,3 @@ void AirTravelFlow::ComputeTravelProbs(DemographicData& demo){
 */
 void AirTravelFlow::Print () const {
 }
-

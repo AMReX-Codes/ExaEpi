@@ -14,7 +14,7 @@ typedef std::map<std::string, std::map<std::string, float> > airTravelType;
 using namespace amrex;
 
 /*! \brief Structure containing information of traffic among major airport hubs*/
-struct AirTravelFlow 
+struct AirTravelFlow
 {
     /*! \brief Null constructor */
     AirTravelFlow (){}
@@ -24,19 +24,19 @@ struct AirTravelFlow
     void ReadAirTravelFlow (const std::string fname);
     void ReadAirports (const std::string fname, DemographicData& demo);
     void ComputeTravelProbs(DemographicData& demo);
-
     void Print () const;
 
     void CopyToDeviceAsync (const amrex::Vector<int>& h_vec, /*!< host vector */
                                          amrex::Gpu::DeviceVector<int>& d_vec /*!< device vector */) {
     	d_vec.resize(0);
-    	d_vec.resize(h_vec.size()); 
+    	d_vec.resize(h_vec.size());
     	Gpu::copyAsync(Gpu::hostToDevice, h_vec.begin(), h_vec.end(), d_vec.begin());
     }
+
     void CopyToDeviceAsync (const amrex::Vector<float>& h_vec, /*!< host vector */
                                          amrex::Gpu::DeviceVector<float>& d_vec /*!< device vector */) {
     	d_vec.resize(0);
-    	d_vec.resize(h_vec.size()); 
+    	d_vec.resize(h_vec.size());
     	Gpu::copyAsync(Gpu::hostToDevice, h_vec.begin(), h_vec.end(), d_vec.begin());
     }
 
@@ -76,7 +76,7 @@ struct AirTravelFlow
     amrex::Vector<int> arrivalUnits;
     amrex::Vector<int> arrivalUnits_offset;
     amrex::Vector<float> arrivalUnits_prob;
-    
+
     amrex::Gpu::DeviceVector<int> assigned_airport_d;
     amrex::Gpu::DeviceVector<float> air_travel_prob_d;
     amrex::Gpu::DeviceVector<int> dest_airports_d;

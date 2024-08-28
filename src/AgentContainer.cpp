@@ -947,7 +947,6 @@ void AgentContainer::moveAirTravel (const iMultiFab& unit_mf, AirTravelFlow& air
     }
 }
 
-
 void AgentContainer::setAirTravel (const iMultiFab& unit_mf, AirTravelFlow& air, DemographicData& demo)
 {
     BL_PROFILE("AgentContainer::setAirTravel");
@@ -1011,9 +1010,9 @@ void AgentContainer::setAirTravel (const iMultiFab& unit_mf, AirTravelFlow& air,
                 if(destAirport >=0){
 			int destUnit=-1;
                         float random1= amrex::Random(engine);
-			int low=arrivalUnits_offset_ptr[destAirport], high=arrivalUnits_offset_ptr[destAirport+1]; 
+			int low=arrivalUnits_offset_ptr[destAirport], high=arrivalUnits_offset_ptr[destAirport+1];
 			if(high-low<=16){
-				//this sequential algo. is very slow when we have to go through hundreds of units to select a destination 
+				//this sequential algo. is very slow when we have to go through hundreds of units to select a destination
 				float lowProb=0.0;
                         	for(int idx= low; idx<high; idx++){
 					if(random1>lowProb && random1 < arrivalUnits_prob_ptr[idx]) {
