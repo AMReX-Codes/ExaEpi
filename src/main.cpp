@@ -196,6 +196,7 @@ void runAgent ()
 
     AgentContainer pc(geom, dm, ba, params.num_diseases, params.disease_names);
     AgentContainer on_travel_pc(geom, dm, ba, params.num_diseases, params.disease_names);
+    pc.setAirTravel(unit_mf, air, demo);
 
     {
         BL_PROFILE_REGION("Initialization");
@@ -402,6 +403,7 @@ void runAgent ()
             if ((params.random_travel_int > 0) && (i % params.random_travel_int == 0)) {
                 pc.interactRandomTravel(mask_behavior, on_travel_pc);
             }
+
 	    if ((params.air_travel_int > 0) && (i % params.air_travel_int == 0)) {
             	pc.interactAirTravel(mask_behavior, on_travel_pc);
 	    }

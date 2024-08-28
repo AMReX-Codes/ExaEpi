@@ -37,6 +37,8 @@ static void binaryInteractionNborhood ( const int a_i, /*!< Index of infectious 
     if (withdrawn_ptr[a_i] || withdrawn_ptr[a_j]) { return; }
     auto random_travel_ptr = a_ptd.m_idata[IntIdx::random_travel];
     if ((random_travel_ptr[a_i] >= 0) || (random_travel_ptr[a_j] >= 0)) {return;}
+    auto air_travel_ptr = a_ptd.m_idata[IntIdx::air_travel];
+    if ((air_travel_ptr[a_i] >= 0) || (air_travel_ptr[a_j] >= 0)) {return;}
 
     //infect *= i_mask;
     //infect *= j_mask;

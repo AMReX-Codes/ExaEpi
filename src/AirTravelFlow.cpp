@@ -160,6 +160,7 @@ void AirTravelFlow::ComputeTravelProbs(DemographicData& demo){
 		//amrex::Print() <<" Original Airport "<< airport<<" Dest Airport "<< destAirport<< " travel path prob threshold "<< dest_airports_prob[curOffset]<<"\n";
 		curOffset++;	
 	}
+        dest_airports_prob[numDest-1]=1.0;//to avoid rounding error, we set the last option prob to 1.0
     }
     dest_airports_offset[nairports]= curOffset;
 }
@@ -184,6 +185,7 @@ void AirTravelFlow::ComputeTravelProbs(DemographicData& demo){
 		//amrex::Print() <<" At Airport "<< airport <<" prob threshold to visit unit "<< destUnit<<" is "<< arrivalUnits_prob[curOffset] <<"\n";
 		curOffset++;
 	}
+	arrivalUnits_prob[nUnits-1]= 1.0; //to avoid rounding error, we set the last option prob to 1.0
     }
     arrivalUnits_offset[nairports]= curOffset;
 }

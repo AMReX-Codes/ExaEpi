@@ -902,10 +902,60 @@ void AgentContainer::moveRandomTravel (const iMultiFab& unit_mf)
 
 void AgentContainer::moveAirTravel (const iMultiFab& unit_mf, AirTravelFlow& air, DemographicData& demo)
 {
-    BL_PROFILE("AgentContainer::moveRandomTravel");
-
+    BL_PROFILE("AgentContainer::moveAirTravel");
     const Box& domain = Geom(0).Domain();
     int i_max = domain.length(0);
+    int j_max = domain.length(1);
+    for (int lev = 0; lev <= finestLevel(); ++lev)
+    {
+        auto& plev  = GetParticles(lev);
+        for(MFIter mfi = MakeMFIter(lev, TilingIfNotGPU()); mfi.isValid(); ++mfi)
+        {
+            const auto unit_arr = unit_mf[mfi].array();
+            int gid = mfi.index();
+            int tid = mfi.LocalTileIndex();
+            auto& ptile = plev[std::make_pair(gid, tid)];
+            const auto& ptd = ptile.getParticleTileData();
+            auto& aos   = ptile.GetArrayOfStructs();
+            ParticleType* pstruct = &(aos[0]);
+            const size_t np = aos.numParticles();
+            auto& soa   = ptile.GetStructOfArrays();
+            auto air_travel_ptr = soa.GetIntData(IntIdx::air_travel).data();
+            auto random_travel_ptr = soa.GetIntData(IntIdx::random_travel).data();
+            auto withdrawn_ptr = soa.GetIntData(IntIdx::withdrawn).data();
+            auto home_i_ptr = soa.GetIntData(IntIdx::home_i).data();
+            auto home_j_ptr = soa.GetIntData(IntIdx::home_j).data();
+            auto trav_i_ptr = soa.GetIntData(IntIdx::trav_i).data();
+            auto trav_j_ptr = soa.GetIntData(IntIdx::trav_j).data();
+            auto air_travel_prob_ptr= air.air_travel_prob_d.data();
+
+            amrex::ParallelForRNG( np,
+            [=] AMREX_GPU_DEVICE (int i, RandomEngine const& engine) noexcept
+            {
+                int unit = unit_arr(home_i_ptr[i], home_j_ptr[i], 0);
+                if (!isHospitalized(i, ptd) && random_travel_ptr[i] <0 && air_travel_ptr[i] <0) {
+                    if (withdrawn_ptr[i] == 1) {return ;}
+                    if (amrex::Random(engine) < air_travel_prob_ptr[unit]) {
+                                ParticleType& p = pstruct[i];
+                                p.pos(0) = trav_i_ptr[i];
+                                p.pos(1) = trav_j_ptr[i];
+                                air_travel_ptr[i] = i;
+                    }
+                }
+            });
+       }
+    }
+}
+
+
+void AgentContainer::setAirTravel (const iMultiFab& unit_mf, AirTravelFlow& air, DemographicData& demo)
+{
+    BL_PROFILE("AgentContainer::setAirTravel");
+
+    amrex::Print()<<"Compute air travel statistics"<<"\n";
+    const Box& domain = Geom(0).Domain();
+    int i_max = domain.length(0);
+    int j_max = domain.length(1);
     for (int lev = 0; lev <= finestLevel(); ++lev)
     {
         auto& plev  = GetParticles(lev);
@@ -924,12 +974,13 @@ void AgentContainer::moveAirTravel (const iMultiFab& unit_mf, AirTravelFlow& air
             ParticleType* pstruct = &(aos[0]);
             const size_t np = aos.numParticles();
             auto& soa   = ptile.GetStructOfArrays();
-            auto random_travel_ptr = soa.GetIntData(IntIdx::random_travel).data();
             auto air_travel_ptr = soa.GetIntData(IntIdx::air_travel).data();
             auto withdrawn_ptr = soa.GetIntData(IntIdx::withdrawn).data();
             auto home_i_ptr = soa.GetIntData(IntIdx::home_i).data();
             auto home_j_ptr = soa.GetIntData(IntIdx::home_j).data();
-            auto Start = demo.Start.data();
+            auto trav_i_ptr = soa.GetIntData(IntIdx::trav_i).data();
+            auto trav_j_ptr = soa.GetIntData(IntIdx::trav_j).data();
+            auto Start = demo.Start_d.data();
 	    auto air_travel_prob_ptr= air.air_travel_prob_d.data();
 	    auto dest_airports_ptr= air.dest_airports_d.data();
 	    auto dest_airports_offset_ptr= air.dest_airports_offset_d.data();
@@ -942,39 +993,53 @@ void AgentContainer::moveAirTravel (const iMultiFab& unit_mf, AirTravelFlow& air
             amrex::ParallelForRNG( np,
             [=] AMREX_GPU_DEVICE (int i, RandomEngine const& engine) noexcept
             {
+                trav_i_ptr[i] = -1;
+                trav_j_ptr[i] = -1;
                 int unit = unit_arr(home_i_ptr[i], home_j_ptr[i], 0);
-                if (!isHospitalized(i, ptd) && random_travel_ptr[i] <0 && air_travel_ptr[i] <0) {
-                    if (withdrawn_ptr[i] == 1) {return ;}
-                    if (amrex::Random(engine) < air_travel_prob_ptr[unit]) {
-                        //now go through all options for the destination airports (probability is in prefix sum format)
-                        float random= amrex::Random(engine);
-			int orgAirport= assigned_airport_ptr[unit];
-                        int destAirport=-1;
-                        for(int idx= dest_airports_offset_ptr[orgAirport]; idx<dest_airports_offset_ptr[orgAirport+1]; idx++){
-                                float probRange= dest_airports_prob_ptr[idx];
-                                if(random < probRange) {
-                                        destAirport=dest_airports_ptr[idx];
-                                        break;
-                                }
+		int orgAirport= assigned_airport_ptr[unit];
+                int destAirport=-1;
+		float lowProb=0.0;
+                float random= amrex::Random(engine);
+                for(int idx= dest_airports_offset_ptr[orgAirport]; idx<dest_airports_offset_ptr[orgAirport+1]; idx++){
+                        float probRange= dest_airports_prob_ptr[idx];
+                        if(random>lowProb && random < probRange) {
+                                destAirport=dest_airports_ptr[idx];
+                                break;
                         }
-                        if(destAirport !=-1){
-				int destUnit=-1;
-                        	float random1= amrex::Random(engine);
-                        	for(int idx= arrivalUnits_offset_ptr[destAirport]; idx<arrivalUnits_offset_ptr[destAirport+1]; idx++){
-					if(random1 < arrivalUnits_prob_ptr[idx]) {
+			lowProb= dest_airports_ptr[idx];
+                }
+                if(destAirport >=0){
+			int destUnit=-1;
+                        float random1= amrex::Random(engine);
+			int low=arrivalUnits_offset_ptr[destAirport], high=arrivalUnits_offset_ptr[destAirport+1]; 
+			if(high-low<=16){
+				//this sequential algo. is very slow when we have to go through hundreds of units to select a destination 
+				float lowProb=0.0;
+                        	for(int idx= low; idx<high; idx++){
+					if(random1>lowProb && random1 < arrivalUnits_prob_ptr[idx]) {
 						destUnit=arrivalUnits_ptr[idx];
 						break;
 					}
+					lowProb= arrivalUnits_prob_ptr[idx];
 				}
-				if(destUnit !=-1){
-                                	int comm_to = Start[destUnit] + amrex::Random_int(Start[destUnit+1] - Start[destUnit], engine);
-                                	air_travel_ptr[i] = i;
-                    			ParticleType& p = pstruct[i];
-                                	p.pos(0) = comm_to%i_max;
-                                	p.pos(1) = comm_to/i_max;
+			}else{  //binary search algorithm
+				while(low<high){
+					int mid= low+ (high-low)/2;
+					if(arrivalUnits_prob_ptr[mid]<random1) low=mid+1;
+					else high=mid-1;
 				}
-                        }
-                    }
+				destUnit=arrivalUnits_ptr[low];
+			}
+			if(destUnit >=0){
+				//randomly select a community in the dest unit
+                                int comm_to = Start[destUnit] + amrex::Random_int(Start[destUnit+1] - Start[destUnit], engine);
+				int new_i= comm_to%i_max;
+				int new_j= comm_to/i_max;
+				if(new_i>=0 && new_j>=0 && new_i<i_max && new_j<j_max){
+                                	trav_i_ptr[i] = new_i;
+                                	trav_j_ptr[i] = new_j;
+				}
+			}
                 }
             });
         }
@@ -1053,7 +1118,7 @@ void AgentContainer::returnAirTravel (const AgentContainer& on_travel_pc)
             int tid = mfi.LocalTileIndex();
             auto& ptile = plev[std::make_pair(gid, tid)];
             auto& soa   = ptile.GetStructOfArrays();
-            auto air_travel_ptr = soa.GetIntData(IntIdx::random_travel).data();
+            auto air_travel_ptr = soa.GetIntData(IntIdx::air_travel).data();
 
             const auto& ptile_travel = plev_travel.at(std::make_pair(gid, tid));
             const auto& aos_travel   = ptile_travel.GetArrayOfStructs();

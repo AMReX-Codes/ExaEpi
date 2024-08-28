@@ -48,13 +48,15 @@ struct IntIdx
         work_j          /*!< work location index */,
         hosp_i          /*!< hosp location index */,
         hosp_j          /*!< hosp location index */,
+        trav_i          /*!< air travel location index */,
+        trav_j          /*!< air travel location index */,
         nborhood,       /*!< home neighborhood ID */
         school,         /*!< school type (elementary, middle, high, none) */
         workgroup,      /*!< workgroup ID */
         work_nborhood,  /*!< work neighborhood ID */
         withdrawn,      /*!< quarantine status */
         random_travel,  /*!< on long distance travel? */
-        air_travel,     /*!< on long distance travel by Air */
+        air_travel,     /*!< on long distance travel by Air? */
         nattribs        /*!< number of integer-type attribute */
     };
 };

@@ -167,6 +167,7 @@ public:
 
     void moveRandomTravel (const amrex::iMultiFab& unit_mf);
     void moveAirTravel (const amrex::iMultiFab& unit_mf, AirTravelFlow& air, DemographicData& demo);
+    void setAirTravel (const iMultiFab& unit_mf, AirTravelFlow& air, DemographicData& demo);
 
     void returnRandomTravel (const AgentContainer& on_travel_pc);
 

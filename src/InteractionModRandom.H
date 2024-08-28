@@ -38,6 +38,9 @@ static void binaryInteractionRandom ( const int a_i, /*!< Index of infectious ag
     auto random_travel_ptr_i = a_ptd_i.m_idata[IntIdx::random_travel];
     auto random_travel_ptr_j = a_ptd_j.m_idata[IntIdx::random_travel];
     if (random_travel_ptr_i[a_i] || random_travel_ptr_j[a_j]) {return;}
+    auto air_travel_ptr_i = a_ptd_i.m_idata[IntIdx::air_travel];
+    auto air_travel_ptr_j = a_ptd_j.m_idata[IntIdx::air_travel];
+    if (air_travel_ptr_i[a_i] || air_travel_ptr_j[a_j]) {return;}
 
     //infect *= i_mask;
     //infect *= j_mask;
