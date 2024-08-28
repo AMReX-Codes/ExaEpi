@@ -862,7 +862,6 @@ void AgentContainer::moveRandomTravel (const iMultiFab& unit_mf)
 #endif
         for(MFIter mfi = MakeMFIter(lev, TilingIfNotGPU()); mfi.isValid(); ++mfi)
         {
-            const auto unit_arr = unit_mf[mfi].array();
             int gid = mfi.index();
             int tid = mfi.LocalTileIndex();
             auto& ptile = plev[std::make_pair(gid, tid)];
