@@ -6,8 +6,8 @@ set(_sources
          AgentContainer.cpp
          CaseData.H
          CaseData.cpp
-	 AirTravelFlow.H
-	 AirTravelFlow.cpp
+         AirTravelFlow.H
+         AirTravelFlow.cpp
          DiseaseParm.H
          DiseaseParm.cpp
          DemographicData.H

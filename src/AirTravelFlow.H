@@ -43,13 +43,13 @@ struct AirTravelFlow
     void CopyDataToDevice () {
         CopyToDeviceAsync(assigned_airport, assigned_airport_d);
         CopyToDeviceAsync(air_travel_prob, air_travel_prob_d);
-	CopyToDeviceAsync(dest_airports, dest_airports_d);
-	CopyToDeviceAsync(dest_airports_offset, dest_airports_offset_d);
-	CopyToDeviceAsync(dest_airports_prob, dest_airports_prob_d);
-	CopyToDeviceAsync(arrivalUnits,arrivalUnits_d);
-	CopyToDeviceAsync(arrivalUnits_offset, arrivalUnits_offset_d);
-	CopyToDeviceAsync(arrivalUnits_prob, arrivalUnits_prob_d);
-	amrex::Gpu::streamSynchronize();
+        CopyToDeviceAsync(dest_airports, dest_airports_d);
+        CopyToDeviceAsync(dest_airports_offset, dest_airports_offset_d);
+        CopyToDeviceAsync(dest_airports_prob, dest_airports_prob_d);
+        CopyToDeviceAsync(arrivalUnits,arrivalUnits_d);
+        CopyToDeviceAsync(arrivalUnits_offset, arrivalUnits_offset_d);
+        CopyToDeviceAsync(arrivalUnits_prob, arrivalUnits_prob_d);
+        amrex::Gpu::streamSynchronize();
     }
 
 //data that processed by only host
