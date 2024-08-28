@@ -1008,37 +1008,37 @@ void AgentContainer::setAirTravel (const iMultiFab& unit_mf, AirTravelFlow& air,
                         lowProb= dest_airports_ptr[idx];
                 }
                 if(destAirport >=0){
-  		int destUnit=-1;
+                  int destUnit=-1;
                         float random1= amrex::Random(engine);
-  		int low=arrivalUnits_offset_ptr[destAirport], high=arrivalUnits_offset_ptr[destAirport+1];
-  		if(high-low<=16){
-  			//this sequential algo. is very slow when we have to go through hundreds of units to select a destination
-  			float lowProb=0.0;
-                        	for(int idx= low; idx<high; idx++){
-  				if(random1>lowProb && random1 < arrivalUnits_prob_ptr[idx]) {
-  					destUnit=arrivalUnits_ptr[idx];
-  					break;
-  				}
-  				lowProb= arrivalUnits_prob_ptr[idx];
-  			}
-  		}else{  //binary search algorithm
-  			while(low<high){
-  				int mid= low+ (high-low)/2;
-  				if(arrivalUnits_prob_ptr[mid]<random1) low=mid+1;
-  				else high=mid-1;
-  			}
-  			destUnit=arrivalUnits_ptr[low];
-  		}
-  		if(destUnit >=0){
-  			//randomly select a community in the dest unit
+                  int low=arrivalUnits_offset_ptr[destAirport], high=arrivalUnits_offset_ptr[destAirport+1];
+                  if(high-low<=16){
+                          //this sequential algo. is very slow when we have to go through hundreds of units to select a destination
+                          float lowProb=0.0;
+                                for(int idx= low; idx<high; idx++){
+                                  if(random1>lowProb && random1 < arrivalUnits_prob_ptr[idx]) {
+                                          destUnit=arrivalUnits_ptr[idx];
+                                          break;
+                                  }
+                                  lowProb= arrivalUnits_prob_ptr[idx];
+                          }
+                  }else{  //binary search algorithm
+                          while(low<high){
+                                  int mid= low+ (high-low)/2;
+                                  if(arrivalUnits_prob_ptr[mid]<random1) low=mid+1;
+                                  else high=mid-1;
+                          }
+                          destUnit=arrivalUnits_ptr[low];
+                  }
+                  if(destUnit >=0){
+                          //randomly select a community in the dest unit
                                 int comm_to = Start[destUnit] + amrex::Random_int(Start[destUnit+1] - Start[destUnit], engine);
-  			int new_i= comm_to%i_max;
-  			int new_j= comm_to/i_max;
-  			if(new_i>=0 && new_j>=0 && new_i<i_max && new_j<j_max){
-                                	trav_i_ptr[i] = new_i;
-                                	trav_j_ptr[i] = new_j;
-  			}
-  		}
+                          int new_i= comm_to%i_max;
+                          int new_j= comm_to/i_max;
+                          if(new_i>=0 && new_j>=0 && new_i<i_max && new_j<j_max){
+                                        trav_i_ptr[i] = new_i;
+                                        trav_j_ptr[i] = new_j;
+                          }
+                  }
                 }
             });
         }
@@ -1085,10 +1085,10 @@ void AgentContainer::returnRandomTravel (const AgentContainer& on_travel_pc)
                     {
                         int dst_index = random_travel_ptr_travel[i];
                         if(dst_index>=0){
-                        	prob_ptr[dst_index] += prob_ptr_travel[i];
-                        	//AMREX_ALWAYS_ASSERT(random_travel_ptr[dst_index] = dst_index);
-                        	//AMREX_ALWAYS_ASSERT(random_travel_ptr[dst_index] >= 0);
-                        	random_travel_ptr[dst_index] = -1;
+                                prob_ptr[dst_index] += prob_ptr_travel[i];
+                                //AMREX_ALWAYS_ASSERT(random_travel_ptr[dst_index] = dst_index);
+                                //AMREX_ALWAYS_ASSERT(random_travel_ptr[dst_index] >= 0);
+                                random_travel_ptr[dst_index] = -1;
                         }
                     });
             }
@@ -1136,8 +1136,8 @@ void AgentContainer::returnAirTravel (const AgentContainer& on_travel_pc)
                     {
                         int dst_index = air_travel_ptr_travel[i];
                         if(dst_index>=0){
-                        	prob_ptr[dst_index] += prob_ptr_travel[i];
-                       		air_travel_ptr[dst_index] = -1;
+                                prob_ptr[dst_index] += prob_ptr_travel[i];
+                                       air_travel_ptr[dst_index] = -1;
                         }
                     });
             }

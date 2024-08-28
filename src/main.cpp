@@ -114,9 +114,9 @@ void runAgent ()
 
     AirTravelFlow air;
     if (params.air_travel_int > 0){
-    	air.ReadAirports(params.airports_filename, demo);
-    	air.ReadAirTravelFlow(params.air_traffic_filename);
-    	air.ComputeTravelProbs(demo);
+        air.ReadAirports(params.airports_filename, demo);
+        air.ReadAirTravelFlow(params.air_traffic_filename);
+        air.ComputeTravelProbs(demo);
     }
 
     Geometry geom = ExaEpi::Utils::get_geometry(demo, params);
@@ -385,7 +385,7 @@ void runAgent ()
             }
 
             if ((params.air_travel_int > 0) && (i % params.air_travel_int == 0)) {
-            	pc.moveAirTravel(unit_mf, air, demo);
+                pc.moveAirTravel(unit_mf, air, demo);
                 using SrcData = AgentContainer::ParticleTileType::ConstParticleTileDataType;
                 on_travel_pc.copyParticles(pc,
                                            [=] AMREX_GPU_HOST_DEVICE (const SrcData& src, int ip) {
@@ -405,7 +405,7 @@ void runAgent ()
             }
 
             if ((params.air_travel_int > 0) && (i % params.air_travel_int == 0)) {
-            	pc.interactAirTravel(mask_behavior, on_travel_pc);
+                pc.interactAirTravel(mask_behavior, on_travel_pc);
             }
 
             // Infect agents based on their interactions

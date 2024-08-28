@@ -28,16 +28,16 @@ struct AirTravelFlow
 
     void CopyToDeviceAsync (const amrex::Vector<int>& h_vec, /*!< host vector */
                                          amrex::Gpu::DeviceVector<int>& d_vec /*!< device vector */) {
-    	d_vec.resize(0);
-    	d_vec.resize(h_vec.size());
-    	Gpu::copyAsync(Gpu::hostToDevice, h_vec.begin(), h_vec.end(), d_vec.begin());
+        d_vec.resize(0);
+        d_vec.resize(h_vec.size());
+        Gpu::copyAsync(Gpu::hostToDevice, h_vec.begin(), h_vec.end(), d_vec.begin());
     }
 
     void CopyToDeviceAsync (const amrex::Vector<float>& h_vec, /*!< host vector */
                                          amrex::Gpu::DeviceVector<float>& d_vec /*!< device vector */) {
-    	d_vec.resize(0);
-    	d_vec.resize(h_vec.size());
-    	Gpu::copyAsync(Gpu::hostToDevice, h_vec.begin(), h_vec.end(), d_vec.begin());
+        d_vec.resize(0);
+        d_vec.resize(h_vec.size());
+        Gpu::copyAsync(Gpu::hostToDevice, h_vec.begin(), h_vec.end(), d_vec.begin());
     }
 
     void CopyDataToDevice () {
@@ -57,14 +57,14 @@ struct AirTravelFlow
     int n_counties_with_airports;
     std::map<std::string, int> airport_id;                /*! integer id for airport code*/
     std::map<int, std::string> id_to_airport;                /*! integer id to airport code*/
-    std::map<int, std::string> FIPS_to_airport;	  /*!< map from FIPS to airport code */
+    std::map<int, std::string> FIPS_to_airport;   /*!< map from FIPS to airport code */
     std::map<int, int> FIPS_to_county;  /*!< map from FIPS to county id */
     int nconnections; /*! The total number of airport connections */
     std::map<std::string, std::vector<std::string> > destAirportMap;
     std::map<std::string, std::vector<int> > inAirportRangeUnitMap; /*!< All units served by an airport */
     std::map<std::string, int> inAirportRangePop; /*!< population of all counties served by an airport */
-    std::map<std::string, int> originPax; 	/*!<number of origin passengers*/
-    std::map<std::string, int> destPax; 	/*!<number of destination passengers*/
+    std::map<std::string, int> originPax; /*!<number of origin passengers*/
+    std::map<std::string, int> destPax;/*!<number of destination passengers*/
     std::map<std::string/*org*/, std::map<std::string/*dest*/, float/*distribution*/> > travel_path_prob; /*!< probability of traveling between two airports */
 
 //data that can be used by either host or GPU

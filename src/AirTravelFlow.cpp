@@ -46,11 +46,11 @@ void AirTravelFlow::ReadAirports(const std::string fname, DemographicData& demo)
         lis >> FIPS >> airportCode;
         FIPS_to_airport[FIPS]= airportCode;
         if(inAirportRangePop.find(airportCode) == inAirportRangePop.end()){//the first time we see this airport
-    	    airport_id[airportCode]=air_i;
-    	    id_to_airport[air_i++]= airportCode;
-    	    inAirportRangePop[airportCode]= demo.CountyPop[FIPS];
+            airport_id[airportCode]=air_i;
+            id_to_airport[air_i++]= airportCode;
+            inAirportRangePop[airportCode]= demo.CountyPop[FIPS];
         }else {
-    	    inAirportRangePop[airportCode]+= demo.CountyPop[FIPS];
+            inAirportRangePop[airportCode]+= demo.CountyPop[FIPS];
         }
         i++;
     }
@@ -120,7 +120,7 @@ void AirTravelFlow::ComputeTravelProbs(DemographicData& demo){
         else air_travel_prob[i]= (float)originPax[FIPS_to_airport[fips]]/inAirportRangePop[FIPS_to_airport[fips]];
         //amrex::Print() <<" Unit "<<i<<" FIPS "<<fips<< " travel prob "<<air_travel_prob[i]<<"\n";
         if(FIPS_to_airport.find(fips) != FIPS_to_airport.end()){
-    	    std::string airportCode= FIPS_to_airport[fips];
+            std::string airportCode= FIPS_to_airport[fips];
             assigned_airport[i]= airport_id[airportCode];
         }else assigned_airport[i]= -1;//a unit that does not have any airport assigned to it
     }
@@ -134,13 +134,13 @@ void AirTravelFlow::ComputeTravelProbs(DemographicData& demo){
             int sum=0;
             for(std::map<std::string, float>::iterator it1= it->second.begin(); it1!= it->second.end(); it1++){
                 std::string dest= it1->first;
-    	        sum+=  travel_path_prob[org][dest];
+                sum+=  travel_path_prob[org][dest];
             }
             //compute chance for each path (we will sort these paths and compute prefix sums later)
             for(std::map<std::string, float>::iterator it1= it->second.begin(); it1!= it->second.end(); it1++){
-    	        std::string dest= it1->first;
-    	        travel_path_prob[org][dest]= travel_path_prob[org][dest]/sum;
-    	        //amrex::Print() <<" Original Airport "<< org<< " Dest Airport "<< dest<< " travel path prob threshold "<< travel_path_prob[org][dest]<<"\n";
+                std::string dest= it1->first;
+                travel_path_prob[org][dest]= travel_path_prob[org][dest]/sum;
+                //amrex::Print() <<" Original Airport "<< org<< " Dest Airport "<< dest<< " travel path prob threshold "<< travel_path_prob[org][dest]<<"\n";
             }
         }
         //pack the travel_path_prob map to 3 vectors that can be offloaded to the GPU
@@ -153,12 +153,12 @@ void AirTravelFlow::ComputeTravelProbs(DemographicData& demo){
            std::string airport= id_to_airport[i];
            int numDest= destAirportMap[airport].size();
            for(int j=0; j<numDest; j++){
-    	       std::string destAirport= destAirportMap[airport][j];
-    	       dest_airports[curOffset]= airport_id[destAirport];
-    	       if(j==0) dest_airports_prob[curOffset]= travel_path_prob[airport][destAirport];
-    	       else dest_airports_prob[curOffset]= dest_airports_prob[curOffset-1]+ travel_path_prob[airport][destAirport];
-    	       //amrex::Print() <<" Original Airport "<< airport<<" Dest Airport "<< destAirport<< " travel path prob threshold "<< dest_airports_prob[curOffset]<<"\n";
-    	       curOffset++;
+               std::string destAirport= destAirportMap[airport][j];
+               dest_airports[curOffset]= airport_id[destAirport];
+               if(j==0) dest_airports_prob[curOffset]= travel_path_prob[airport][destAirport];
+               else dest_airports_prob[curOffset]= dest_airports_prob[curOffset-1]+ travel_path_prob[airport][destAirport];
+               //amrex::Print() <<" Original Airport "<< airport<<" Dest Airport "<< destAirport<< " travel path prob threshold "<< dest_airports_prob[curOffset]<<"\n";
+               curOffset++;
            }
            dest_airports_prob[numDest-1]=1.0;//to avoid rounding error, we set the last option prob to 1.0
        }
@@ -177,13 +177,13 @@ void AirTravelFlow::ComputeTravelProbs(DemographicData& demo){
            int nUnits= inAirportRangeUnitMap[airport].size();
            //all units served by this airport
            for(int j=0; j<nUnits; j++){
-    	       int fips= demo.FIPS[j];
-    	       int destUnit= inAirportRangeUnitMap[airport][j];
-    	       arrivalUnits[curOffset]= destUnit;
-    	       if(j==0)arrivalUnits_prob[curOffset]= (float)demo.Population[destUnit]/inAirportRangePop[airport];
-    	       else arrivalUnits_prob[curOffset]=  arrivalUnits_prob[curOffset-1] + (float)demo.Population[destUnit]/inAirportRangePop[airport];
-    	       //amrex::Print() <<" At Airport "<< airport <<" prob threshold to visit unit "<< destUnit<<" is "<< arrivalUnits_prob[curOffset] <<"\n";
-    	       curOffset++;
+               int fips= demo.FIPS[j];
+               int destUnit= inAirportRangeUnitMap[airport][j];
+               arrivalUnits[curOffset]= destUnit;
+               if(j==0)arrivalUnits_prob[curOffset]= (float)demo.Population[destUnit]/inAirportRangePop[airport];
+               else arrivalUnits_prob[curOffset]=  arrivalUnits_prob[curOffset-1] + (float)demo.Population[destUnit]/inAirportRangePop[airport];
+               //amrex::Print() <<" At Airport "<< airport <<" prob threshold to visit unit "<< destUnit<<" is "<< arrivalUnits_prob[curOffset] <<"\n";
+               curOffset++;
            }
            arrivalUnits_prob[nUnits-1]= 1.0; //to avoid rounding error, we set the last option prob to 1.0
        }
