@@ -135,12 +135,6 @@ public:
         }
     }
 
-    void initAgentsDemo (amrex::iMultiFab& /*num_residents*/,
-                         amrex::iMultiFab& /*unit_mf*/,
-                         amrex::iMultiFab& /*FIPS_mf*/,
-                         amrex::iMultiFab& /*comm_mf*/,
-                         DemographicData& /*demo*/);
-
     void initAgentsCensus (amrex::iMultiFab& num_residents,
                            amrex::iMultiFab& unit_mf,
                            amrex::iMultiFab& FIPS_mf,
