@@ -38,9 +38,9 @@ void AirTravelFlow::ReadAirports(const std::string fname, DemographicData& demo)
 
     int FIPS = 0;
     std::string airportCode =  "";
-    int i=0;
+    int cnt=0;
     int air_i=0;
-    while (n_counties_with_airports>i) {
+    while (n_counties_with_airports>cnt) {
         std::getline(is, line);
         std::istringstream lis(line);
         lis >> FIPS >> airportCode;
@@ -52,7 +52,7 @@ void AirTravelFlow::ReadAirports(const std::string fname, DemographicData& demo)
         }else {
             inAirportRangePop[airportCode]+= demo.CountyPop[FIPS];
         }
-        i++;
+        cnt++;
     }
     //now convert the FIPS_to_airport map to vectors to offload to the GPU
     for(int i=0; i<n_counties_with_airports; i++){
@@ -61,8 +61,8 @@ void AirTravelFlow::ReadAirports(const std::string fname, DemographicData& demo)
     }
     for(int i=0; i<demo.Nunit; i++){
         int fips= demo.FIPS[i];
-        std::string airportCode= FIPS_to_airport[fips];
-        inAirportRangeUnitMap[airportCode].push_back(i);
+        std::string airport= FIPS_to_airport[fips];
+        inAirportRangeUnitMap[airport].push_back(i);
     }
 }
 
@@ -100,7 +100,7 @@ void AirTravelFlow::ReadAirTravelFlow (const std::string fname /*!< Filename to 
         lis >> dest >> org >> pax;
         //amrex::Print() << "ORIGIN AIRPORT " << org<< "  DEST AIRPORT "<< dest <<" PASSENGERS "<< pax<<"\n";
         destAirportMap[org].push_back(dest);
-        int pax_per_day= (int)(pax/365);
+        float pax_per_day= (float)(pax/365);
         travel_path_prob[org][dest]= pax_per_day;//just initialize, will be finalized later in ComputeTravelProbs(DemographicData& demo)
 
         if(originPax.find(org)== originPax.end()) originPax[org]= pax_per_day;
@@ -131,7 +131,7 @@ void AirTravelFlow::ComputeTravelProbs(DemographicData& demo){
         {
             std::string org= it->first;
             //find all paths from the origin airport
-            int sum=0;
+            float sum=0.;
             for(std::map<std::string, float>::iterator it1= it->second.begin(); it1!= it->second.end(); it1++){
                 std::string dest= it1->first;
                 sum+=  travel_path_prob[org][dest];
@@ -177,7 +177,6 @@ void AirTravelFlow::ComputeTravelProbs(DemographicData& demo){
            int nUnits= inAirportRangeUnitMap[airport].size();
            //all units served by this airport
            for(int j=0; j<nUnits; j++){
-               int fips= demo.FIPS[j];
                int destUnit= inAirportRangeUnitMap[airport][j];
                arrivalUnits[curOffset]= destUnit;
                if(j==0)arrivalUnits_prob[curOffset]= (float)demo.Population[destUnit]/inAirportRangePop[airport];
