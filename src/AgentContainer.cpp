@@ -904,8 +904,6 @@ void AgentContainer::moveAirTravel (const iMultiFab& unit_mf, AirTravelFlow& air
 {
     BL_PROFILE("AgentContainer::moveAirTravel");
     const Box& domain = Geom(0).Domain();
-    int i_max = domain.length(0);
-    int j_max = domain.length(1);
     for (int lev = 0; lev <= finestLevel(); ++lev)
     {
         auto& plev  = GetParticles(lev);
@@ -968,19 +966,14 @@ void AgentContainer::setAirTravel (const iMultiFab& unit_mf, AirTravelFlow& air,
             int gid = mfi.index();
             int tid = mfi.LocalTileIndex();
             auto& ptile = plev[std::make_pair(gid, tid)];
-            const auto& ptd = ptile.getParticleTileData();
             auto& aos   = ptile.GetArrayOfStructs();
-            ParticleType* pstruct = &(aos[0]);
             const size_t np = aos.numParticles();
             auto& soa   = ptile.GetStructOfArrays();
-            auto air_travel_ptr = soa.GetIntData(IntIdx::air_travel).data();
-            auto withdrawn_ptr = soa.GetIntData(IntIdx::withdrawn).data();
             auto home_i_ptr = soa.GetIntData(IntIdx::home_i).data();
             auto home_j_ptr = soa.GetIntData(IntIdx::home_j).data();
             auto trav_i_ptr = soa.GetIntData(IntIdx::trav_i).data();
             auto trav_j_ptr = soa.GetIntData(IntIdx::trav_j).data();
             auto Start = demo.Start_d.data();
-            auto air_travel_prob_ptr= air.air_travel_prob_d.data();
             auto dest_airports_ptr= air.dest_airports_d.data();
             auto dest_airports_offset_ptr= air.dest_airports_offset_d.data();
             auto dest_airports_prob_ptr= air.dest_airports_prob_d.data();
@@ -1013,13 +1006,13 @@ void AgentContainer::setAirTravel (const iMultiFab& unit_mf, AirTravelFlow& air,
                   int low=arrivalUnits_offset_ptr[destAirport], high=arrivalUnits_offset_ptr[destAirport+1];
                   if(high-low<=16){
                           //this sequential algo. is very slow when we have to go through hundreds of units to select a destination
-                          float lowProb=0.0;
+                          float lProb=0.0;
                                 for(int idx= low; idx<high; idx++){
-                                  if(random1>lowProb && random1 < arrivalUnits_prob_ptr[idx]) {
+                                  if(random1>lProb && random1 < arrivalUnits_prob_ptr[idx]) {
                                           destUnit=arrivalUnits_ptr[idx];
                                           break;
                                   }
-                                  lowProb= arrivalUnits_prob_ptr[idx];
+                                  lProb= arrivalUnits_prob_ptr[idx];
                           }
                   }else{  //binary search algorithm
                           while(low<high){
