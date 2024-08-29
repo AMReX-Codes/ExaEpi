@@ -203,7 +203,7 @@ public:
             if (m_at_work) { return &m_bins_work[a_idx]; }
             else           { return &m_bins_home[a_idx]; }
         } else if (a_mod_name == ExaEpi::InteractionNames::random || a_mod_name == ExaEpi::InteractionNames::airTravel) {
-            return &m_bins_random[a_idx];
+            return &m_bins_travel[a_idx];
         } else {
             amrex::Abort("Invalid a_mod_name!");
             return nullptr;
@@ -293,9 +293,9 @@ protected:
     /*! Map of work bins (of agents) indexed by MultiFab iterator and tile index;
         see AgentContainer::interactAgentsHomeWork() */
     std::map<std::pair<int, int>, amrex::DenseBins<PType> > m_bins_work;
-    /*! Map of random travel bins (of agents) indexed by MultiFab iterator and tile index;
+    /*! Map of air and random travel bins (of agents) indexed by MultiFab iterator and tile index;
         see AgentContainer::interactAgentsRandom() */
-    std::map<std::pair<int, int>, amrex::DenseBins<PType> > m_bins_random;
+    std::map<std::pair<int, int>, amrex::DenseBins<PType> > m_bins_travel;
 
     std::map<std::string,IntModel*> m_interactions; /*!< Map of interaction models */
     std::unique_ptr<HospitalModel<PCType,PTileType,PTDType,PType>> m_hospital; /*!< hospital model */
