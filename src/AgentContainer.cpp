@@ -991,7 +991,7 @@ void AgentContainer::setAirTravel (const iMultiFab& unit_mf, AirTravelFlow& air,
                 int destAirport=-1;
                 float lowProb=0.0;
                 float random= amrex::Random(engine);
-		//choose a destination airport for the agent (number of airports is often small, so let's visit in sequential order)
+                //choose a destination airport for the agent (number of airports is often small, so let's visit in sequential order)
                 for(int idx= dest_airports_offset_ptr[orgAirport]; idx<dest_airports_offset_ptr[orgAirport+1]; idx++){
                         float hiProb= dest_airports_prob_ptr[idx];
                         if(random>lowProb && random < hiProb) {
