@@ -903,7 +903,6 @@ void AgentContainer::moveRandomTravel (const iMultiFab& unit_mf)
 void AgentContainer::moveAirTravel (const iMultiFab& unit_mf, AirTravelFlow& air, DemographicData& demo)
 {
     BL_PROFILE("AgentContainer::moveAirTravel");
-    const Box& domain = Geom(0).Domain();
     for (int lev = 0; lev <= finestLevel(); ++lev)
     {
         auto& plev  = GetParticles(lev);
