@@ -100,8 +100,8 @@ void AirTravelFlow::ReadAirTravelFlow (const std::string fname /*!< Filename to 
         lis >> dest >> org >> pax;
         //amrex::Print() << "ORIGIN AIRPORT " << org<< "  DEST AIRPORT "<< dest <<" PASSENGERS "<< pax<<"\n";
         destAirportMap[org].push_back(dest);
-        float pax_per_day= (float)(pax/365);
-        travel_path_prob[org][dest]= pax_per_day;//just initialize, will be finalized later in ComputeTravelProbs(DemographicData& demo)
+        int pax_per_day= (float)(pax/365);
+        travel_path_prob[org][dest]= (float)pax_per_day;//just initialize, will be finalized later in ComputeTravelProbs(DemographicData& demo)
 
         if(originPax.find(org)== originPax.end()) originPax[org]= pax_per_day;
         else originPax[org]+= pax_per_day;
