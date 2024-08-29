@@ -991,9 +991,10 @@ void AgentContainer::setAirTravel (const iMultiFab& unit_mf, AirTravelFlow& air,
                 int destAirport=-1;
                 float lowProb=0.0;
                 float random= amrex::Random(engine);
+		//choose a destination airport for the agent (number of airports is often small, so let's visit in sequential order)
                 for(int idx= dest_airports_offset_ptr[orgAirport]; idx<dest_airports_offset_ptr[orgAirport+1]; idx++){
-                        float probRange= dest_airports_prob_ptr[idx];
-                        if(random>lowProb && random < probRange) {
+                        float hiProb= dest_airports_prob_ptr[idx];
+                        if(random>lowProb && random < hiProb) {
                                 destAirport=dest_airports_ptr[idx];
                                 break;
                         }
@@ -1001,12 +1002,12 @@ void AgentContainer::setAirTravel (const iMultiFab& unit_mf, AirTravelFlow& air,
                 }
                 if(destAirport >=0){
                   int destUnit=-1;
-                        float random1= amrex::Random(engine);
+                  float random1= amrex::Random(engine);
                   int low=arrivalUnits_offset_ptr[destAirport], high=arrivalUnits_offset_ptr[destAirport+1];
                   if(high-low<=16){
-                          //this sequential algo. is very slow when we have to go through hundreds of units to select a destination
+                          //this sequential algo. is very slow when we have to go through hundreds or thoudsands of units to select a destination
                           float lProb=0.0;
-                                for(int idx= low; idx<high; idx++){
+                          for(int idx= low; idx<high; idx++){
                                   if(random1>lProb && random1 < arrivalUnits_prob_ptr[idx]) {
                                           destUnit=arrivalUnits_ptr[idx];
                                           break;
@@ -1015,6 +1016,8 @@ void AgentContainer::setAirTravel (const iMultiFab& unit_mf, AirTravelFlow& air,
                           }
                   }else{  //binary search algorithm
                           while(low<high){
+                                  if(random1<low) break; //low is the found airport index
+                                  //if random1 falls within (low, high), half the range
                                   int mid= low+ (high-low)/2;
                                   if(arrivalUnits_prob_ptr[mid]<random1) low=mid+1;
                                   else high=mid-1;
@@ -1027,8 +1030,8 @@ void AgentContainer::setAirTravel (const iMultiFab& unit_mf, AirTravelFlow& air,
                           int new_i= comm_to%i_max;
                           int new_j= comm_to/i_max;
                           if(new_i>=0 && new_j>=0 && new_i<i_max && new_j<j_max){
-                                        trav_i_ptr[i] = new_i;
-                                        trav_j_ptr[i] = new_j;
+                                  trav_i_ptr[i] = new_i;
+                                  trav_j_ptr[i] = new_j;
                           }
                   }
                 }
