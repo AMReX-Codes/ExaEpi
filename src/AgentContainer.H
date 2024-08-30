@@ -18,11 +18,11 @@
 #include <AMReX_Vector.H>
 
 #include "AgentDefinitions.H"
-#include "DemographicData.H"
 #include "DiseaseParm.H"
 #include "DiseaseStatus.H"
 #include "HospitalModel.H"
 #include "InteractionModelLibrary.H"
+
 
 /*! \brief Derived class from ParticleContainer that defines agents and their functions */
 class AgentContainer
@@ -46,13 +46,6 @@ public:
                     const int                        & a_num_diseases,
                     const std::vector<std::string>   & a_disease_names);
 
-    void initAgentsCensus (amrex::iMultiFab& num_residents,
-                           amrex::iMultiFab& unit_mf,
-                           amrex::iMultiFab& FIPS_mf,
-                           amrex::iMultiFab& comm_mf,
-                           DemographicData& demo,
-                           const int nborhood_size);
-
     void morningCommute(amrex::MultiFab&);
 
     void eveningCommute(amrex::MultiFab&);
@@ -67,7 +60,7 @@ public:
 
     void moveAgentsRandomWalk ();
 
-    void moveRandomTravel (const amrex::iMultiFab& unit_mf);
+    void moveRandomTravel ();
 
     void returnRandomTravel (const AgentContainer& on_travel_pc);
 
@@ -142,9 +135,7 @@ public:
         return m_symptomatic_withdraw_compliance;
     }
 
-protected:
-
-    amrex::iMultiFab student_counts;
+    amrex::iMultiFab m_student_counts;
     amrex::Gpu::DeviceVector<int> m_unit_teacher_counts_d;
     amrex::Gpu::DeviceVector<int> m_comm_teacher_counts_total_d;
     amrex::Gpu::DeviceVector<int> m_comm_teacher_counts_high_d;
@@ -156,6 +147,8 @@ protected:
 
     int m_num_diseases; /*!< Number of diseases */
     std::vector<std::string> m_disease_names; /*!< names of the diseases */
+
+protected:
 
     int m_symptomatic_withdraw = 1; /*!< whether symptomatic agents withdraw or not */
 

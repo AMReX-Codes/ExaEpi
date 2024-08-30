@@ -97,10 +97,6 @@ namespace Utils
 {
 
     void get_test_params (ExaEpi::TestParams& params, const std::string& prefix);
-
-    amrex::Geometry get_geometry (const DemographicData& demo,
-                                  const ExaEpi::TestParams& params);
-
 }
 }
 
