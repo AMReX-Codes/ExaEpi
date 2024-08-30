@@ -96,12 +96,12 @@ public:
 
     /*! \brief Return disease parameters object pointer (host) */
     inline const DiseaseParm* getDiseaseParameters_h (int d /*!< disease index */) const {
-        return h_parm[d];
+        return m_h_parm[d];
     }
 
     /*! \brief Return disease parameters object pointer (device) */
     inline const DiseaseParm* getDiseaseParameters_d (int d /*!< disease index */) const {
-        return d_parm[d];
+        return m_d_parm[d];
     }
 
     /*! \brief Return the number of diseases */
@@ -111,25 +111,25 @@ public:
 
     /* Since read_workerflow update worker status Unit-wise and not community-wise - Get total teacher needed for each unit */
     inline const amrex::Gpu::DeviceVector<int>& getUnitTeacherCounts() const {
-        return unit_teacher_counts_d;
+        return m_unit_teacher_counts_d;
     }
     inline const amrex::Gpu::DeviceVector<int>& getCommDayCrTeacherCounts() const {
-        return comm_teacher_counts_daycr_d;
+        return m_comm_teacher_counts_daycr_d;
     }
     inline const amrex::Gpu::DeviceVector<int>& getCommHighTeacherCounts() const {
-        return comm_teacher_counts_high_d;
+        return m_comm_teacher_counts_high_d;
     }
     inline const amrex::Gpu::DeviceVector<int>& getCommMiddleTeacherCounts() const {
-        return comm_teacher_counts_middle_d;
+        return m_comm_teacher_counts_middle_d;
     }
     inline const amrex::Gpu::DeviceVector<int>& getCommElem3TeacherCounts() const {
-        return comm_teacher_counts_elem3_d;
+        return m_comm_teacher_counts_elem3_d;
     }
     inline const amrex::Gpu::DeviceVector<int>& getCommElem4TeacherCounts() const {
-        return comm_teacher_counts_elem4_d;
+        return m_comm_teacher_counts_elem4_d;
     }
     inline const amrex::Gpu::DeviceVector<int>& getCommTeacherCounts() const {
-        return comm_teacher_counts_total_d;
+        return m_comm_teacher_counts_total_d;
     }
 
     /*! \brief return the symptomatic withdrawal status */
@@ -145,14 +145,14 @@ public:
 protected:
 
     amrex::iMultiFab student_counts;
-    amrex::Gpu::DeviceVector<int> unit_teacher_counts_d;
-    amrex::Gpu::DeviceVector<int> comm_teacher_counts_total_d;
-    amrex::Gpu::DeviceVector<int> comm_teacher_counts_high_d;
-    amrex::Gpu::DeviceVector<int> comm_teacher_counts_middle_d;
-    amrex::Gpu::DeviceVector<int> comm_teacher_counts_elem3_d;
-    amrex::Gpu::DeviceVector<int> comm_teacher_counts_elem4_d;
-    amrex::Gpu::DeviceVector<int> comm_teacher_counts_daycr_d;
-    std::vector<long> student_teacher_ratios = {20, 20, 20, 20, 20, 1000000000}; // ignore daycare teachers since daycare interaction isnt handled yet!
+    amrex::Gpu::DeviceVector<int> m_unit_teacher_counts_d;
+    amrex::Gpu::DeviceVector<int> m_comm_teacher_counts_total_d;
+    amrex::Gpu::DeviceVector<int> m_comm_teacher_counts_high_d;
+    amrex::Gpu::DeviceVector<int> m_comm_teacher_counts_middle_d;
+    amrex::Gpu::DeviceVector<int> m_comm_teacher_counts_elem3_d;
+    amrex::Gpu::DeviceVector<int> m_comm_teacher_counts_elem4_d;
+    amrex::Gpu::DeviceVector<int> m_comm_teacher_counts_daycr_d;
+    std::vector<long> m_student_teacher_ratios = {20, 20, 20, 20, 20, 1000000000}; // ignore daycare teachers since daycare interaction isnt handled yet!
 
     int m_num_diseases; /*!< Number of diseases */
     std::vector<std::string> m_disease_names; /*!< names of the diseases */
@@ -162,8 +162,8 @@ protected:
     amrex::Real m_shelter_compliance = 0.95_rt; /*!< Shelter-in-place compliance rate */
     amrex::Real m_symptomatic_withdraw_compliance = 0.95_rt; /*!< Symptomatic withdrawal compliance rate */
 
-    std::vector<DiseaseParm*> h_parm;    /*!< Disease parameters */
-    std::vector<DiseaseParm*> d_parm;    /*!< Disease parameters (GPU device) */
+    std::vector<DiseaseParm*> m_h_parm;    /*!< Disease parameters */
+    std::vector<DiseaseParm*> m_d_parm;    /*!< Disease parameters (GPU device) */
 
     /*! Map of home bins (of agents) indexed by MultiFab iterator and tile index;
         see AgentContainer::interactAgentsHomeWork() */
@@ -186,7 +186,6 @@ protected:
 
     /*! \brief queries if a given interaction type (model) is available */
     inline bool haveInteractionModel( const std::string& a_mod_name ) const {
-        BL_PROFILE("AgentContainer::haveInteractionModel");
         return (m_interactions.find(a_mod_name) != m_interactions.end());
     }
 

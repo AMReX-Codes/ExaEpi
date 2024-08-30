@@ -84,7 +84,7 @@ AgentContainer::AgentContainer (const amrex::Geometry            & a_geom,  /*!<
         pp.query("symptomatic_withdraw", m_symptomatic_withdraw);
         pp.query("shelter_compliance", m_shelter_compliance);
         pp.query("symptomatic_withdraw_compliance", m_symptomatic_withdraw_compliance);
-        pp.queryarr("student_teacher_ratios", student_teacher_ratios);
+        pp.queryarr("student_teacher_ratios", m_student_teacher_ratios);
 
     }
 
@@ -103,24 +103,24 @@ AgentContainer::AgentContainer (const amrex::Geometry            & a_geom,  /*!<
         m_hospital = std::make_unique<HospitalModel<PCType,PTileType,PTDType,PType>>();
     }
 
-    h_parm.resize(m_num_diseases);
-    d_parm.resize(m_num_diseases);
+    m_h_parm.resize(m_num_diseases);
+    m_d_parm.resize(m_num_diseases);
 
     for (int d = 0; d < m_num_diseases; d++) {
-        h_parm[d] = new DiseaseParm{};
-        d_parm[d] = (DiseaseParm*)amrex::The_Arena()->alloc(sizeof(DiseaseParm));
+        m_h_parm[d] = new DiseaseParm{};
+        m_d_parm[d] = (DiseaseParm*)amrex::The_Arena()->alloc(sizeof(DiseaseParm));
 
-        h_parm[d]->readContact();
+        m_h_parm[d]->readContact();
         // first read inputs common to all diseases
-        h_parm[d]->readInputs("disease");
+        m_h_parm[d]->readInputs("disease");
         // now read any disease-specific input, if available
-        h_parm[d]->readInputs(std::string("disease_"+m_disease_names[d]));
-        h_parm[d]->Initialize();
+        m_h_parm[d]->readInputs(std::string("disease_"+m_disease_names[d]));
+        m_h_parm[d]->Initialize();
 
 #ifdef AMREX_USE_GPU
-        amrex::Gpu::htod_memcpy(d_parm[d], h_parm[d], sizeof(DiseaseParm));
+        amrex::Gpu::htod_memcpy(m_d_parm[d], m_h_parm[d], sizeof(DiseaseParm));
 #else
-        std::memcpy(d_parm[d], h_parm[d], sizeof(DiseaseParm));
+        std::memcpy(m_d_parm[d], m_h_parm[d], sizeof(DiseaseParm));
 #endif
     }
 }
@@ -198,17 +198,18 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,    /*!< Number 
 
     auto Nunit = demo.Nunit;
     auto Ncommunity = demo.Ncommunity;
-    unit_teacher_counts_d.resize(Nunit, 0);
+    m_unit_teacher_counts_d.resize(Nunit, 0);
     /* One can decide to define a iMultifab teachercounts -- but, data locality might be challenging*/
-    comm_teacher_counts_total_d.resize(Ncommunity, 0);
-    comm_teacher_counts_high_d.resize(Ncommunity, 0);
-    comm_teacher_counts_middle_d.resize(Ncommunity, 0);
-    comm_teacher_counts_elem3_d.resize(Ncommunity, 0);
-    comm_teacher_counts_elem4_d.resize(Ncommunity, 0);
-    comm_teacher_counts_daycr_d.resize(Ncommunity, 0);
+    m_comm_teacher_counts_total_d.resize(Ncommunity, 0);
+    m_comm_teacher_counts_high_d.resize(Ncommunity, 0);
+    m_comm_teacher_counts_middle_d.resize(Ncommunity, 0);
+    m_comm_teacher_counts_elem3_d.resize(Ncommunity, 0);
+    m_comm_teacher_counts_elem4_d.resize(Ncommunity, 0);
+    m_comm_teacher_counts_daycr_d.resize(Ncommunity, 0);
 
-    amrex::Gpu::DeviceVector<long> student_teacher_ratios_d(student_teacher_ratios.size());
-    amrex::Gpu::copy(amrex::Gpu::hostToDevice, student_teacher_ratios.begin(), student_teacher_ratios.end(), student_teacher_ratios_d.begin());
+    amrex::Gpu::DeviceVector<long> student_teacher_ratios_d(m_student_teacher_ratios.size());
+    amrex::Gpu::copy(amrex::Gpu::hostToDevice, m_student_teacher_ratios.begin(), m_student_teacher_ratios.end(),
+                     student_teacher_ratios_d.begin());
 
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
@@ -242,13 +243,13 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,    /*!< Number 
         //auto N65plus = demo.N65plus_d.data();
 
         auto ratios = student_teacher_ratios_d.dataPtr();
-        auto unit_teacher_counts_d_ptr = unit_teacher_counts_d.data();
-        auto comm_teacher_counts_total_d_ptr = comm_teacher_counts_total_d.data();
-        auto comm_teacher_counts_high_d_ptr = comm_teacher_counts_high_d.data();
-        auto comm_teacher_counts_middle_d_ptr = comm_teacher_counts_middle_d.data();
-        auto comm_teacher_counts_elem3_d_ptr = comm_teacher_counts_elem3_d.data();
-        auto comm_teacher_counts_elem4_d_ptr = comm_teacher_counts_elem4_d.data();
-        auto comm_teacher_counts_daycr_d_ptr = comm_teacher_counts_daycr_d.data();
+        auto unit_teacher_counts_d_ptr = m_unit_teacher_counts_d.data();
+        auto comm_teacher_counts_total_d_ptr = m_comm_teacher_counts_total_d.data();
+        auto comm_teacher_counts_high_d_ptr = m_comm_teacher_counts_high_d.data();
+        auto comm_teacher_counts_middle_d_ptr = m_comm_teacher_counts_middle_d.data();
+        auto comm_teacher_counts_elem3_d_ptr = m_comm_teacher_counts_elem3_d.data();
+        auto comm_teacher_counts_elem4_d_ptr = m_comm_teacher_counts_elem4_d.data();
+        auto comm_teacher_counts_daycr_d_ptr = m_comm_teacher_counts_daycr_d.data();
 
         auto bx = mfi.tilebox();
         amrex::ParallelForRNG(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k, amrex::RandomEngine const& engine) noexcept
@@ -540,7 +541,7 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,    /*!< Number 
                       + comm_teacher_counts_elem4_d_ptr[comm]
                       + comm_teacher_counts_daycr_d_ptr[comm];
             comm_teacher_counts_total_d_ptr[comm] = total;
-            amrex::Gpu::Atomic::AddNoRet(&unit_teacher_counts_d_ptr[unit_arr(i,j,k,0)],total);
+            amrex::Gpu::Atomic::AddNoRet(&unit_teacher_counts_d_ptr[unit_arr(i,j,k,0)], total);
         });
     }
 
@@ -943,7 +944,7 @@ void AgentContainer::infectAgents ()
                 auto infectious_period_ptr = soa.GetRealData(r_RT+r0(d)+RealIdxDisease::infectious_period).data();
                 auto symptomdev_period_ptr = soa.GetRealData(r_RT+r0(d)+RealIdxDisease::symptomdev_period).data();
 
-                auto* lparm = d_parm[d];
+                auto* lparm = m_d_parm[d];
 
                 amrex::ParallelForRNG( np,
                 [=] AMREX_GPU_DEVICE (int i, amrex::RandomEngine const& engine) noexcept
