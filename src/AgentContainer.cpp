@@ -6,6 +6,30 @@
 
 using namespace amrex;
 
+/*! \brief Assigns school by taking a random number between 0 and 100, and using
+ *  default distribution to choose elementary/middle/high school. */
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+int assign_school (const int nborhood, const amrex::RandomEngine& engine) {
+    int il4 = amrex::Random_int(100, engine);
+    int school = -1;
+
+    if (il4 < 36) {
+        school = 3 + (nborhood / 2);  /* elementary school */
+    }
+    else if (il4 < 68) {
+        school = 2;  /* middle school */
+    }
+
+    else if (il4 < 93) {
+        school = 1;  /* high school */
+    }
+    else {
+        school = 0;  /* not in school, presumably 18-year-olds or some home-schooled */
+    }
+    return school;
+}
+
+
 /*! Add runtime SoA attributes */
 void AgentContainer::add_attributes()
 {
@@ -28,6 +52,79 @@ void AgentContainer::add_attributes()
     }
     return;
 }
+
+/*! Constructor:
+    *  + Initializes particle container for agents
+    *  + Read in contact probabilities from command line input file
+    *  + Read in disease parameters from command line input file
+*/
+AgentContainer::AgentContainer (const amrex::Geometry            & a_geom,  /*!< Physical domain */
+                                const amrex::DistributionMapping & a_dmap,  /*!< Distribution mapping */
+                                const amrex::BoxArray            & a_ba,    /*!< Box array */
+                                const int                        & a_num_diseases, /*!< Number of diseases */
+                                const std::vector<std::string>   & a_disease_names /*!< names of the diseases */)
+    : amrex::ParticleContainer< 0,
+                                0,
+                                RealIdx::nattribs,
+                                IntIdx::nattribs> (a_geom, a_dmap, a_ba),
+        student_counts(a_ba, a_dmap, SchoolType::total_school_type, 0)
+{
+    BL_PROFILE("AgentContainer::AgentContainer");
+
+    m_num_diseases = a_num_diseases;
+    AMREX_ASSERT(m_num_diseases < ExaEpi::max_num_diseases);
+    m_disease_names = a_disease_names;
+
+    student_counts.setVal(0);  // Initialize the MultiFab to zero
+
+    add_attributes();
+
+    {
+        amrex::ParmParse pp("agent");
+        pp.query("symptomatic_withdraw", m_symptomatic_withdraw);
+        pp.query("shelter_compliance", m_shelter_compliance);
+        pp.query("symptomatic_withdraw_compliance", m_symptomatic_withdraw_compliance);
+        pp.queryarr("student_teacher_ratios", student_teacher_ratios);
+
+    }
+
+    {
+        using namespace ExaEpi;
+
+        /* Create the interaction model objects and push to container */
+        m_interactions.clear();
+        m_interactions[InteractionNames::generic] = new InteractionModGeneric<PCType,PTileType,PTDType,PType>;
+        m_interactions[InteractionNames::home] = new InteractionModHome<PCType,PTileType,PTDType,PType>;
+        m_interactions[InteractionNames::work] = new InteractionModWork<PCType,PTileType,PTDType,PType>;
+        m_interactions[InteractionNames::school] = new InteractionModSchool<PCType,PTileType,PTDType,PType>;
+        m_interactions[InteractionNames::nborhood] = new InteractionModNborhood<PCType,PTileType,PTDType,PType>;
+        m_interactions[InteractionNames::random] = new InteractionModRandom<PCType,PTileType, PTDType, PType>;
+
+        m_hospital = std::make_unique<HospitalModel<PCType,PTileType,PTDType,PType>>();
+    }
+
+    h_parm.resize(m_num_diseases);
+    d_parm.resize(m_num_diseases);
+
+    for (int d = 0; d < m_num_diseases; d++) {
+        h_parm[d] = new DiseaseParm{};
+        d_parm[d] = (DiseaseParm*)amrex::The_Arena()->alloc(sizeof(DiseaseParm));
+
+        h_parm[d]->readContact();
+        // first read inputs common to all diseases
+        h_parm[d]->readInputs("disease");
+        // now read any disease-specific input, if available
+        h_parm[d]->readInputs(std::string("disease_"+m_disease_names[d]));
+        h_parm[d]->Initialize();
+
+#ifdef AMREX_USE_GPU
+        amrex::Gpu::htod_memcpy(d_parm[d], h_parm[d], sizeof(DiseaseParm));
+#else
+        std::memcpy(d_parm[d], h_parm[d], sizeof(DiseaseParm));
+#endif
+    }
+}
+
 
 /*! \brief Initialize agents for ExaEpi::ICType::Census
 
@@ -449,6 +546,27 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,    /*!< Number 
 
     demo.CopyToHostAsync(demo.Unit_on_proc_d, demo.Unit_on_proc);
     amrex::Gpu::streamSynchronize();
+}
+
+/*! \brief Return bin pointer at a given mfi, tile and model name */
+DenseBins<AgentContainer::PType>* AgentContainer::getBins (const std::pair<int,int>& a_idx,
+                                                           const std::string& a_mod_name)
+{
+    BL_PROFILE("AgentContainer::getBins");
+    if (a_mod_name == ExaEpi::InteractionNames::home) {
+        return &m_bins_home[a_idx];
+    } else if (    (a_mod_name == ExaEpi::InteractionNames::work)
+                || (a_mod_name == ExaEpi::InteractionNames::school) ) {
+        return &m_bins_work[a_idx];
+    } else if (a_mod_name == ExaEpi::InteractionNames::nborhood) {
+        if (m_at_work) { return &m_bins_work[a_idx]; }
+        else           { return &m_bins_home[a_idx]; }
+    } else if (a_mod_name == ExaEpi::InteractionNames::random) {
+        return &m_bins_random[a_idx];
+    } else {
+        amrex::Abort("Invalid a_mod_name!");
+        return nullptr;
+    }
 }
 
 /*! \brief Send agents on a random walk around the neighborhood
