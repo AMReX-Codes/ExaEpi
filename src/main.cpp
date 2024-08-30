@@ -193,7 +193,7 @@ void runAgent ()
         BL_PROFILE_REGION("Initialization");
         if (params.ic_type == ICType::Census) {
             pc.initAgentsCensus(num_residents, unit_mf, FIPS_mf, comm_mf, demo, params.nborhood_size);
-            ExaEpi::Initialization::read_workerflow(demo, params, unit_mf, comm_mf, pc);
+            ExaEpi::Initialization::read_workerflow(demo, params, unit_mf, comm_mf, pc, params.workgroup_size);
             if (params.initial_case_type[0] == "file") {
                 ExaEpi::Initialization::setInitialCasesFromFile( pc,
                                                                  unit_mf,
@@ -381,10 +381,8 @@ void runAgent ()
 
             // Typical day
             pc.morningCommute(mask_behavior);
-            pc.Redistribute();
             pc.interactDay(mask_behavior);
             pc.eveningCommute(mask_behavior);
-            pc.Redistribute();
             pc.interactEvening(mask_behavior);
             pc.interactNight(mask_behavior);
 

@@ -60,7 +60,8 @@ namespace Initialization
                           const TestParams& params,     /*!< Test parameters */
                           const iMultiFab& unit_mf,     /*!< MultiFab with unit number at each grid cell */
                           const iMultiFab& comm_mf,     /*!< MultiFab with community number at each grid cell */
-                          AgentContainer& pc            /*!< Agent container (particle container) */ )
+                          AgentContainer& pc,           /*!< Agent container (particle container) */
+                          const int workgroup_size      /*!< Number of agents in each workgroup */)
     {
 
         /* Allocate worker-flow matrix, only from units with nighttime
@@ -193,9 +194,8 @@ namespace Initialization
                     work_i_ptr[ip] = comm_to_iv[0];
                     work_j_ptr[ip] = comm_to_iv[1];
 
-                    constexpr int WG_size = 20;
                     number = (unsigned int) rint( ((Real) Ndaywork[to]) /
-                             ((Real) WG_size * (Start[to+1] - Start[to])) );
+                             ((Real) workgroup_size * (Start[to+1] - Start[to])) );
 
                     if (number) {
                         workgroup_ptr[ip] = 1 + amrex::Random_int(number, engine);

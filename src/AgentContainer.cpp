@@ -530,6 +530,8 @@ void AgentContainer::moveAgentsToWork ()
     }
 
     m_at_work = true;
+
+    Redistribute();
 }
 
 /*! \brief Move agents to home
@@ -575,6 +577,8 @@ void AgentContainer::moveAgentsToHome ()
     }
 
     m_at_work = false;
+
+    Redistribute();
 }
 
 /*! \brief Move agents randomly

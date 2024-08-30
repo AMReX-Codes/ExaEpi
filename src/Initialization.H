@@ -24,7 +24,8 @@ namespace Initialization
                           const TestParams& params,
                           const amrex::iMultiFab& unit_mf,
                           const amrex::iMultiFab& comm_mf,
-                          AgentContainer& pc);
+                          AgentContainer& pc,
+                          const int workgroup_size);
 
     void assignTeachersAndWorkgroup (const DemographicData& demo,
                           const amrex::iMultiFab& unit_mf,
