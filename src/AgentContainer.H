@@ -139,7 +139,8 @@ public:
                            amrex::iMultiFab& unit_mf,
                            amrex::iMultiFab& FIPS_mf,
                            amrex::iMultiFab& comm_mf,
-                           DemographicData& demo);
+                           DemographicData& demo,
+                           const int nborhood_size);
 
     void morningCommute(amrex::MultiFab&);
 

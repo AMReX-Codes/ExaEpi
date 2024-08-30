@@ -82,7 +82,8 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,    /*!< Number 
                                                                          census tract number (component 1)
                                                                          of each community */
                                        iMultiFab& comm_mf,          /*!< Community number */
-                                       DemographicData& demo        /*!< Demographic data */ )
+                                       DemographicData& demo,       /*!< Demographic data */
+                                       const int nborhood_size      /*!< Size of neighborhood */ )
 {
     BL_PROFILE("initAgentsCensus");
 
@@ -167,11 +168,11 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,    /*!< Number 
             FIPS_arr(i, j, k, 1) = Tract[unit];
 
             int community_size;
-            if (Population[unit] < (1000 + 2000*(community - Start[unit]))) {
+            if (Population[unit] < (1000 + DemographicData::COMMUNITY_SIZE * (community - Start[unit]))) {
                 community_size = 0;  /* Don't set up any residents; workgroup-only */
             }
             else {
-                community_size = 2000;   /* Standard 2000-person community */
+                community_size = DemographicData::COMMUNITY_SIZE;   /* Standard 2000-person community */
             }
 
             int p_hh[7] = {330, 670, 800, 900, 970, 990, 1000};
@@ -302,11 +303,11 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,    /*!< Number 
             int num_to_add = family_size * nf;
 
             int community_size;
-            if (Population[unit] < (1000 + 2000*(community - Start[unit]))) {
+            if (Population[unit] < (1000 + DemographicData::COMMUNITY_SIZE * (community - Start[unit]))) {
                 community_size = 0;  /* Don't set up any residents; workgroup-only */
             }
             else {
-                community_size = 2000;   /* Standard 2000-person community */
+                community_size = DemographicData::COMMUNITY_SIZE;   /* Standard 2000-person community */
             }
 
             int p_schoolage = 0;
@@ -326,7 +327,7 @@ void AgentContainer::initAgentsCensus (iMultiFab& num_residents,    /*!< Number 
                 auto& agent = aos[ip];
                 int il2 = amrex::Random_int(100, engine);
                 if (ii % family_size == 0) {
-                    nborhood = amrex::Random_int(4, engine);
+                    nborhood = amrex::Random_int(DemographicData::COMMUNITY_SIZE / nborhood_size, engine);
                 }
                 int age_group = -1;
 

@@ -101,13 +101,13 @@ void runAgent ()
     }
 
     DemographicData demo;
-    if (params.ic_type == ICType::Census) { demo.InitFromFile(params.census_filename); }
+    if (params.ic_type == ICType::Census) { demo.InitFromFile(params.census_filename, params.workgroup_size); }
 
     std::vector<CaseData> cases;
     cases.resize(params.num_diseases);
     for (int d = 0; d < params.num_diseases; d++) {
         if (params.ic_type == ICType::Census && params.initial_case_type[d] == "file") {
-            cases[d].InitFromFile(params.disease_names[d],params.case_filename[d]);
+            cases[d].InitFromFile(params.disease_names[d], params.case_filename[d]);
         }
     }
 
@@ -192,7 +192,7 @@ void runAgent ()
     {
         BL_PROFILE_REGION("Initialization");
         if (params.ic_type == ICType::Census) {
-            pc.initAgentsCensus(num_residents, unit_mf, FIPS_mf, comm_mf, demo);
+            pc.initAgentsCensus(num_residents, unit_mf, FIPS_mf, comm_mf, demo, params.nborhood_size);
             ExaEpi::Initialization::read_workerflow(demo, params, unit_mf, comm_mf, pc);
             if (params.initial_case_type[0] == "file") {
                 ExaEpi::Initialization::setInitialCasesFromFile( pc,
@@ -211,6 +211,10 @@ void runAgent ()
                                                                 params.disease_names,
                                                                 demo );
             }
+        } else if (params.ic_type == ICType::UrbanPop) {
+            Abort("UrbanPop not yet implemented");
+        } else {
+            Abort("Unimplemented ic_type");
         }
     }
 
@@ -231,7 +235,7 @@ void runAgent ()
         BL_PROFILE_REGION("Evolution");
         for (int i = 0; i < params.nsteps; ++i)
         {
-            amrex::Print() << "Simulating day " << i << "\n";
+            amrex::Print() << "Simulating day " << i << " " << std::flush;
 
             if ((params.plot_int > 0) && (i % params.plot_int == 0)) {
                 ExaEpi::IO::writePlotFile(  pc,
@@ -313,6 +317,8 @@ void runAgent ()
 
                 if (ParallelDescriptor::IOProcessor())
                 {
+                    amrex::Print() << " " << counts[1] << " infected, " << counts[4] << " deaths\n";
+
                     // total number of deaths computed on agents and on mesh should be the same...
                     if (mmc[3] != counts[4]) {
                         amrex::Print() << mmc[3] << " " << counts[4] << "\n";
@@ -375,8 +381,10 @@ void runAgent ()
 
             // Typical day
             pc.morningCommute(mask_behavior);
+            pc.Redistribute();
             pc.interactDay(mask_behavior);
             pc.eveningCommute(mask_behavior);
+            pc.Redistribute();
             pc.interactEvening(mask_behavior);
             pc.interactNight(mask_behavior);
 
