@@ -19,7 +19,6 @@
 struct CensusData
 {
 
-    amrex::Geometry geom;
     DemographicData demo;
 
     amrex::iMultiFab num_residents_mf; /*!< Number of residents in each community (grid cell);
