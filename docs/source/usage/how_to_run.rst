@@ -33,10 +33,8 @@ The following are inputs for the overall simulation:
 * ``agent.disease_names`` (vector of `strings`)
     Names of the diseases; the size of the vector must be the same as ``agent.number_of_diseases``.
     If unspecified, the disease names are set as ``default00``, ``default01``, ``...``.
-* ``agent.ic_type`` (`string`: either ``"census"`` or ``"demo"``)
+* ``agent.ic_type`` (`string`: either ``"census"``)
     If ``"census"``, initial conditions will be read from the provided census data file.
-    If ``"demo"``, agents will be initialized according to a power law distribution.
-    Note that the ``"demo"`` `ic_type` is deprecated and will be removed in the future.
 * ``agent.census_filename`` (`string`)
     The path to the ``*.dat`` file containing the census data used to set initial conditions.
     Must be provided if ``ic_type`` is ``"census"``. Examples of these data files are provided

@@ -76,15 +76,11 @@ struct TestParams
 
 /**
   * \brief enum for the different initial condition options.\n
-  *        demo is for an initial power law\n
   *        census reads in census data.\n
-  *
-  *        Default is demo.
   */
 struct ICType {
     enum {
-        Demo = 0,   /*!< Initial power law (default) */
-        Census = 1  /*!< Census data */
+        Census = 0  /*!< Census data. Default */
     };
 };
 

@@ -60,7 +60,7 @@ int main (int argc, /*!< Number of command line arguments */
       + Community number of the community at each grid cell.
       + Disease statistics with 4 components (hospitalization, ICU, ventilator, deaths)
       + Masking behavior
-    + Initialize agents (AgentContainer::initAgentsDemo or AgentContainer::initAgentsCensus).
+    + Initialize agents (AgentContainer::initAgentsCensus).
       If ExaEpi::TestParams::ic_type is ExaEpi::ICType::Census, then
       + Read worker flow (ExaEpi::Initialization::read_workerflow)
       + Initialize cases (ExaEpi::Initialization::setInitialCases)
@@ -191,9 +191,7 @@ void runAgent ()
 
     {
         BL_PROFILE_REGION("Initialization");
-        if (params.ic_type == ICType::Demo) {
-            pc.initAgentsDemo(num_residents, unit_mf, FIPS_mf, comm_mf, demo);
-        } else if (params.ic_type == ICType::Census) {
+        if (params.ic_type == ICType::Census) {
             pc.initAgentsCensus(num_residents, unit_mf, FIPS_mf, comm_mf, demo);
             ExaEpi::Initialization::read_workerflow(demo, params, unit_mf, comm_mf, pc);
             if (params.initial_case_type[0] == "file") {

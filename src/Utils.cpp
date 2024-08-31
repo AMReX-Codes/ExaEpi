@@ -52,11 +52,9 @@ void ExaEpi::Utils::get_test_params (   TestParams& params,         /*!< Test pa
     params.num_initial_cases.resize(params.num_diseases);
     params.case_filename.resize(params.num_diseases);
 
-    std::string ic_type = "demo";
+    std::string ic_type = "census";
     pp.query( "ic_type", ic_type );
-    if (ic_type == "demo") {
-        params.ic_type = ICType::Demo;
-    } else if (ic_type == "census") {
+    if (ic_type == "census") {
         params.ic_type = ICType::Census;
         pp.get("census_filename", params.census_filename);
         pp.get("workerflow_filename", params.workerflow_filename);
@@ -93,7 +91,7 @@ void ExaEpi::Utils::get_test_params (   TestParams& params,         /*!< Test pa
             }
         }
     } else {
-        amrex::Abort("ic type not recognized");
+        amrex::Abort("ic_type not recognized (currently supported 'census')");
     }
 
     params.aggregated_diag_int = -1;
@@ -135,18 +133,7 @@ Geometry ExaEpi::Utils::get_geometry (const DemographicData&    demo,   /*!< dem
     Box base_domain;
     Geometry geom;
 
-    if (params.ic_type == ICType::Demo) {
-        IntVect domain_lo(AMREX_D_DECL(0, 0, 0));
-        IntVect domain_hi(AMREX_D_DECL(params.size[0]-1,params.size[1]-1,params.size[2]-1));
-        base_domain = Box(domain_lo, domain_hi);
-
-        for (int n = 0; n < BL_SPACEDIM; n++)
-        {
-            real_box.setLo(n, 0.0);
-            real_box.setHi(n, 3000.0);
-        }
-
-    } else if (params.ic_type == ICType::Census) {
+    if (params.ic_type == ICType::Census) {
         IntVect iv;
         iv[0] = iv[1] = (int) std::floor(std::sqrt((double) demo.Ncommunity));
         while (iv[0]*iv[1] <= demo.Ncommunity) {
