@@ -505,6 +505,20 @@ void CensusData::initAgents (AgentContainer& pc,       /*!< Agents */
 
     demo.CopyToHostAsync(demo.Unit_on_proc_d, demo.Unit_on_proc);
     amrex::Gpu::streamSynchronize();
+
+    std::ofstream outf("agents." + std::to_string(ParallelDescriptor::MyProc()) + ".csv");
+    for (MFIter mfi = pc.MakeMFIter(0, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+        auto& ptile = pc.ParticlesAt(0, mfi);
+        auto& aos = ptile.GetArrayOfStructs();
+        const auto np = aos.numParticles();
+        auto agents = &(aos[0]);
+
+        for (int i = 0; i < np; i++) {
+            outf << agents[i].cpu() << "." << agents[i].id() << ", " << agents[i].pos(0) << ", " << agents[i].pos(1) << "\n";
+        }
+    }
+    outf.close();
+
 }
 
 /*! \brief Read worker flow data from file and set work location for agents
@@ -952,6 +966,51 @@ int infect_random_community (AgentContainer& pc, /*!< Agent container (particle 
     return num_infected;
 }
 
+
+
+void CensusData::setInitialCasesFixed (AgentContainer& pc,
+                                        std::vector<int> num_cases, /*!< Number of initial cases */
+                                        const std::vector<std::string>& d_names /*!< Disease names */)
+{
+    auto& plev  = pc.GetParticles(0);
+    int num_infected = 0;
+    for (MFIter mfi = pc.MakeMFIter(0, false); mfi.isValid(); ++mfi) {
+        auto& ptile = plev[std::make_pair(mfi.index(), mfi.LocalTileIndex())];
+        auto& soa = ptile.GetStructOfArrays();
+        auto& aos = ptile.GetArrayOfStructs();
+        auto agents = &(aos[0]);
+        auto workgroup_ptr = soa.GetIntData(IntIdx::workgroup).data();
+        const auto np = ptile.numParticles();
+        int i_RT = IntIdx::nattribs;
+        int r_RT = RealIdx::nattribs;
+        auto status_ptr = soa.GetIntData(i_RT+i0(0)+IntIdxDisease::status).data();
+        auto counter_ptr           = soa.GetRealData(r_RT+r0(0)+RealIdxDisease::disease_counter).data();
+        auto incubation_period_ptr = soa.GetRealData(r_RT+r0(0)+RealIdxDisease::incubation_period).data();
+        auto infectious_period_ptr = soa.GetRealData(r_RT+r0(0)+RealIdxDisease::infectious_period).data();
+        auto symptomdev_period_ptr = soa.GetRealData(r_RT+r0(0)+RealIdxDisease::symptomdev_period).data();
+        const auto* lparm = pc.getDiseaseParameters_d(0);
+        RandomEngine engine;
+        int local_infections = 0;
+        for (int i = 0; i < np; i++) {
+            if (!workgroup_ptr[i]) continue;
+            status_ptr[i] = Status::infected;
+            counter_ptr[i] = 0;
+            incubation_period_ptr[i] = amrex::RandomNormal(lparm->latent_length_mean, lparm->latent_length_std, engine);
+            infectious_period_ptr[i] = amrex::RandomNormal(lparm->infectious_length_mean, lparm->infectious_length_std, engine);
+            symptomdev_period_ptr[i] = amrex::RandomNormal(lparm->incubation_length_mean, lparm->incubation_length_std, engine);
+            num_infected++;
+            local_infections++;
+            if (local_infections == 100) break;
+            //AllPrint() << "Process " << ParallelDescriptor::MyProc() << " infected "
+            //           << agents[i].id() << " " << agents[i].pos(0) << " " << agents[i].pos(1) << "\n";
+        }
+    }
+    AllPrint() << "Process " << ParallelDescriptor::MyProc() << " number infected " << num_infected << "\n";
+    ParallelDescriptor::ReduceIntSum(num_infected);
+    Print() << "Total number infected " << num_infected << "\n";
+    ParallelContext::BarrierAll();
+}
+
 /*! \brief Set initial cases for the simulation
 
     Set the initial cases of infection for the simulation based on the #CaseData:
@@ -969,6 +1028,9 @@ void CensusData::setInitialCasesFromFile (AgentContainer& pc, /*!< Agent contain
                                           const std::vector<std::string>& d_names /*!< Disease names */)
 {
     BL_PROFILE("setInitialCasesFromFile");
+
+    //setFixedInitialCases(pc);
+    //return;
 
     std::map<std::pair<int, int>, amrex::DenseBins<AgentContainer::ParticleType> > bin_map;
 
@@ -1023,6 +1085,32 @@ void CensusData::setInitialCasesRandom (AgentContainer& pc, /*!< Agent container
         }
         amrex::ignore_unused(ninf);
     }
+
+    auto& plev  = pc.GetParticles(0);
+    int num_infected = 0;
+    for (MFIter mfi = pc.MakeMFIter(0, false); mfi.isValid(); ++mfi) {
+        auto& ptile = plev[std::make_pair(mfi.index(), mfi.LocalTileIndex())];
+        auto& soa = ptile.GetStructOfArrays();
+        auto& aos = ptile.GetArrayOfStructs();
+        auto agents = &(aos[0]);
+        auto workgroup_ptr = soa.GetIntData(IntIdx::workgroup).data();
+        const auto np = ptile.numParticles();
+        int i_RT = IntIdx::nattribs;
+        int r_RT = RealIdx::nattribs;
+        auto status_ptr = soa.GetIntData(i_RT+i0(0)+IntIdxDisease::status).data();
+        auto counter_ptr           = soa.GetRealData(r_RT+r0(0)+RealIdxDisease::disease_counter).data();
+        auto incubation_period_ptr = soa.GetRealData(r_RT+r0(0)+RealIdxDisease::incubation_period).data();
+        auto infectious_period_ptr = soa.GetRealData(r_RT+r0(0)+RealIdxDisease::infectious_period).data();
+        auto symptomdev_period_ptr = soa.GetRealData(r_RT+r0(0)+RealIdxDisease::symptomdev_period).data();
+        for (int i = 0; i < np; i++) {
+            if (status_ptr[i] == Status::infected) num_infected++;
+        }
+    }
+    AllPrint() << "Process " << ParallelDescriptor::MyProc() << " counted infected total of " << num_infected << "\n";
+    ParallelDescriptor::ReduceIntSum(num_infected);
+    Print() << "Total number infected over all processes " << num_infected << "\n";
+    ParallelContext::BarrierAll();
+
 }
 
 

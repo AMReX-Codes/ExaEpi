@@ -67,7 +67,7 @@ void ExaEpi::Utils::get_test_params (   TestParams& params,         /*!< Test pa
                     std::string key = "case_filename_" + params.disease_names[0];
                     pp.get(key.c_str(), params.case_filename[0]);
                 }
-            } else if (params.initial_case_type[0] == "random") {
+            } else if (params.initial_case_type[0] == "random" || params.initial_case_type[0] == "fixed") {
                 if (pp.contains("num_initial_cases")) {
                     pp.get("num_initial_cases", params.num_initial_cases[0]);
                 } else {
@@ -82,7 +82,7 @@ void ExaEpi::Utils::get_test_params (   TestParams& params,         /*!< Test pa
                 if (params.initial_case_type[d] == "file") {
                     std::string key = "case_filename_" + params.disease_names[d];
                     pp.get(key.c_str(), params.case_filename[d]);
-                } else if (params.initial_case_type[d] == "random") {
+                } else if (params.initial_case_type[d] == "random" || params.initial_case_type[d] == "fixed") {
                     std::string key = "num_initial_cases_" + params.disease_names[d];
                     pp.get(key.c_str(), params.num_initial_cases[d]);
                 } else {

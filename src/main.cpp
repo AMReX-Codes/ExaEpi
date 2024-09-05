@@ -12,6 +12,8 @@
 #include "DemographicData.H"
 #include "IO.H"
 #include "Utils.H"
+#include "UrbanPopData.H"
+
 
 using namespace amrex;
 using namespace ExaEpi;
@@ -111,8 +113,13 @@ void runAgent ()
     BoxArray ba;
     DistributionMapping dm;
     CensusData censusData;
+    UrbanPopData urbanPopData;
+
     if (params.ic_type == ICType::Census) {
         censusData.init(params, geom, ba, dm);
+    } else if (params.ic_type == ICType::UrbanPop) {
+        urbanPopData.init(params, geom, ba, dm);
+        return;
     }
 
     // The default output filename is:
@@ -183,8 +190,10 @@ void runAgent ()
             censusData.read_workerflow(pc, params.workerflow_filename, params.workgroup_size);
             if (params.initial_case_type[0] == "file") {
                 censusData.setInitialCasesFromFile(pc, cases, params.disease_names);
-            } else {
+            } else if (params.initial_case_type[0] == "random") {
                 censusData.setInitialCasesRandom(pc, params.num_initial_cases, params.disease_names);
+            } else if (params.initial_case_type[0] == "fixed") {
+                censusData.setInitialCasesFixed(pc, params.num_initial_cases, params.disease_names);
             }
         } else if (params.ic_type == ICType::UrbanPop) {
             Abort("UrbanPop not yet implemented");
