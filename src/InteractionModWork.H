@@ -32,6 +32,47 @@ struct GetWorkerBin
     }
 };
 
+/*! \brief One-on-one interaction between an infectious agent and a susceptible agent.
+ *
+ * This function defines the one-on-one interaction between an infectious agent and a
+ * susceptible agent at work. */
+template <typename PTDType>
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+static void binaryInteractionWork (const int infectious_i, /*!< Index of infectious agent */
+                                   const int susceptible_i, /*!< Index of susceptible agent */
+                                   const PTDType& a_ptd, /*!< Particle tile data */
+                                   const DiseaseParm* const a_lparm,  /*!< disease paramters */
+                                   const Real a_work_scale, /*!< work scale */
+                                   ParticleReal* const a_prob_ptr, /*!< infection probability */
+                                   const int a_d   /*!< disease index */)
+{
+    Real infect = a_lparm->infect;
+    infect *= (1.0_rt - a_lparm->vac_eff);
+
+    auto withdrawn_ptr = a_ptd.m_idata[IntIdx::withdrawn];
+    auto random_travel_ptr = a_ptd.m_idata[IntIdx::random_travel];
+
+    //Real j_mask = mask_arr(home_i_ptr[j], home_j_ptr[j], 0);
+    if (infectious_i == susceptible_i) return;          // same agents
+    if (!isSusceptible(susceptible_i, a_ptd, a_d)) return; // not susceptible
+    if (isHospitalized(susceptible_i, a_ptd)) return;      // in hospital
+    if (!isAtWork(susceptible_i, a_ptd)) return;        // not at work
+    if (withdrawn_ptr[susceptible_i]) return;           // withdrawn
+    if (random_travel_ptr[susceptible_i] >= 0) return;  // on random travel
+
+    auto work_i_ptr = a_ptd.m_idata[IntIdx::work_i];
+    auto work_j_ptr = a_ptd.m_idata[IntIdx::work_j];
+    auto workgroup_ptr = a_ptd.m_idata[IntIdx::workgroup];
+    AMREX_ASSERT(workgroup_ptr[infectious_i] == workgroup_ptr[susceptible_i]);
+    AMREX_ASSERT(work_i_ptr[infectious_i] == work_i_ptr[susceptible_i] && work_j_ptr[infectious_i] == work_j_ptr[susceptible_i]);
+
+    //infect *= i_mask;
+    //infect *= j_mask;
+    ParticleReal prob = 1.0_prt - infect * a_lparm->xmit_work * a_work_scale;
+    // this is needed if we find all the susceptible for each infectious in turn
+    Gpu::Atomic::Multiply(&a_prob_ptr[susceptible_i], prob);
+}
+
 /*! \brief Class describing agent interactions at work */
 template <typename AC, typename ACT, typename ACTD, typename A>
 class InteractionModWork : public InteractionModel<AC,ACT,ACTD,A>
@@ -156,34 +197,16 @@ void InteractionModWork<AC,ACT,ACTD,A>::interactAgents(AC& a_agents,
                     // because there are usually more susceptible agents than infectious. This can be a large performance
                     // difference for CPU only runs.
                     if (isInfectious<ACTD>(infectious_i, ptd, d) &&  // infectious
-                        !isHospitalized(infectious_i, ptd) &&        // not in hospital
-                        workgroup_ptr[infectious_i] &&               // is a worker
-                        !withdrawn_ptr[infectious_i] &&                  // not withdrawn
-                        random_travel_ptr[infectious_i] < 0 &&       // not traveling
-                        work_i_ptr[infectious_i] >= 0)               // at work
+                        !isHospitalized(infectious_i, ptd) &&  // not in hospital
+                        isAtWork(infectious_i, ptd) &&         // worker at work
+                        !withdrawn_ptr[infectious_i] &&        // not withdrawn
+                        random_travel_ptr[infectious_i] < 0)   // not traveling
                     {
                         //Real i_mask = mask_arr(home_i_ptr[i], home_j_ptr[i], 0);
                         for (auto jj = cell_start; jj < cell_stop; ++jj) {
                             auto susceptible_i = inds[jj];
                             AMREX_ALWAYS_ASSERT((Long)susceptible_i < np);
-                            //Real j_mask = mask_arr(home_i_ptr[j], home_j_ptr[j], 0);
-                            if (infectious_i != susceptible_i &&                // different agents
-                                !isHospitalized(susceptible_i, ptd) &&          // not in hospital
-                                isSusceptible<ACTD>(susceptible_i, ptd, d) &&   // susceptible
-                                workgroup_ptr[susceptible_i] &&                 // is a worker
-                                !withdrawn_ptr[susceptible_i] &&                // not withdrawn
-                                random_travel_ptr[susceptible_i] < 0 &&         // not on random travel
-                                work_i_ptr[susceptible_i] >= 0)                 // at work
-                            {
-                                AMREX_ASSERT(workgroup_ptr[infectious_i] == workgroup_ptr[susceptible_i]);
-                                AMREX_ASSERT(work_i_ptr[infectious_i] == work_i_ptr[susceptible_i] &&
-                                             work_j_ptr[infectious_i] == work_j_ptr[susceptible_i]);
-                                //infect *= i_mask;
-                                //infect *= j_mask;
-                                ParticleReal prob = 1.0_prt - infect * lparm->xmit_work * work_scale;
-                                // this is needed if we find all the susceptible for each infectious in turn
-                                Gpu::Atomic::Multiply(&prob_ptr[susceptible_i], prob);
-                            }
+                            binaryInteractionWork(infectious_i, susceptible_i, ptd, lparm, work_scale, prob_ptr, d);
                         }
                     }
                 });
