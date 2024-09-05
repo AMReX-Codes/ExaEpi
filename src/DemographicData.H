@@ -17,9 +17,9 @@ struct DemographicData
     DemographicData () {}
 
     /*! \brief Constructor with initializes from a given census file */
-    DemographicData (const::std::string& fname);
+    DemographicData (const::std::string& fname, const int workgroup_size);
 
-    void InitFromFile (const std::string& fname);
+    void InitFromFile (const std::string& fname, const int workgroup_size);
 
     void Print () const;
 
@@ -73,6 +73,8 @@ struct DemographicData
     amrex::Gpu::DeviceVector<int> Ndaywork_d; /*!< Number of daytime workers (GPU device) */
     amrex::Gpu::DeviceVector<int> myIDtoUnit_d; /*!< Given myID #, what Unit # is it? (GPU device) */
     amrex::Gpu::DeviceVector<int> Unit_on_proc_d; /*!< Is any part of this unit on this processor? (GPU device) */
+
+    static const int COMMUNITY_SIZE = 2000;
 };
 
 #endif

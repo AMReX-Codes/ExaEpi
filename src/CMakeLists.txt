@@ -6,12 +6,12 @@ set(_sources
          AgentContainer.cpp
          CaseData.H
          CaseData.cpp
+         CensusData.H
+         CensusData.cpp
          DiseaseParm.H
          DiseaseParm.cpp
          DemographicData.H
          DemographicData.cpp
-         Initialization.H
-         Initialization.cpp
          IO.H
          IO.cpp
          InteractionModel.H
