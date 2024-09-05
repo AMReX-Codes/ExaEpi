@@ -22,6 +22,9 @@ set(_sources
          InteractionModSchool.H
          InteractionModWork.H
          InteractionModelLibrary.H
+         UrbanPopAgentStruct.H
+         UrbanPopData.H
+         UrbanPopData.cpp
          Utils.H
          Utils.cpp)
 
