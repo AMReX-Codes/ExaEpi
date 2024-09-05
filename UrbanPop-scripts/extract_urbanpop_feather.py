@@ -113,10 +113,11 @@ def print_header(df):
 using std::string;
 using float32_t = float;
 
+const size_t NUM_COLS = {len(df.columns)};
+
 """
 #const size_t PUMS_ID_LEN = {PUMS_ID_LEN};
 #const size_t NAICS_LEN = {NAICS_LEN};
-#const size_t NUM_COLS = {len(df.columns)};
 #"""
 
     # print out string arrays with category names
@@ -149,7 +150,7 @@ static std::vector<string> split_string(const string &s, char delim) {
         string buf;
         if (!getline(f, buf)) return false;
         if (buf[0] != '*') {
-            p_id = -1;
+            id = -1;
             return true;
         }
         try {
