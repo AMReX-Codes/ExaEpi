@@ -12,25 +12,32 @@ using namespace amrex;
 
 
 template <typename PTDType>
-struct GetWorkerBin
+struct WorkBinner
 {
+    WorkBinner(const Geometry &geom, const IntVect &bin_size, const Box &box, const int max_wg) :
+            bin_size(bin_size), box(box), max_wg(max_wg) {
+        dxi = geom.InvCellSizeArray();
+        plo = geom.ProbLoArray();
+        domain = geom.Domain();
+    }
+
+    AMREX_GPU_HOST_DEVICE
+    unsigned int operator() (const PTDType& ptd, int i) const noexcept {
+        Box tbx;
+        auto iv = getParticleCell(ptd, i, plo, dxi, domain);
+        auto tid = getTileIndex(iv, box, true, bin_size, tbx);
+        auto wg = ptd.m_idata[IntIdx::workgroup][i];
+        return static_cast<unsigned int>(tid * max_wg + wg);
+    }
+
+  private:
+
     GpuArray<Real,AMREX_SPACEDIM> plo;
     GpuArray<Real,AMREX_SPACEDIM> dxi;
     Box domain;
     IntVect bin_size;
     Box box;
     int max_wg;
-
-    AMREX_GPU_HOST_DEVICE
-    unsigned int operator() (const PTDType& ptd, int i) const noexcept
-    {
-        Box tbx;
-        auto iv = getParticleCell(ptd, i, plo, dxi, domain);
-        auto tid = getTileIndex(iv, box, true, bin_size, tbx);
-        //auto wg = p.idata(0);
-        auto wg = ptd.m_idata[IntIdx::workgroup][i];
-        return static_cast<unsigned int>(tid * max_wg + wg);
-    }
 };
 
 /*! \brief One-on-one interaction between an infectious agent and a susceptible agent.
@@ -94,6 +101,8 @@ class InteractionModWork : public InteractionModel<AC,ACT,ACTD,A>
     protected:
 
     private:
+
+        DenseBins<ACTD> bins_work;
 };
 
 
@@ -136,51 +145,42 @@ void InteractionModWork<AC,ACT,ACTD,A>::interactAgents(AC& a_agents,
     IntVect bin_size = {AMREX_D_DECL(1, 1, 1)};
     for (int lev = 0; lev < a_agents.numLevels(); ++lev)
     {
-        const Geometry& geom = a_agents.Geom(lev);
-        const auto dxi = geom.InvCellSizeArray();
-        const auto plo = geom.ProbLoArray();
-        const auto domain = geom.Domain();
-
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
 #endif
         for (MFIter mfi = a_agents.MakeMFIter(lev, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
             auto& ptile = a_agents.ParticlesAt(lev, mfi);
             const auto& ptd = ptile.getParticleTileData();
-            auto& aos   = ptile.GetArrayOfStructs();
-            const auto np = aos.numParticles();
-            auto pstruct_ptr = aos().dataPtr();
+            const auto np = ptile.GetArrayOfStructs().numParticles();
             auto& soa = ptile.GetStructOfArrays();
             auto workgroup_ptr = soa.GetIntData(IntIdx::workgroup).data();
             auto withdrawn_ptr = soa.GetIntData(IntIdx::withdrawn).data();
             auto random_travel_ptr = soa.GetIntData(IntIdx::random_travel).data();
-            auto pair_ind = std::make_pair(mfi.index(), mfi.LocalTileIndex());
             auto num_tiles = numTilesInBox(mfi.validbox(), true, bin_size);
 
-            auto agents = &(aos[0]);
             int max_wg = 0;
             for (int i = 0; i < np; i++) {
                 max_wg = max(max_wg, workgroup_ptr[i]);
             }
 
-            auto bins_ptr = a_agents.getPTDBins(pair_ind, ExaEpi::InteractionNames::work);
-            auto binner = GetWorkerBin<ACTD>{plo, dxi, domain, bin_size, mfi.validbox(), max_wg};
-            bins_ptr->build(BinPolicy::Serial, np, ptd, num_tiles * max_wg, binner);
+            // agents are binned by community + workgroup. These values can change from one time step to the next so they
+            // have to be recomputed (rebuild the bins) every time step
+            WorkBinner<ACTD> binner(a_agents.Geom(lev), bin_size, mfi.validbox(), max_wg);
+            bins_work.build(BinPolicy::Serial, np, ptd, num_tiles * max_wg, binner);
 
-            AMREX_ALWAYS_ASSERT(bins_ptr->numBins() >= 0);
-            auto inds = bins_ptr->permutationPtr();
-            auto offsets = bins_ptr->offsetsPtr();
+            AMREX_ALWAYS_ASSERT(bins_work.numBins() >= 0);
+            auto inds = bins_work.permutationPtr();
+            auto offsets = bins_work.offsetsPtr();
 
             for (int d = 0; d < n_disease; d++) {
-
-                auto prob_ptr = this->getAgentProbPtr(a_agents,lev,mfi,d);
+                auto prob_ptr = this->getAgentProbPtr(a_agents, lev, mfi, d);
                 //auto mask_arr = a_mask[mfi].array();
                 auto lparm = a_agents.getDiseaseParameters_d(d);
                 Real work_scale = 1.0_prt;  // TODO this should vary based on cell
                 Real infect = lparm->infect;
                 infect *= (1.0_rt - lparm->vac_eff);
 
-                ParallelFor(bins_ptr->numItems(), [=] AMREX_GPU_DEVICE (int ii) noexcept {
+                ParallelFor(bins_work.numItems(), [=] AMREX_GPU_DEVICE (int ii) noexcept {
                     auto infectious_i = inds[ii];
                     int i_cell = binner(ptd, infectious_i);
                     auto cell_start = offsets[i_cell];

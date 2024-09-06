@@ -10,6 +10,27 @@
 
 using namespace amrex;
 
+
+template <typename PTDType>
+struct GetNborhoodBin
+{
+    GpuArray<Real,AMREX_SPACEDIM> plo;
+    GpuArray<Real,AMREX_SPACEDIM> dxi;
+    Box domain;
+    IntVect bin_size;
+    Box box;
+
+    AMREX_GPU_HOST_DEVICE
+    unsigned int operator() (const PTDType& ptd, int i) const noexcept
+    {
+        Box tbx;
+        auto iv = getParticleCell(ptd, i, plo, dxi, domain);
+        auto tid = getTileIndex(iv, box, true, bin_size, tbx);
+        return static_cast<unsigned int>(tid);
+    }
+};
+
+
 /*! \brief One-on-one interaction between an infectious agent and a susceptible agent.
  *
  * This function defines the one-on-one interaction between an infectious agent and a
@@ -156,7 +177,7 @@ void InteractionModNborhood<AC,ACT,ACTD,A>::interactAgents( AC& a_agents, /*!< A
             const auto np = aos.numParticles();
             auto pstruct_ptr = aos().dataPtr();
 
-            auto binner = GetParticleBin{plo, dxi, domain, bin_size, mfi.validbox()};
+            auto binner = GetNborhoodBin<ACTD>{plo, dxi, domain, bin_size, mfi.validbox()};
             AMREX_ALWAYS_ASSERT(bins_ptr->numBins() >= 0);
             auto inds = bins_ptr->permutationPtr();
             auto offsets = bins_ptr->offsetsPtr();
@@ -171,7 +192,7 @@ void InteractionModNborhood<AC,ACT,ACTD,A>::interactAgents( AC& a_agents, /*!< A
                                 noexcept
                 {
                     auto i = inds[ii];
-                    int i_cell = binner(pstruct_ptr[i]);
+                    int i_cell = binner(ptd, i);
                     auto cell_start = offsets[i_cell];
                     auto cell_stop  = offsets[i_cell+1];
 

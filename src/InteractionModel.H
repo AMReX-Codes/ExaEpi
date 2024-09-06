@@ -98,12 +98,13 @@ class InteractionModel
                 auto& aos   = ptile.GetArrayOfStructs();
                 const auto np = aos.numParticles();
                 auto pstruct_ptr = aos().dataPtr();
+                const auto& ptd = ptile.getParticleTileData();
 
                 const Box& box = mfi.validbox();
                 int ntiles = numTilesInBox(box, true, a_bin_size);
 
                 auto binner = GetParticleBin{plo, dxi, domain, a_bin_size, box};
-                bins_ptr->build(BinPolicy::Serial, np, pstruct_ptr, ntiles, binner);
+                bins_ptr->build(BinPolicy::Serial, np, ptd, ntiles, binner);
 
                 AMREX_ALWAYS_ASSERT(np == bins_ptr->numItems());
 
