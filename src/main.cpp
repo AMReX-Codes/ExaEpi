@@ -11,7 +11,6 @@
 #include "CaseData.H"
 #include "AirTravelFlow.H"
 #include "DemographicData.H"
-#include "Initialization.H"
 #include "IO.H"
 #include "Utils.H"
 
@@ -101,35 +100,28 @@ void runAgent ()
         amrex::Print() << "    " << params.disease_names[d] << "\n";
     }
 
-    DemographicData demo;
-    if (params.ic_type == ICType::Census) { demo.InitFromFile(params.census_filename); }
-
     std::vector<CaseData> cases;
     cases.resize(params.num_diseases);
     for (int d = 0; d < params.num_diseases; d++) {
-        if (params.ic_type == ICType::Census && params.initial_case_type[d] == "file") {
+        if (params.initial_case_type[d] == "file") {
             cases[d].InitFromFile(params.disease_names[d],params.case_filename[d]);
         }
     }
 
-    AirTravelFlow air;
-    if (params.air_travel_int > 0){
-        air.ReadAirports(params.airports_filename, demo);
-        air.ReadAirTravelFlow(params.air_traffic_filename);
-        air.ComputeTravelProbs(demo);
-    }
-
-    Geometry geom = ExaEpi::Utils::get_geometry(demo, params);
-
+    Geometry geom;
     BoxArray ba;
     DistributionMapping dm;
-    ba.define(geom.Domain());
-    ba.maxSize(params.max_grid_size);
-    dm.define(ba);
+    CensusData censusData;
+    if (params.ic_type == ICType::Census) {
+        censusData.init(params, geom, ba, dm);
+    }
 
-    amrex::Print() << "Base domain is: " << geom.Domain() << "\n";
-    amrex::Print() << "Max grid size is: " << params.max_grid_size << "\n";
-    amrex::Print() << "Number of boxes is: " << ba.size() << " over " << ParallelDescriptor::NProcs() << " ranks. \n";
+    AirTravelFlow air;
+    if (params.air_travel_int > 0){
+        air.ReadAirports(params.airports_filename, censusData.demo);
+        air.ReadAirTravelFlow(params.air_traffic_filename);
+        air.ComputeTravelProbs(censusData.demo);
+    }
 
     // The default output filename is:
     // output.dat for a single disease
@@ -179,11 +171,6 @@ void runAgent ()
         }
     }
 
-    iMultiFab num_residents(ba, dm, 6, 0);
-    iMultiFab unit_mf(ba, dm, 1, 0);
-    iMultiFab FIPS_mf(ba, dm, 2, 0);
-    iMultiFab comm_mf(ba, dm, 1, 0);
-
     amrex::Vector< std::unique_ptr<MultiFab> > disease_stats;
     disease_stats.resize(params.num_diseases);
     for (int d = 0; d < params.num_diseases; d++) {
@@ -196,32 +183,22 @@ void runAgent ()
 
     AgentContainer pc(geom, dm, ba, params.num_diseases, params.disease_names);
     AgentContainer on_travel_pc(geom, dm, ba, params.num_diseases, params.disease_names);
-    pc.setAirTravel(unit_mf, air, demo);
+    if (params.air_travel_int > 0) pc.setAirTravel(censusData.unit_mf, air, censusData.demo);
 
     {
         BL_PROFILE_REGION("Initialization");
-        if (params.ic_type == ICType::Demo) {
-            pc.initAgentsDemo(num_residents, unit_mf, FIPS_mf, comm_mf, demo);
-        } else if (params.ic_type == ICType::Census) {
-            pc.initAgentsCensus(num_residents, unit_mf, FIPS_mf, comm_mf, demo);
-            ExaEpi::Initialization::read_workerflow(demo, params, unit_mf, comm_mf, pc);
+        if (params.ic_type == ICType::Census) {
+            censusData.initAgents(pc, params.nborhood_size);
+            censusData.read_workerflow(pc, params.workerflow_filename, params.workgroup_size);
             if (params.initial_case_type[0] == "file") {
-                ExaEpi::Initialization::setInitialCasesFromFile( pc,
-                                                                 unit_mf,
-                                                                 FIPS_mf,
-                                                                 comm_mf,
-                                                                 cases,
-                                                                 params.disease_names,
-                                                                 demo );
+                censusData.setInitialCasesFromFile(pc, cases, params.disease_names);
             } else {
-                ExaEpi::Initialization::setInitialCasesRandom(  pc,
-                                                                unit_mf,
-                                                                FIPS_mf,
-                                                                comm_mf,
-                                                                params.num_initial_cases,
-                                                                params.disease_names,
-                                                                demo );
+                censusData.setInitialCasesRandom(pc, params.num_initial_cases, params.disease_names);
             }
+        } else if (params.ic_type == ICType::UrbanPop) {
+            Abort("UrbanPop not yet implemented");
+        } else {
+            Abort("Unimplemented ic_type");
         }
     }
 
@@ -245,27 +222,11 @@ void runAgent ()
             amrex::Print() << "Simulating day " << i << "\n";
 
             if ((params.plot_int > 0) && (i % params.plot_int == 0)) {
-                ExaEpi::IO::writePlotFile(  pc,
-                                            num_residents,
-                                            unit_mf,
-                                            FIPS_mf,
-                                            comm_mf,
-                                            params.num_diseases,
-                                            params.disease_names,
-                                            cur_time,
-                                            i);
+                ExaEpi::IO::writePlotFile(pc, censusData, params.num_diseases, params.disease_names, cur_time, i);
             }
 
             if ((params.aggregated_diag_int > 0) && (i % params.aggregated_diag_int == 0)) {
-                ExaEpi::IO::writeFIPSData(  pc,
-                                            unit_mf,
-                                            FIPS_mf,
-                                            comm_mf,
-                                            demo,
-                                            params.aggregated_diag_prefix,
-                                            params.num_diseases,
-                                            params.disease_names,
-                                            i );
+                ExaEpi::IO::writeFIPSData(pc, censusData, params.aggregated_diag_prefix, params.num_diseases, params.disease_names, i);
             }
 
             // Update agents' disease status
@@ -376,7 +337,7 @@ void runAgent ()
             }
 
             if ((params.random_travel_int > 0) && (i % params.random_travel_int == 0)) {
-                pc.moveRandomTravel(unit_mf);
+                pc.moveRandomTravel();
                 using SrcData = AgentContainer::ParticleTileType::ConstParticleTileDataType;
                 on_travel_pc.copyParticles(pc,
                                            [=] AMREX_GPU_HOST_DEVICE (const SrcData& src, int ip) {
@@ -385,7 +346,7 @@ void runAgent ()
             }
 
             if ((params.air_travel_int > 0) && (i % params.air_travel_int == 0)) {
-                pc.moveAirTravel(unit_mf, air, demo);
+                pc.moveAirTravel(censusData.unit_mf, air, censusData.demo);
                 using SrcData = AgentContainer::ParticleTileType::ConstParticleTileDataType;
                 on_travel_pc.copyParticles(pc,
                                            [=] AMREX_GPU_HOST_DEVICE (const SrcData& src, int ip) {
@@ -448,26 +409,11 @@ void runAgent ()
     }
 
     if (params.plot_int > 0) {
-        ExaEpi::IO::writePlotFile(  pc,
-                                    num_residents,
-                                    unit_mf,
-                                    FIPS_mf,
-                                    comm_mf,
-                                    params.num_diseases,
-                                    params.disease_names,
-                                    cur_time,
-                                    params.nsteps);
+        ExaEpi::IO::writePlotFile(pc, censusData, params.num_diseases, params.disease_names, cur_time, params.nsteps);
     }
 
     if ((params.aggregated_diag_int > 0) && (params.nsteps % params.aggregated_diag_int == 0)) {
-        ExaEpi::IO::writeFIPSData(  pc,
-                                    unit_mf,
-                                    FIPS_mf,
-                                    comm_mf,
-                                    demo,
-                                    params.aggregated_diag_prefix,
-                                    params.num_diseases,
-                                    params.disease_names,
-                                    params.nsteps);
+        ExaEpi::IO::writeFIPSData(pc, censusData, params.aggregated_diag_prefix, params.num_diseases,
+                                  params.disease_names, params.nsteps);
     }
 }

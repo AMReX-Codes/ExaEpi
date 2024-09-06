@@ -8,12 +8,12 @@ set(_sources
          CaseData.cpp
          AirTravelFlow.H
          AirTravelFlow.cpp
+         CensusData.H
+         CensusData.cpp
          DiseaseParm.H
          DiseaseParm.cpp
          DemographicData.H
          DemographicData.cpp
-         Initialization.H
-         Initialization.cpp
          IO.H
          IO.cpp
          InteractionModel.H
