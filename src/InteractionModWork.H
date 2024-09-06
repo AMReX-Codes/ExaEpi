@@ -154,8 +154,6 @@ void InteractionModWork<AC,ACT,ACTD,A>::interactAgents(AC& a_agents,
             auto pstruct_ptr = aos().dataPtr();
             auto& soa = ptile.GetStructOfArrays();
             auto workgroup_ptr = soa.GetIntData(IntIdx::workgroup).data();
-            auto work_i_ptr = soa.GetIntData(IntIdx::work_i).data();
-            auto work_j_ptr = soa.GetIntData(IntIdx::work_j).data();
             auto withdrawn_ptr = soa.GetIntData(IntIdx::withdrawn).data();
             auto random_travel_ptr = soa.GetIntData(IntIdx::random_travel).data();
             auto pair_ind = std::make_pair(mfi.index(), mfi.LocalTileIndex());
@@ -196,7 +194,7 @@ void InteractionModWork<AC,ACT,ACTD,A>::interactAgents(AC& a_agents,
                     // Doing infectious first requires an atomic operation for GPUs, but generally requires far fewer operations
                     // because there are usually more susceptible agents than infectious. This can be a large performance
                     // difference for CPU only runs.
-                    if (isInfectious<ACTD>(infectious_i, ptd, d) &&  // infectious
+                    if (isInfectious(infectious_i, ptd, d) &&  // infectious
                         !isHospitalized(infectious_i, ptd) &&  // not in hospital
                         isAtWork(infectious_i, ptd) &&         // worker at work
                         !withdrawn_ptr[infectious_i] &&        // not withdrawn

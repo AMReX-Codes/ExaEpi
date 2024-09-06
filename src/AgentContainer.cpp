@@ -41,7 +41,7 @@ AgentContainer::AgentContainer (const amrex::Geometry            & a_geom,  /*!<
                                 const int                        & a_num_diseases, /*!< Number of diseases */
                                 const std::vector<std::string>   & a_disease_names /*!< names of the diseases */)
     : amrex::ParticleContainer< 0,
-                                0,
+                                1,
                                 RealIdx::nattribs,
                                 IntIdx::nattribs> (a_geom, a_dmap, a_ba),
         m_student_counts(a_ba, a_dmap, SchoolType::total_school_type, 0)
@@ -206,6 +206,7 @@ void AgentContainer::moveAgentsToWork ()
     m_at_work = true;
 
     Redistribute();
+    AMREX_ALWAYS_ASSERT(OK());
 }
 
 /*! \brief Move agents to home
@@ -253,6 +254,7 @@ void AgentContainer::moveAgentsToHome ()
     m_at_work = false;
 
     Redistribute();
+    AMREX_ALWAYS_ASSERT(OK());
 }
 
 /*! \brief Move agents randomly
@@ -654,12 +656,14 @@ void AgentContainer::interactDay ( MultiFab& a_mask_behavior /*!< Masking behavi
     if (haveInteractionModel(ExaEpi::InteractionNames::work)) {
         m_interactions[ExaEpi::InteractionNames::work]->interactAgents( *this, a_mask_behavior );
     }
+    /*
     if (haveInteractionModel(ExaEpi::InteractionNames::school)) {
         m_interactions[ExaEpi::InteractionNames::school]->interactAgents( *this, a_mask_behavior );
     }
     if (haveInteractionModel(ExaEpi::InteractionNames::nborhood)) {
         m_interactions[ExaEpi::InteractionNames::nborhood]->interactAgents( *this, a_mask_behavior );
     }
+    */
 
     m_hospital->interactAgents(*this, a_mask_behavior);
 }
