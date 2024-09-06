@@ -26,7 +26,7 @@
 
 /*! \brief Derived class from ParticleContainer that defines agents and their functions */
 class AgentContainer
-    : public amrex::ParticleContainer<0, 1, RealIdx::nattribs, IntIdx::nattribs>
+    : public amrex::ParticleContainer<0, 0, RealIdx::nattribs, IntIdx::nattribs>
 {
 
     using PCType = AgentContainer;
@@ -81,6 +81,7 @@ public:
     void moveAgentsToHome ();
 
     amrex::DenseBins<PType>* getBins(const std::pair<int,int>& a_idx, const std::string& a_mod_name);
+    amrex::DenseBins<PTDType>* getPTDBins(const std::pair<int,int>& a_idx, const std::string& a_mod_name);
 
     /*! \brief Return flag indicating if agents are at work */
     inline bool isAtWork() const {
@@ -163,7 +164,7 @@ protected:
     std::map<std::pair<int, int>, amrex::DenseBins<PType> > m_bins_home;
     /*! Map of work bins (of agents) indexed by MultiFab iterator and tile index;
         see AgentContainer::interactAgentsHomeWork() */
-    std::map<std::pair<int, int>, amrex::DenseBins<PType> > m_bins_work;
+    std::map<std::pair<int, int>, amrex::DenseBins<PTDType> > m_bins_work;
     /*! Map of random travel bins (of agents) indexed by MultiFab iterator and tile index;
         see AgentContainer::interactAgentsRandom() */
     std::map<std::pair<int, int>, amrex::DenseBins<PType> > m_bins_random;

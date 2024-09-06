@@ -41,7 +41,7 @@ AgentContainer::AgentContainer (const amrex::Geometry            & a_geom,  /*!<
                                 const int                        & a_num_diseases, /*!< Number of diseases */
                                 const std::vector<std::string>   & a_disease_names /*!< names of the diseases */)
     : amrex::ParticleContainer< 0,
-                                1,
+                                0,
                                 RealIdx::nattribs,
                                 IntIdx::nattribs> (a_geom, a_dmap, a_ba),
         m_student_counts(a_ba, a_dmap, SchoolType::total_school_type, 0)
@@ -102,8 +102,6 @@ AgentContainer::AgentContainer (const amrex::Geometry            & a_geom,  /*!<
     }
 }
 
-
-
 /*! \brief Return bin pointer at a given mfi, tile and model name */
 DenseBins<AgentContainer::PType>* AgentContainer::getBins (const std::pair<int,int>& a_idx,
                                                            const std::string& a_mod_name)
@@ -113,9 +111,10 @@ DenseBins<AgentContainer::PType>* AgentContainer::getBins (const std::pair<int,i
         return &m_bins_home[a_idx];
     } else if (    (a_mod_name == ExaEpi::InteractionNames::work)
                 || (a_mod_name == ExaEpi::InteractionNames::school) ) {
-        return &m_bins_work[a_idx];
+        Abort("wrong implementation"); return nullptr;
+        //return &m_bins_work[a_idx];
     } else if (a_mod_name == ExaEpi::InteractionNames::nborhood) {
-        if (m_at_work) { return &m_bins_work[a_idx]; }
+        if (m_at_work) { Abort("wrong impl"); return nullptr; }//return &m_bins_work[a_idx]; }
         else           { return &m_bins_home[a_idx]; }
     } else if (a_mod_name == ExaEpi::InteractionNames::random) {
         return &m_bins_random[a_idx];
@@ -123,6 +122,15 @@ DenseBins<AgentContainer::PType>* AgentContainer::getBins (const std::pair<int,i
         amrex::Abort("Invalid a_mod_name!");
         return nullptr;
     }
+}
+
+/*! \brief Return bin pointer at a given mfi, tile and model name */
+DenseBins<AgentContainer::PTDType>* AgentContainer::getPTDBins (const std::pair<int,int>& a_idx, const std::string& a_mod_name)
+{
+    BL_PROFILE("AgentContainer::getBins");
+    if (a_mod_name == ExaEpi::InteractionNames::work) return &m_bins_work[a_idx];
+    amrex::Abort("Invalid for this model");
+    return nullptr;
 }
 
 /*! \brief Send agents on a random walk around the neighborhood

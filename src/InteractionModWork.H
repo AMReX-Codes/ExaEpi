@@ -11,7 +11,7 @@
 using namespace amrex;
 
 
-template <typename ParticleType>
+template <typename PTDType>
 struct GetWorkerBin
 {
     GpuArray<Real,AMREX_SPACEDIM> plo;
@@ -22,12 +22,13 @@ struct GetWorkerBin
     int max_wg;
 
     AMREX_GPU_HOST_DEVICE
-    unsigned int operator() (const ParticleType& p) const noexcept
+    unsigned int operator() (const PTDType& ptd, int i) const noexcept
     {
         Box tbx;
-        auto iv = getParticleCell(p, plo, dxi, domain);
+        auto iv = getParticleCell(ptd, i, plo, dxi, domain);
         auto tid = getTileIndex(iv, box, true, bin_size, tbx);
-        auto wg = p.idata(0);
+        //auto wg = p.idata(0);
+        auto wg = ptd.m_idata[IntIdx::workgroup][i];
         return static_cast<unsigned int>(tid * max_wg + wg);
     }
 };
@@ -161,13 +162,10 @@ void InteractionModWork<AC,ACT,ACTD,A>::interactAgents(AC& a_agents,
             for (int i = 0; i < np; i++) {
                 max_wg = max(max_wg, workgroup_ptr[i]);
             }
-            ParallelFor(np, [=] AMREX_GPU_DEVICE (int i) noexcept {
-                agents[i].idata(0) = workgroup_ptr[i];
-            });
 
-            auto bins_ptr = a_agents.getBins(pair_ind, ExaEpi::InteractionNames::work);
-            auto binner = GetWorkerBin<A>{plo, dxi, domain, bin_size, mfi.validbox(), max_wg};
-            bins_ptr->build(BinPolicy::Serial, np, pstruct_ptr, num_tiles * max_wg, binner);
+            auto bins_ptr = a_agents.getPTDBins(pair_ind, ExaEpi::InteractionNames::work);
+            auto binner = GetWorkerBin<ACTD>{plo, dxi, domain, bin_size, mfi.validbox(), max_wg};
+            bins_ptr->build(BinPolicy::Serial, np, ptd, num_tiles * max_wg, binner);
 
             AMREX_ALWAYS_ASSERT(bins_ptr->numBins() >= 0);
             auto inds = bins_ptr->permutationPtr();
@@ -184,7 +182,7 @@ void InteractionModWork<AC,ACT,ACTD,A>::interactAgents(AC& a_agents,
 
                 ParallelFor(bins_ptr->numItems(), [=] AMREX_GPU_DEVICE (int ii) noexcept {
                     auto infectious_i = inds[ii];
-                    int i_cell = binner(pstruct_ptr[infectious_i]);
+                    int i_cell = binner(ptd, infectious_i);
                     auto cell_start = offsets[i_cell];
                     auto cell_stop = offsets[i_cell + 1];
                     AMREX_ALWAYS_ASSERT((Long)infectious_i < np);
