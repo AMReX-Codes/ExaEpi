@@ -60,12 +60,9 @@ static void binaryInteractionWork (const int infectious_i, /*!< Index of infecti
     if (withdrawn_ptr[susceptible_i]) return;           // withdrawn
     if (random_travel_ptr[susceptible_i] >= 0) return;  // on random travel
 
-    auto work_i_ptr = a_ptd.m_idata[IntIdx::work_i];
-    auto work_j_ptr = a_ptd.m_idata[IntIdx::work_j];
-    auto workgroup_ptr = a_ptd.m_idata[IntIdx::workgroup];
-    AMREX_ASSERT(workgroup_ptr[infectious_i] == workgroup_ptr[susceptible_i]);
-    AMREX_ASSERT(work_i_ptr[infectious_i] == work_i_ptr[susceptible_i] && work_j_ptr[infectious_i] == work_j_ptr[susceptible_i]);
-
+    AMREX_ASSERT(a_ptd.m_idata[IntIdx::workgroup][infectious_i] == a_ptd.m_idata[IntIdx::workgroup][susceptible_i]);
+    AMREX_ASSERT(a_ptd.m_idata[IntIdx::work_i][infectious_i] == a_ptd.m_idata[IntIdx::work_i][susceptible_i] &&
+                 a_ptd.m_idata[IntIdx::work_j][infectious_i] == a_ptd.m_idata[IntIdx::work_j][susceptible_i]);
     //infect *= i_mask;
     //infect *= j_mask;
     ParticleReal prob = 1.0_prt - infect * a_lparm->xmit_work * a_work_scale;
