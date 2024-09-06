@@ -18,9 +18,9 @@ using namespace amrex;
 
 /*! Initializes by reading in demographic data from a given
     filename. Calls DemographicData::InitFromFile(). */
-DemographicData::DemographicData (const::std::string& fname /*!< Name of file containing demographic data */)
+DemographicData::DemographicData (const::std::string& fname /*!< Name of file containing demographic data */,const int workgroup_size)
 {
-    InitFromFile(fname);
+    InitFromFile(fname, workgroup_size);
 }
 
 /*! \brief Read in demographic data from given file.
@@ -46,7 +46,7 @@ DemographicData::DemographicData (const::std::string& fname /*!< Name of file co
  *  + Compute total population and number of daytime workers.
  *  + Copy data to GPU device memory.
  */
-void DemographicData::InitFromFile (const std::string& fname /*!< Name of file containing demographic data */)
+void DemographicData::InitFromFile (const std::string& fname /*!< Name of file containing demographic data */,const int workgroup_size)
 {
     BL_PROFILE("DemographicData::InitFromFile");
 
@@ -99,10 +99,9 @@ void DemographicData::InitFromFile (const std::string& fname /*!< Name of file c
         else CountyPop[FIPS[i]] += Population[i];
 
         /*   How many 2000-person communities does this require?   */
-        int ncomm = (int) std::rint(((double) Population[i]) / 2000.0);
-        //amrex::Print() << Population[i] << " " << ncomm << " " << ncomm * 2000 << "\n";
+        int ncomm = (int) std::rint(((double) Population[i]) / DemographicData::COMMUNITY_SIZE);
+        //amrex::Print() << Population[i] << " " << ncomm << " " << ncomm * DemographicData::COMMUNITY_SIZE << "\n";
 
-        constexpr int WG_size = 20;
         /*
           Note that some census tracts have little or no residential
           population, but a large daytime worker population, in which
@@ -124,7 +123,7 @@ void DemographicData::InitFromFile (const std::string& fname /*!< Name of file c
           Let's limit each community to 1000 workers, which would be
           about 50 workgroups:
         */
-        if ( (Ndaywork[i] >= WG_size) && !ncomm ) {
+        if ( (Ndaywork[i] >= workgroup_size) && !ncomm ) {
             ncomm = 1;
             //amrex::Print() << "myID " << myID[i] << ": " << ncomm << " community to accommodate " << Ndaywork[i] << " daytime workers\n";
         }
