@@ -26,7 +26,7 @@
 
 /*! \brief Derived class from ParticleContainer that defines agents and their functions */
 class AgentContainer
-    : public amrex::ParticleContainer<0, 0, RealIdx::nattribs, IntIdx::nattribs>
+    : public amrex::ParticleContainer<0, 1, RealIdx::nattribs, IntIdx::nattribs>
 {
 
     using PCType = AgentContainer;
