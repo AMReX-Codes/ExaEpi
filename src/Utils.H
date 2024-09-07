@@ -55,10 +55,6 @@ struct TestParams
     */
     std::string urbanpop_filename;
 
-    /*! UrbanPop data filename.
-    */
-    std::string urbanpop_filename;
-
     /*! Worker flow filename (ExaEpi::Initialization::read_workerflow):
         It is a binary file that contains 3 x (number of work patthers) unsigned integer
         data. The 3 integers are: from, to, and the number of workers with this from and to.
