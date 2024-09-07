@@ -180,7 +180,7 @@ void InteractionModNborhood<AC,ACT,ACTD,A>::interactAgents (AC& a_agents, /*!< A
 
             NborhoodBinner<ACTD> binner(a_agents.Geom(lev), bin_size, mfi.validbox());
             DenseBins<ACTD> bins_nborhood;
-            bins_nborhood.build(BinPolicy::Serial, np, ptd, num_tiles, binner);
+            bins_nborhood.build(BinPolicy::GPU, np, ptd, num_tiles, binner);
 
             AMREX_ALWAYS_ASSERT(bins_nborhood.numBins() >= 0);
             auto inds = bins_nborhood.permutationPtr();

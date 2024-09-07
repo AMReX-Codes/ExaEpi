@@ -154,7 +154,7 @@ void InteractionModWork<AC,ACT,ACTD,A>::interactAgents(AC& a_agents,
             // have to be recomputed (rebuild the bins) every time step
             WorkBinner<ACTD> binner(a_agents.Geom(lev), bin_size, mfi.validbox(), max_wg);
             DenseBins<ACTD> bins_work;
-            bins_work.build(BinPolicy::Serial, np, ptd, num_tiles * max_wg, binner);
+            bins_work.build(BinPolicy::GPU, np, ptd, num_tiles * max_wg, binner);
 
             AMREX_ALWAYS_ASSERT(bins_work.numBins() >= 0);
             auto inds = bins_work.permutationPtr();

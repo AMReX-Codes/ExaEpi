@@ -203,7 +203,7 @@ void InteractionModHome<AC,ACT,ACTD,A>::interactAgents(AC& a_agents, /*!< Agent 
 
             HomeBinner<ACTD> binner(a_agents.Geom(lev), bin_size, mfi.validbox(), max_nborhood, max_family_cluster);
             DenseBins<ACTD> bins_home;
-            bins_home.build(BinPolicy::Serial, np, ptd, num_tiles * max_nborhood * max_family_cluster, binner);
+            bins_home.build(BinPolicy::GPU, np, ptd, num_tiles * max_nborhood * max_family_cluster, binner);
 
             AMREX_ALWAYS_ASSERT(bins_home.numBins() >= 0);
             auto inds = bins_home.permutationPtr();
