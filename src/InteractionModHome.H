@@ -186,7 +186,7 @@ void InteractionModHome<AC,ACT,ACTD,A>::interactAgents(AC& a_agents, /*!< Agent 
  #ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
 #endif
-        for(MFIter mfi = a_agents.MakeMFIter(lev, TilingIfNotGPU()); mfi.isValid(); ++mfi)
+        for (MFIter mfi = a_agents.MakeMFIter(lev, TilingIfNotGPU()); mfi.isValid(); ++mfi)
         {
             auto& ptile = a_agents.ParticlesAt(lev, mfi);
             const auto& ptd = ptile.getParticleTileData();
@@ -223,10 +223,10 @@ void InteractionModHome<AC,ACT,ACTD,A>::interactAgents(AC& a_agents, /*!< Agent 
 
                 ParallelFor(bins_home.numItems(), [=] AMREX_GPU_DEVICE (int ii) noexcept {
                     auto infectious_i = inds[ii];
+                    AMREX_ALWAYS_ASSERT((Long)infectious_i < np);
                     int i_cell = binner(ptd, infectious_i);
                     auto cell_start = offsets[i_cell];
                     auto cell_stop  = offsets[i_cell + 1];
-                    AMREX_ALWAYS_ASSERT((Long)infectious_i < np);
 
                     if (isInfectious(infectious_i, ptd, d) &&  // infectious
                         !isHospitalized(infectious_i, ptd) &&  // not in hospital

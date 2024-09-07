@@ -12,13 +12,14 @@ using namespace amrex;
 
 
 template <typename PTDType>
-struct GetNborhoodBin
+struct NborhoodBinner
 {
-    GpuArray<Real,AMREX_SPACEDIM> plo;
-    GpuArray<Real,AMREX_SPACEDIM> dxi;
-    Box domain;
-    IntVect bin_size;
-    Box box;
+    NborhoodBinner(const Geometry &geom, const IntVect &bin_size, const Box &box) :
+               bin_size(bin_size), box(box) {
+        dxi = geom.InvCellSizeArray();
+        plo = geom.ProbLoArray();
+        domain = geom.Domain();
+    }
 
     AMREX_GPU_HOST_DEVICE
     unsigned int operator() (const PTDType& ptd, int i) const noexcept
@@ -28,6 +29,14 @@ struct GetNborhoodBin
         auto tid = getTileIndex(iv, box, true, bin_size, tbx);
         return static_cast<unsigned int>(tid);
     }
+
+  private:
+
+    GpuArray<Real,AMREX_SPACEDIM> plo;
+    GpuArray<Real,AMREX_SPACEDIM> dxi;
+    Box domain;
+    IntVect bin_size;
+    Box box;
 };
 
 
@@ -37,14 +46,14 @@ struct GetNborhoodBin
  * susceptible agent in the neighborhood/community. */
 template <typename PTDType>
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-static void binaryInteractionNborhood ( const int a_i, /*!< Index of infectious agent */
-                                        const int a_j, /*!< Index of susceptible agent */
+static void binaryInteractionNborhood (const int infectious_i, /*!< Index of infectious agent */
+                                        const int susceptible_i, /*!< Index of susceptible agent */
                                         const PTDType& a_ptd, /*!< Particle tile data */
                                         const DiseaseParm* const a_lparm, /*!< disease paramters */
                                         const Real a_social_scale, /*!< Social scale */
                                         ParticleReal* const a_prob_ptr, /*!< infection probability */
                                         const bool a_at_work_ptr, /*!< whether agents are at work or at home */
-                                        const int a_thread /*!< agent index of this thread */)
+                                        const int a_d /*!< disease index */)
 {
     Real infect = a_lparm->infect;
     infect *= (1.0_rt - a_lparm->vac_eff);
@@ -53,43 +62,51 @@ static void binaryInteractionNborhood ( const int a_i, /*!< Index of infectious 
     auto nborhood_ptr = a_ptd.m_idata[IntIdx::nborhood];
     auto school_ptr = a_ptd.m_idata[IntIdx::school];
     auto withdrawn_ptr = a_ptd.m_idata[IntIdx::withdrawn];
+    auto random_travel_ptr = a_ptd.m_idata[IntIdx::random_travel];
     auto work_nborhood_ptr = a_ptd.m_idata[IntIdx::work_nborhood];
 
-    if (withdrawn_ptr[a_i] || withdrawn_ptr[a_j]) { return; }
-    auto random_travel_ptr = a_ptd.m_idata[IntIdx::random_travel];
-    if ((random_travel_ptr[a_i] >= 0) || (random_travel_ptr[a_j] >= 0)) {return;}
+    if (infectious_i == susceptible_i) return;             // same agents
+    if (!isSusceptible(susceptible_i, a_ptd, a_d)) return; // not susceptible
+    if (isHospitalized(susceptible_i, a_ptd)) return;      // in hospital
+    if (withdrawn_ptr[susceptible_i]) return;              // withdrawn
+    if (random_travel_ptr[susceptible_i] >= 0) return;     // on random travel
+
+    if (a_at_work_ptr) {
+        AMREX_ALWAYS_ASSERT(a_ptd.m_idata[IntIdx::work_i][infectious_i] == a_ptd.m_idata[IntIdx::work_i][susceptible_i] &&
+                            a_ptd.m_idata[IntIdx::work_j][infectious_i] == a_ptd.m_idata[IntIdx::work_j][susceptible_i]);
+    } else {
+        AMREX_ALWAYS_ASSERT(a_ptd.m_idata[IntIdx::home_i][infectious_i] == a_ptd.m_idata[IntIdx::home_i][susceptible_i] &&
+                            a_ptd.m_idata[IntIdx::home_j][infectious_i] == a_ptd.m_idata[IntIdx::home_j][susceptible_i]);
+    }
 
     //infect *= i_mask;
     //infect *= j_mask;
     ParticleReal prob = 1.0_prt;
-
-    /* define neighbordhood based on whether agent is in home or work community */
-    int nborhood_ai = nborhood_ptr[a_i];
-    int nborhood_aj = nborhood_ptr[a_j];
+    // define neighbordhood based on whether agent is in home or work community
+    int nborhood_infectious_i = nborhood_ptr[infectious_i];
+    int nborhood_susceptible_i = nborhood_ptr[susceptible_i];
     if (a_at_work_ptr) {
-        nborhood_ai = (age_group_ptr[a_i] <= 1) ? nborhood_ptr[a_i] : work_nborhood_ptr[a_i];
-        nborhood_aj = (age_group_ptr[a_j] <= 1) ? nborhood_ptr[a_j] : work_nborhood_ptr[a_j];
+        if (age_group_ptr[infectious_i] > 1) nborhood_infectious_i = work_nborhood_ptr[infectious_i];
+        if (age_group_ptr[susceptible_i] > 1) nborhood_susceptible_i = work_nborhood_ptr[susceptible_i];
     }
 
     // school < 0 means a child normally attends school, but not today
-    /* Should always be in the same community = same cell */
-    // /* Neighborhood? */
-    if (nborhood_ai == nborhood_aj) {
-        if (school_ptr[a_i] < 0 ) { // not attending school, use _SC contacts
-            prob *= 1.0_prt - infect * a_lparm->xmit_hood_SC[age_group_ptr[a_j]] * a_social_scale;
+    // Should always be in the same community = same cell
+    // Neighborhood?
+    if (nborhood_infectious_i == nborhood_susceptible_i) {
+        if (school_ptr[infectious_i] < 0 ) { // not attending school, use _SC contacts
+            prob *= 1.0_prt - infect * a_lparm->xmit_hood_SC[age_group_ptr[susceptible_i]] * a_social_scale;
         } else {
-            prob *= 1.0_prt - infect * a_lparm->xmit_hood[age_group_ptr[a_j]] * a_social_scale;
+            prob *= 1.0_prt - infect * a_lparm->xmit_hood[age_group_ptr[susceptible_i]] * a_social_scale;
         }
-    } else { // /* Community? */
-        if (school_ptr[a_i] < 0) { // not attending school, use _SC contacts
-            prob *= 1.0_prt - infect * a_lparm->xmit_comm_SC[age_group_ptr[a_j]] * a_social_scale;
+    } else { // Community?
+        if (school_ptr[infectious_i] < 0) { // not attending school, use _SC contacts
+            prob *= 1.0_prt - infect * a_lparm->xmit_comm_SC[age_group_ptr[susceptible_i]] * a_social_scale;
         } else {
-            prob *= 1.0_prt - infect * a_lparm->xmit_comm[age_group_ptr[a_j]] * a_social_scale;
+            prob *= 1.0_prt - infect * a_lparm->xmit_comm[age_group_ptr[susceptible_i]] * a_social_scale;
         }
     }
-
-    AMREX_ASSERT(a_j == a_thread);
-    a_prob_ptr[a_j] *= prob;
+    Gpu::Atomic::Multiply(&a_prob_ptr[susceptible_i], prob);
 }
 
 /*! \brief Class describing agent interactions in the neighborhood/community */
@@ -146,79 +163,63 @@ class InteractionModNborhood : public InteractionModel<AC,ACT,ACTD,A>
     + Compute probability from neighborhood
 */
 template <typename AC, typename ACT, typename ACTD, typename A>
-void InteractionModNborhood<AC,ACT,ACTD,A>::interactAgents( AC& a_agents, /*!< Agent container */
+void InteractionModNborhood<AC,ACT,ACTD,A>::interactAgents (AC& a_agents, /*!< Agent container */
                                                             MultiFab& /*a_mask*/ /*!< Masking behavior */)
 {
     BL_PROFILE("InteractionModNborhood::interactAgents");
     int n_disease = a_agents.numDiseases();
-
     IntVect bin_size = {AMREX_D_DECL(1, 1, 1)};
+
     for (int lev = 0; lev < a_agents.numLevels(); ++lev)
     {
-        const Geometry& geom = a_agents.Geom(lev);
-        const auto dxi = geom.InvCellSizeArray();
-        const auto plo = geom.ProbLoArray();
-        const auto domain = geom.Domain();
-
-        this->makeBins( a_agents, bin_size, lev, ExaEpi::InteractionNames::nborhood );
-
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
 #endif
-        for(MFIter mfi = a_agents.MakeMFIter(lev, TilingIfNotGPU()); mfi.isValid(); ++mfi)
+        for (MFIter mfi = a_agents.MakeMFIter(lev, TilingIfNotGPU()); mfi.isValid(); ++mfi)
         {
-            auto pair_ind = std::make_pair(mfi.index(), mfi.LocalTileIndex());
-            auto bins_ptr = a_agents.getBins(pair_ind, ExaEpi::InteractionNames::nborhood);
-
-            auto flag_at_work = a_agents.isAtWork(); /*! Flag to indicate if agents are at work */
             auto& ptile = a_agents.ParticlesAt(lev, mfi);
             const auto& ptd = ptile.getParticleTileData();
-            auto& aos   = ptile.GetArrayOfStructs();
-            const auto np = aos.numParticles();
-            auto pstruct_ptr = aos().dataPtr();
+            const auto np = ptile.GetArrayOfStructs().numParticles();
+            auto& soa = ptile.GetStructOfArrays();
+            auto num_tiles = numTilesInBox(mfi.validbox(), true, bin_size);
+            auto withdrawn_ptr = soa.GetIntData(IntIdx::withdrawn).data();
+            auto random_travel_ptr = soa.GetIntData(IntIdx::random_travel).data();
 
-            auto binner = GetNborhoodBin<ACTD>{plo, dxi, domain, bin_size, mfi.validbox()};
-            AMREX_ALWAYS_ASSERT(bins_ptr->numBins() >= 0);
-            auto inds = bins_ptr->permutationPtr();
-            auto offsets = bins_ptr->offsetsPtr();
+            auto flag_at_work = a_agents.isAtWork(); /*! Flag to indicate if agents are at work */
+
+            NborhoodBinner<ACTD> binner(a_agents.Geom(lev), bin_size, mfi.validbox());
+            DenseBins<ACTD> bins_nborhood;
+            bins_nborhood.build(BinPolicy::Serial, np, ptd, num_tiles, binner);
+
+            AMREX_ALWAYS_ASSERT(bins_nborhood.numBins() >= 0);
+            auto inds = bins_nborhood.permutationPtr();
+            auto offsets = bins_nborhood.offsetsPtr();
 
             for (int d = 0; d < n_disease; d++) {
-                auto prob_ptr = this->getAgentProbPtr(a_agents,lev,mfi,d);
+                auto prob_ptr = this->getAgentProbPtr(a_agents, lev, mfi, d);
                 //auto mask_arr = a_mask[mfi].array();
                 auto lparm = a_agents.getDiseaseParameters_d(d);
 
-                ParallelForRNG( bins_ptr->numItems(),
-                                [=] AMREX_GPU_DEVICE (int ii, RandomEngine const& /*engine*/)
-                                noexcept
-                {
-                    auto i = inds[ii];
-                    int i_cell = binner(ptd, i);
+                ParallelFor(bins_nborhood.numItems(), [=] AMREX_GPU_DEVICE (int ii) noexcept {
+                    auto infectious_i = inds[ii];
+                    AMREX_ALWAYS_ASSERT((Long)infectious_i < np);
+                    int i_cell = binner(ptd, infectious_i);
                     auto cell_start = offsets[i_cell];
-                    auto cell_stop  = offsets[i_cell+1];
+                    auto cell_stop  = offsets[i_cell + 1];
 
-                    AMREX_ALWAYS_ASSERT( (Long) i < np);
-                    if ( notSusceptible<ACTD>(i, ptd, d) )  { return; }
-                    if ( isHospitalized(i, ptd) )  { return; }
-
-                    //Real i_mask = mask_arr(home_i_ptr[i], home_j_ptr[i], 0);
-                    for (auto jj = cell_start; jj < cell_stop; ++jj) {
-
-                        auto j = inds[jj];
-                        AMREX_ALWAYS_ASSERT( (Long) j < np);
-
-                        //Real j_mask = mask_arr(home_i_ptr[j], home_j_ptr[j], 0);
-                        if (i == j) continue;
-                        if ( isHospitalized(j, ptd) )  { continue; }
-
-                        if ( isInfectious<ACTD>(j, ptd, d) ) {
+                    if (isInfectious(infectious_i, ptd, d) &&  // infectious
+                        !isHospitalized(infectious_i, ptd) &&  // not in hospital
+                        !withdrawn_ptr[infectious_i] &&        // not withdrawn
+                        random_travel_ptr[infectious_i] < 0)   // not traveling
+                    {
+                        //Real i_mask = mask_arr(home_i_ptr[i], home_j_ptr[i], 0);
+                        for (auto jj = cell_start; jj < cell_stop; ++jj) {
+                            auto susceptible_i = inds[jj];
+                            AMREX_ALWAYS_ASSERT((Long)susceptible_i < np);
+                            //Real j_mask = mask_arr(home_i_ptr[j], home_j_ptr[j], 0);
                             Real social_scale = 1.0_prt;  // TODO this should vary based on cell
-                            binaryInteractionNborhood<ACTD>( j, i,
-                                                             ptd,
-                                                             lparm,
-                                                             social_scale,
-                                                             prob_ptr,
-                                                             flag_at_work,
-                                                             i );
+                            binaryInteractionNborhood<ACTD>(infectious_i, susceptible_i, ptd, lparm, social_scale, prob_ptr,
+                                                            flag_at_work, d);
                         }
                     }
                 });

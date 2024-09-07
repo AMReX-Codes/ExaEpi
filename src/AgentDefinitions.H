@@ -216,7 +216,7 @@ bool isHospitalized ( const int      a_idx, /*!< Agent index */
 template <typename PTDType>
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
 bool isAtWork (const int      a_idx, /*!< Agent index */
-               const PTDType& a_ptd  /*!< Particle tile data */ )
+               const PTDType& a_ptd  /*!< Particle tile data */)
 {
     return ((a_ptd.m_idata[IntIdx::work_i][a_idx] >= 0)   // at work
              && (a_ptd.m_idata[IntIdx::workgroup][a_idx] > 0));  // is a worker
