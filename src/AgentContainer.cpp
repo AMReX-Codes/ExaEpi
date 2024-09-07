@@ -204,7 +204,6 @@ void AgentContainer::moveAgentsToWork ()
     }
 
     m_at_work = true;
-
 }
 
 /*! \brief Move agents to home
@@ -250,7 +249,6 @@ void AgentContainer::moveAgentsToHome ()
     }
 
     m_at_work = false;
-
 }
 
 /*! \brief Move agents randomly

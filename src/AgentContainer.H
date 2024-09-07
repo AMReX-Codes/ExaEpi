@@ -89,7 +89,6 @@ public:
 
     amrex::DenseBins<PType>* getBins(const std::pair<int,int>& a_idx, const std::string& a_mod_name);
 
-
     /*! \brief Return flag indicating if agents are at work */
     inline bool isAtWork() const {
         return m_at_work;

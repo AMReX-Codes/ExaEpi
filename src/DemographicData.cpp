@@ -18,7 +18,9 @@ using namespace amrex;
 
 /*! Initializes by reading in demographic data from a given
     filename. Calls DemographicData::InitFromFile(). */
-DemographicData::DemographicData (const::std::string& fname /*!< Name of file containing demographic data */,const int workgroup_size)
+
+DemographicData::DemographicData (const::std::string& fname, /*!< Name of file containing demographic data */
+                                  const int workgroup_size)
 {
     InitFromFile(fname, workgroup_size);
 }
@@ -46,7 +48,9 @@ DemographicData::DemographicData (const::std::string& fname /*!< Name of file co
  *  + Compute total population and number of daytime workers.
  *  + Copy data to GPU device memory.
  */
-void DemographicData::InitFromFile (const std::string& fname /*!< Name of file containing demographic data */,const int workgroup_size)
+
+void DemographicData::InitFromFile (const std::string& fname, /*!< Name of file containing demographic data */
+                                    const int workgroup_size  /*!< The size of workgroups */)
 {
     BL_PROFILE("DemographicData::InitFromFile");
 

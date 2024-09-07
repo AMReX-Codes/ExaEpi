@@ -33,7 +33,7 @@ void override_amrex_defaults ()
 int main (int argc, /*!< Number of command line arguments */
           char* argv[] /*!< Command line arguments */)
 {
-    amrex::Initialize(argc,argv,true,MPI_COMM_WORLD,override_amrex_defaults);
+    amrex::Initialize(argc, argv, true, MPI_COMM_WORLD, override_amrex_defaults);
 
     runAgent();
 
@@ -60,7 +60,7 @@ int main (int argc, /*!< Number of command line arguments */
       + Community number of the community at each grid cell.
       + Disease statistics with 4 components (hospitalization, ICU, ventilator, deaths)
       + Masking behavior
-    + Initialize agents (AgentContainer::initAgentsDemo or AgentContainer::initAgentsCensus).
+    + Initialize agents (AgentContainer::initAgentsCensus).
       If ExaEpi::TestParams::ic_type is ExaEpi::ICType::Census, then
       + Read worker flow (ExaEpi::Initialization::read_workerflow)
       + Initialize cases (ExaEpi::Initialization::setInitialCases)
@@ -219,7 +219,7 @@ void runAgent ()
         BL_PROFILE_REGION("Evolution");
         for (int i = 0; i < params.nsteps; ++i)
         {
-            amrex::Print() << "Simulating day " << i << "\n";
+            amrex::Print() << "Simulating day " << i << " " << std::flush;
 
             if ((params.plot_int > 0) && (i % params.plot_int == 0)) {
                 ExaEpi::IO::writePlotFile(pc, censusData, params.num_diseases, params.disease_names, cur_time, i);
@@ -285,6 +285,8 @@ void runAgent ()
 
                 if (ParallelDescriptor::IOProcessor())
                 {
+                    amrex::Print() << " " << counts[1] << " infected, " << counts[4] << " deaths\n";
+
                     // total number of deaths computed on agents and on mesh should be the same...
                     if (mmc[3] != counts[4]) {
                         amrex::Print() << mmc[3] << " " << counts[4] << "\n";

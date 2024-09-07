@@ -99,7 +99,7 @@ void ExaEpi::Utils::get_test_params (   TestParams& params,         /*!< Test pa
         params.ic_type = ICType::UrbanPop;
         pp.get("urbanpop_filename", params.urbanpop_filename);
     } else {
-        amrex::Abort("ic type not recognized");
+        amrex::Abort("ic_type not recognized (currently supported 'census')");
     }
 
     params.aggregated_diag_int = -1;

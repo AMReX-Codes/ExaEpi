@@ -74,6 +74,7 @@ struct DemographicData
     amrex::Gpu::DeviceVector<int> Ndaywork_d; /*!< Number of daytime workers (GPU device) */
     amrex::Gpu::DeviceVector<int> myIDtoUnit_d; /*!< Given myID #, what Unit # is it? (GPU device) */
     amrex::Gpu::DeviceVector<int> Unit_on_proc_d; /*!< Is any part of this unit on this processor? (GPU device) */
+
     static const int COMMUNITY_SIZE = 2000;
 };
 
