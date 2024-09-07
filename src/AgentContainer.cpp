@@ -532,8 +532,8 @@ void AgentContainer::returnAirTravel (const AgentContainer& on_travel_pc)
                     {
                         int dst_index = air_travel_ptr_travel[i];
                         if(dst_index>=0){
-                                prob_ptr[dst_index] += prob_ptr_travel[i];
-                                       air_travel_ptr[dst_index] = -1;
+                            prob_ptr[dst_index] += prob_ptr_travel[i];
+                            air_travel_ptr[dst_index] = -1;
                         }
                     });
             }
