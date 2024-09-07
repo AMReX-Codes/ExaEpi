@@ -11,12 +11,14 @@
 
 using namespace amrex;
 
+#define FAMILIES_PER_CLUSTER 4
 
 template <typename PTDType>
 struct HomeBinner
 {
-    HomeBinner(const Geometry &geom, const IntVect &bin_size, const Box &box) :
-               bin_size(bin_size), box(box) {
+    HomeBinner(const Geometry &geom, const IntVect &bin_size, const Box &box, const int max_nborhood,
+               const int max_family_cluster) :
+               bin_size(bin_size), box(box), max_nborhood(max_nborhood), max_family_cluster(max_family_cluster) {
         dxi = geom.InvCellSizeArray();
         plo = geom.ProbLoArray();
         domain = geom.Domain();
@@ -27,7 +29,10 @@ struct HomeBinner
         Box tbx;
         auto iv = getParticleCell(ptd, i, plo, dxi, domain);
         auto tid = getTileIndex(iv, box, true, bin_size, tbx);
-        return static_cast<unsigned int>(tid);
+        auto nborhood = ptd.m_idata[IntIdx::nborhood][i];
+        auto family_cluster = ptd.m_idata[IntIdx::family][i] / FAMILIES_PER_CLUSTER;
+        AMREX_ASSERT(nborhood < max_nborhood && nborhood >= 0);
+        return static_cast<unsigned int>((tid * max_nborhood + nborhood) * max_family_cluster + family_cluster);
     }
 
   private:
@@ -37,6 +42,8 @@ struct HomeBinner
     Box domain;
     IntVect bin_size;
     Box box;
+    int max_nborhood;
+    int max_family_cluster;
 };
 
 
@@ -51,26 +58,34 @@ static void binaryInteractionHome (const int infectious_i, /*!< Index of infecti
                                    const PTDType& a_ptd, /*!< Particle tile data */
                                    const DiseaseParm* const a_lparm,  /*!< disease paramters */
                                    const Real a_social_scale, /*!< Social scale */
-                                   ParticleReal* const a_prob_ptr /*!< infection probability */)
+                                   ParticleReal* const a_prob_ptr, /*!< infection probability */
+                                   const int a_d   /*!< disease index */)
 {
     Real infect = a_lparm->infect;
     infect *= (1.0_rt - a_lparm->vac_eff);
 
     auto age_group_ptr = a_ptd.m_idata[IntIdx::age_group];
     auto family_ptr = a_ptd.m_idata[IntIdx::family];
-    auto nborhood_ptr = a_ptd.m_idata[IntIdx::nborhood];
     auto school_ptr = a_ptd.m_idata[IntIdx::school];
     auto withdrawn_ptr = a_ptd.m_idata[IntIdx::withdrawn];
     auto random_travel_ptr = a_ptd.m_idata[IntIdx::random_travel];
-    if ((random_travel_ptr[infectious_i] >= 0) || (random_travel_ptr[susceptible_i] >= 0)) {return;}
+
+    if (infectious_i == susceptible_i) return;          // same agents
+    if (!isSusceptible(susceptible_i, a_ptd, a_d)) return; // not susceptible
+    if (isHospitalized(susceptible_i, a_ptd)) return;      // in hospital
+    if (random_travel_ptr[susceptible_i] >= 0) return;  // on random travel
+
+    AMREX_ALWAYS_ASSERT(a_ptd.m_idata[IntIdx::home_i][infectious_i] == a_ptd.m_idata[IntIdx::home_i][susceptible_i] &&
+                        a_ptd.m_idata[IntIdx::home_j][infectious_i] == a_ptd.m_idata[IntIdx::home_j][susceptible_i]);
+    AMREX_ALWAYS_ASSERT(a_ptd.m_idata[IntIdx::nborhood][infectious_i] == a_ptd.m_idata[IntIdx::nborhood][susceptible_i]);
+    AMREX_ALWAYS_ASSERT(family_ptr[infectious_i] / FAMILIES_PER_CLUSTER == family_ptr[susceptible_i] / FAMILIES_PER_CLUSTER);
 
     //infect *= i_mask;
     //infect *= j_mask;
     ParticleReal prob = 1.0_prt;
-    if (     (nborhood_ptr[infectious_i] == nborhood_ptr[susceptible_i])
-          && (family_ptr[infectious_i] == family_ptr[susceptible_i]) ) {
-        /* at home, within a family */
-        if (age_group_ptr[infectious_i] <= 1) {  /* Transmitter i is a child */
+    if (family_ptr[infectious_i] == family_ptr[susceptible_i]) {
+        // at home, within a family
+        if (age_group_ptr[infectious_i] <= 1) {  // Transmitter i is a child
             if (school_ptr[infectious_i] < 0) { // not attending school, use _SC contacts
                 prob *= 1.0_prt - infect * a_lparm->xmit_child_SC[age_group_ptr[susceptible_i]];
             } else {
@@ -83,18 +98,15 @@ static void binaryInteractionHome (const int infectious_i, /*!< Index of infecti
                 prob *= 1.0_prt - infect * a_lparm->xmit_adult[age_group_ptr[susceptible_i]];
             }
         }
-    } else if (    (nborhood_ptr[infectious_i] == nborhood_ptr[susceptible_i])
-                && (!withdrawn_ptr[infectious_i]) && (!withdrawn_ptr[susceptible_i])
-                && ((family_ptr[infectious_i] / 4) == (family_ptr[susceptible_i] / 4)) ) {
-        /* check for common neighborhood cluster: */
-        if (age_group_ptr[infectious_i] <= 1) {  /* Transmitter i is a child */
+    } else if (!withdrawn_ptr[infectious_i] && !withdrawn_ptr[susceptible_i]) {
+        // family cluster
+        if (age_group_ptr[infectious_i] <= 1) {  // Transmitter i is a child
             if (school_ptr[infectious_i] < 0)  // not attending school, use _SC contacts
                 prob *= 1.0_prt - infect * a_lparm->xmit_nc_child_SC[age_group_ptr[susceptible_i]] * a_social_scale;
             else
                 prob *= 1.0_prt - infect * a_lparm->xmit_nc_child[age_group_ptr[susceptible_i]] * a_social_scale;
         } else {
-            if (school_ptr[infectious_i] < 0)  {
-                // not attending school, use _SC contacts
+            if (school_ptr[infectious_i] < 0) { // not attending school, use _SC contacts
                 prob *= 1.0_prt - infect * a_lparm->xmit_nc_adult_SC[age_group_ptr[susceptible_i]] * a_social_scale;
             } else {
                 prob *= 1.0_prt - infect * a_lparm->xmit_nc_adult[age_group_ptr[susceptible_i]] * a_social_scale;
@@ -127,8 +139,6 @@ class InteractionModHome : public InteractionModel<AC,ACT,ACTD,A>
     protected:
 
     private:
-
-        DenseBins<ACTD> bins_home;
 };
 
 /*! Simulate the interactions between agents at home and compute
@@ -169,8 +179,8 @@ void InteractionModHome<AC,ACT,ACTD,A>::interactAgents(AC& a_agents, /*!< Agent 
 {
     BL_PROFILE("InteractionModHome::interactAgents");
     int n_disease = a_agents.numDiseases();
-
     IntVect bin_size = {AMREX_D_DECL(1, 1, 1)};
+
     for (int lev = 0; lev < a_agents.numLevels(); ++lev)
     {
  #ifdef AMREX_USE_OMP
@@ -181,10 +191,26 @@ void InteractionModHome<AC,ACT,ACTD,A>::interactAgents(AC& a_agents, /*!< Agent 
             auto& ptile = a_agents.ParticlesAt(lev, mfi);
             const auto& ptd = ptile.getParticleTileData();
             const auto np = ptile.GetArrayOfStructs().numParticles();
+            auto& soa = ptile.GetStructOfArrays();
             auto num_tiles = numTilesInBox(mfi.validbox(), true, bin_size);
+            auto nborhood_ptr = soa.GetIntData(IntIdx::nborhood).data();
+            auto family_ptr = soa.GetIntData(IntIdx::family).data();
+            auto random_travel_ptr = soa.GetIntData(IntIdx::random_travel).data();
 
-            HomeBinner<ACTD> binner(a_agents.Geom(lev), bin_size, mfi.validbox());
-            bins_home.build(BinPolicy::Serial, np, ptd, num_tiles, binner);
+            int max_nborhood = 0;
+            int max_family_cluster = 0;
+            for (int i = 0; i < np; i++) {
+                max_nborhood = max(max_nborhood, nborhood_ptr[i]);
+                max_family_cluster = max(max_family_cluster, family_ptr[i] / FAMILIES_PER_CLUSTER);
+            }
+            max_nborhood++;
+            max_family_cluster++;
+            AMREX_ALWAYS_ASSERT(max_nborhood > 0);
+            AMREX_ALWAYS_ASSERT(max_family_cluster > 0);
+
+            HomeBinner<ACTD> binner(a_agents.Geom(lev), bin_size, mfi.validbox(), max_nborhood, max_family_cluster);
+            DenseBins<ACTD> bins_home;
+            bins_home.build(BinPolicy::Serial, np, ptd, num_tiles * max_nborhood * max_family_cluster, binner);
 
             AMREX_ALWAYS_ASSERT(bins_home.numBins() >= 0);
             auto inds = bins_home.permutationPtr();
@@ -199,25 +225,19 @@ void InteractionModHome<AC,ACT,ACTD,A>::interactAgents(AC& a_agents, /*!< Agent 
                     auto infectious_i = inds[ii];
                     int i_cell = binner(ptd, infectious_i);
                     auto cell_start = offsets[i_cell];
-                    auto cell_stop  = offsets[i_cell+1];
-
+                    auto cell_stop  = offsets[i_cell + 1];
                     AMREX_ALWAYS_ASSERT((Long)infectious_i < np);
 
-                    if (!isInfectious<ACTD>(infectious_i, ptd, d)) return;
-                    if (isHospitalized(infectious_i, ptd)) return;
-
-                    //Real i_mask = mask_arr(home_i_ptr[i], home_j_ptr[i], 0);
-                    for (auto jj = cell_start; jj < cell_stop; ++jj) {
-                        auto susceptible_i = inds[jj];
-                        AMREX_ALWAYS_ASSERT((Long)susceptible_i < np);
-
-                        //Real j_mask = mask_arr(home_i_ptr[j], home_j_ptr[j], 0);
-                        if (infectious_i == susceptible_i) continue;
-                        if (isHospitalized(susceptible_i, ptd)) continue;
-
-                        if (isSusceptible<ACTD>(susceptible_i, ptd, d)) {
+                    if (isInfectious(infectious_i, ptd, d) &&  // infectious
+                        !isHospitalized(infectious_i, ptd) &&  // not in hospital
+                        random_travel_ptr[infectious_i] < 0)   // not traveling
+                    {
+                        //Real i_mask = mask_arr(home_i_ptr[i], home_j_ptr[i], 0);
+                        for (auto jj = cell_start; jj < cell_stop; ++jj) {
+                            auto susceptible_i = inds[jj];
+                            AMREX_ALWAYS_ASSERT((Long)susceptible_i < np);
                             Real social_scale = 1.0_prt;  // TODO this should vary based on cell
-                            binaryInteractionHome<ACTD>(infectious_i, susceptible_i, ptd, lparm, social_scale, prob_ptr);
+                            binaryInteractionHome<ACTD>(infectious_i, susceptible_i, ptd, lparm, social_scale, prob_ptr, d);
                         }
                     }
                 });

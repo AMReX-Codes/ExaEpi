@@ -68,9 +68,9 @@ static void binaryInteractionWork (const int infectious_i, /*!< Index of infecti
     if (withdrawn_ptr[susceptible_i]) return;           // withdrawn
     if (random_travel_ptr[susceptible_i] >= 0) return;  // on random travel
 
-    AMREX_ASSERT(a_ptd.m_idata[IntIdx::workgroup][infectious_i] == a_ptd.m_idata[IntIdx::workgroup][susceptible_i]);
-    AMREX_ASSERT(a_ptd.m_idata[IntIdx::work_i][infectious_i] == a_ptd.m_idata[IntIdx::work_i][susceptible_i] &&
-                 a_ptd.m_idata[IntIdx::work_j][infectious_i] == a_ptd.m_idata[IntIdx::work_j][susceptible_i]);
+    AMREX_ALWAYS_ASSERT(a_ptd.m_idata[IntIdx::workgroup][infectious_i] == a_ptd.m_idata[IntIdx::workgroup][susceptible_i]);
+    AMREX_ALWAYS_ASSERT(a_ptd.m_idata[IntIdx::work_i][infectious_i] == a_ptd.m_idata[IntIdx::work_i][susceptible_i] &&
+                        a_ptd.m_idata[IntIdx::work_j][infectious_i] == a_ptd.m_idata[IntIdx::work_j][susceptible_i]);
     //infect *= i_mask;
     //infect *= j_mask;
     ParticleReal prob = 1.0_prt - infect * a_lparm->xmit_work * a_work_scale;
@@ -101,8 +101,6 @@ class InteractionModWork : public InteractionModel<AC,ACT,ACTD,A>
     protected:
 
     private:
-
-        DenseBins<ACTD> bins_work;
 };
 
 
@@ -141,8 +139,8 @@ void InteractionModWork<AC,ACT,ACTD,A>::interactAgents(AC& a_agents,
 {
     BL_PROFILE("InteractionModWork::interactAgents");
     int n_disease = a_agents.numDiseases();
-
     IntVect bin_size = {AMREX_D_DECL(1, 1, 1)};
+
     for (int lev = 0; lev < a_agents.numLevels(); ++lev)
     {
 #ifdef AMREX_USE_OMP
@@ -153,19 +151,21 @@ void InteractionModWork<AC,ACT,ACTD,A>::interactAgents(AC& a_agents,
             const auto& ptd = ptile.getParticleTileData();
             const auto np = ptile.GetArrayOfStructs().numParticles();
             auto& soa = ptile.GetStructOfArrays();
+            auto num_tiles = numTilesInBox(mfi.validbox(), true, bin_size);
             auto workgroup_ptr = soa.GetIntData(IntIdx::workgroup).data();
             auto withdrawn_ptr = soa.GetIntData(IntIdx::withdrawn).data();
             auto random_travel_ptr = soa.GetIntData(IntIdx::random_travel).data();
-            auto num_tiles = numTilesInBox(mfi.validbox(), true, bin_size);
 
             int max_wg = 0;
             for (int i = 0; i < np; i++) {
                 max_wg = max(max_wg, workgroup_ptr[i]);
             }
+            max_wg++;
 
             // agents are binned by community + workgroup. These values can change from one time step to the next so they
             // have to be recomputed (rebuild the bins) every time step
             WorkBinner<ACTD> binner(a_agents.Geom(lev), bin_size, mfi.validbox(), max_wg);
+            DenseBins<ACTD> bins_work;
             bins_work.build(BinPolicy::Serial, np, ptd, num_tiles * max_wg, binner);
 
             AMREX_ALWAYS_ASSERT(bins_work.numBins() >= 0);
