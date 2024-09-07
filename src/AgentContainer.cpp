@@ -493,7 +493,7 @@ void AgentContainer::returnRandomTravel (const AgentContainer& on_travel_pc)
 }
 
 
-/*! \brief Return agents from random travel
+/*! \brief Return agents from air travel
 */
 void AgentContainer::returnAirTravel (const AgentContainer& on_travel_pc)
 {
@@ -881,9 +881,9 @@ void AgentContainer::interactRandomTravel ( MultiFab& a_mask_behavior, /*!< Mask
     }
 }
 
-/*! \brief Interaction with agents on random travel */
+/*! \brief Interaction with agents on air travel */
 void AgentContainer::interactAirTravel ( MultiFab& a_mask_behavior, /*!< Masking behavior */
-                                            AgentContainer& on_travel_pc /*< agents that are on random_travel */)
+                                            AgentContainer& on_travel_pc /*< agents that are on air_travel */)
 {
     BL_PROFILE("AgentContainer::interactAirTravel");
     if (haveInteractionModel(ExaEpi::InteractionNames::airTravel)) {
