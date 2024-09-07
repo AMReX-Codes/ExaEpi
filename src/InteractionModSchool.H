@@ -10,62 +10,89 @@
 
 using namespace amrex;
 
+
+template <typename PTDType>
+struct SchoolBinner
+{
+    SchoolBinner(const Geometry &geom, const IntVect &bin_size, const Box &box, const int max_school, const int max_work_nborhood) :
+                 bin_size(bin_size), box(box), max_school(max_school), max_work_nborhood(max_work_nborhood) {
+        dxi = geom.InvCellSizeArray();
+        plo = geom.ProbLoArray();
+        domain = geom.Domain();
+    }
+
+    AMREX_GPU_HOST_DEVICE
+    unsigned int operator() (const PTDType& ptd, int i) const noexcept {
+        Box tbx;
+        auto iv = getParticleCell(ptd, i, plo, dxi, domain);
+        auto tid = getTileIndex(iv, box, true, bin_size, tbx);
+        auto school = ptd.m_idata[IntIdx::school][i];
+        auto work_nborhood = ptd.m_idata[IntIdx::work_nborhood][i];
+        return static_cast<unsigned int>((tid * max_school + school) * max_work_nborhood + work_nborhood);
+    }
+
+  private:
+
+    GpuArray<Real,AMREX_SPACEDIM> plo;
+    GpuArray<Real,AMREX_SPACEDIM> dxi;
+    Box domain;
+    IntVect bin_size;
+    Box box;
+    int max_school;
+    int max_work_nborhood;
+};
+
 /*! \brief One-on-one interaction between an infectious agent and a susceptible agent.
  *
  * This function defines the one-on-one interaction between an infectious agent and a
  * susceptible agent at school. */
 template <typename PTDType>
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-static void binaryInteractionSchool ( const int a_i, /*!< Index of infectious agent */
-                                      const int a_j, /*!< Index of susceptible agent */
-                                      const PTDType& a_ptd, /*!< Particle tile data */
-                                      const DiseaseParm* const a_lparm, /*!< disease paramters */
-                                      const Real a_social_scale,  /*!< Social scale */
-                                      ParticleReal* const a_prob_ptr, /*!< infection probability */
-                                      const int a_thread /*!< agent index of this thread */)
+static void binaryInteractionSchool (const int infectious_i, /*!< Index of infectious agent */
+                                     const int susceptible_i, /*!< Index of susceptible agent */
+                                     const PTDType& a_ptd, /*!< Particle tile data */
+                                     const DiseaseParm* const a_lparm, /*!< disease paramters */
+                                     const Real a_social_scale,  /*!< Social scale */
+                                     ParticleReal* const a_prob_ptr /*!< infection probability */)
 {
     Real infect = a_lparm->infect;
     infect *= (1.0_rt - a_lparm->vac_eff);
 
+    AMREX_ALWAYS_ASSERT(a_ptd.m_idata[IntIdx::school][infectious_i] == a_ptd.m_idata[IntIdx::school][susceptible_i]);
+    AMREX_ALWAYS_ASSERT(a_ptd.m_idata[IntIdx::work_nborhood][infectious_i] == a_ptd.m_idata[IntIdx::work_nborhood][susceptible_i]);
+    AMREX_ALWAYS_ASSERT(a_ptd.m_idata[IntIdx::work_i][infectious_i] == a_ptd.m_idata[IntIdx::work_i][susceptible_i] &&
+                        a_ptd.m_idata[IntIdx::work_j][infectious_i] == a_ptd.m_idata[IntIdx::work_j][susceptible_i]);
+
     auto age_group_ptr = a_ptd.m_idata[IntIdx::age_group];
     auto nborhood_ptr = a_ptd.m_idata[IntIdx::nborhood];
     auto school_ptr = a_ptd.m_idata[IntIdx::school];
-    auto withdrawn_ptr = a_ptd.m_idata[IntIdx::withdrawn];
-    if (withdrawn_ptr[a_i] || withdrawn_ptr[a_j]) { return; }
-    auto random_travel_ptr = a_ptd.m_idata[IntIdx::random_travel];
-    if ((random_travel_ptr[a_i] >= 0) || (random_travel_ptr[a_j] >= 0)) {return;}
 
+    // binned so that infectious and susceptible are in the same school
+    int school = school_ptr[infectious_i];
     //infect *= i_mask;
     //infect *= j_mask;
     ParticleReal prob = 1.0_prt;
-    if (nborhood_ptr[a_i] == nborhood_ptr[a_j]) {
-        if (school_ptr[a_i] == school_ptr[a_j]) {
-            if (school_ptr[a_i] > 5) {
-                /* Playgroup */
+    // Elementary/middle/high school in common
+    if (school > 0 && school < 5) {
+        if (age_group_ptr[infectious_i] <= 1) {  // Transmitter i is a child
+            if (age_group_ptr[susceptible_i] <= 1) {  // Receiver j is a child
+                prob *= 1.0_prt - infect * a_lparm->xmit_school[school] * a_social_scale;
+            } else {  // Child student -> adult teacher/staff transmission
+                prob  *= 1.0_prt - infect * a_lparm->xmit_sch_c2a[school] * a_social_scale;
+            }
+        } else if (age_group_ptr[susceptible_i] <= 1) {  // Adult teacher/staff -> child student
+            prob *= 1.0_prt - infect * a_lparm->xmit_sch_a2c[school] * a_social_scale;
+        }
+    } else {
+        if (nborhood_ptr[infectious_i] == nborhood_ptr[susceptible_i]) {
+            if (school > 5) {             // Playgroup
                 prob *= 1.0_prt - infect * a_lparm->xmit_school[6] * a_social_scale;
-            } else if (school_ptr[a_i] == 5) {
-                /* Day care */
+            } else if (school == 5) {     // Day care
                 prob *= 1.0_prt - infect * a_lparm->xmit_school[5] * a_social_scale;
             }
         }
     }
-    /* Elementary/middle/high school in common */
-    if (    (school_ptr[a_i] == school_ptr[a_j])
-         && (school_ptr[a_i] > 0)
-         && (school_ptr[a_i] < 5) ) {
-        if (age_group_ptr[a_i] <= 1) {  /* Transmitter i is a child */
-            if (age_group_ptr[a_j] <= 1) {  /* Receiver j is a child */
-                prob *= 1.0_prt - infect * a_lparm->xmit_school[school_ptr[a_i]] * a_social_scale;
-            } else {  // Child student -> adult teacher/staff transmission
-                prob  *= 1.0_prt - infect * a_lparm->xmit_sch_c2a[school_ptr[a_i]] * a_social_scale;
-            }
-        } else if (age_group_ptr[a_j] <= 1) {  // Adult teacher/staff -> child student
-            prob *= 1.0_prt - infect * a_lparm->xmit_sch_a2c[school_ptr[a_i]] * a_social_scale;
-        }
-    }
-
-    AMREX_ASSERT(a_j == a_thread);
-    a_prob_ptr[a_j] *= prob;
+    Gpu::Atomic::Multiply(&a_prob_ptr[susceptible_i], prob);
 }
 
 /*! \brief Class describing agent interactions at school */
@@ -130,73 +157,81 @@ void InteractionModSchool<AC,ACT,ACTD,A>::interactAgents(AC& a_agents, /*!< Agen
 {
     BL_PROFILE("InteractionModSchool::interactAgents");
     int n_disease = a_agents.numDiseases();
-
     IntVect bin_size = {AMREX_D_DECL(1, 1, 1)};
+
     for (int lev = 0; lev < a_agents.numLevels(); ++lev)
     {
-        const Geometry& geom = a_agents.Geom(lev);
-        const auto dxi = geom.InvCellSizeArray();
-        const auto plo = geom.ProbLoArray();
-        const auto domain = geom.Domain();
-
-        this->makeBins( a_agents, bin_size, lev, ExaEpi::InteractionNames::school );
-
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
 #endif
-        for(MFIter mfi = a_agents.MakeMFIter(lev, TilingIfNotGPU()); mfi.isValid(); ++mfi)
+        for (MFIter mfi = a_agents.MakeMFIter(lev, TilingIfNotGPU()); mfi.isValid(); ++mfi)
         {
-            auto pair_ind = std::make_pair(mfi.index(), mfi.LocalTileIndex());
-            auto bins_ptr = a_agents.getBins(pair_ind, ExaEpi::InteractionNames::school);
-
             auto& ptile = a_agents.ParticlesAt(lev, mfi);
             const auto& ptd = ptile.getParticleTileData();
-            auto& aos   = ptile.GetArrayOfStructs();
-            const auto np = aos.numParticles();
-            auto pstruct_ptr = aos().dataPtr();
+            const auto np = ptile.GetArrayOfStructs().numParticles();
+            auto& soa = ptile.GetStructOfArrays();
+            auto num_tiles = numTilesInBox(mfi.validbox(), true, bin_size);
+            auto school_ptr = soa.GetIntData(IntIdx::school).data();
+            auto work_nborhood_ptr = soa.GetIntData(IntIdx::work_nborhood).data();
+            auto withdrawn_ptr = soa.GetIntData(IntIdx::withdrawn).data();
+            auto random_travel_ptr = soa.GetIntData(IntIdx::random_travel).data();
 
-            auto binner = GetParticleBin{plo, dxi, domain, bin_size, mfi.validbox()};
-            AMREX_ALWAYS_ASSERT(bins_ptr->numBins() >= 0);
-            auto inds = bins_ptr->permutationPtr();
-            auto offsets = bins_ptr->offsetsPtr();
+            int max_school = 0;
+            int max_work_nborhood = 0;
+            for (int i = 0; i < np; i++) {
+                max_school = max(max_school, school_ptr[i]);
+                max_work_nborhood = max(max_work_nborhood, work_nborhood_ptr[i]);
+            }
+            max_school++;
+            max_work_nborhood++;
+
+            // agents are binned by community + workgroup. These values can change from one time step to the next so they
+            // have to be recomputed (rebuild the bins) every time step
+            SchoolBinner<ACTD> binner(a_agents.Geom(lev), bin_size, mfi.validbox(), max_school, max_work_nborhood);
+            DenseBins<ACTD> bins_school;
+            bins_school.build(BinPolicy::GPU, np, ptd, num_tiles * max_school * max_work_nborhood, binner);
+
+            AMREX_ALWAYS_ASSERT(bins_school.numBins() >= 0);
+            auto inds = bins_school.permutationPtr();
+            auto offsets = bins_school.offsetsPtr();
 
             for (int d = 0; d < n_disease; d++) {
-
-                auto prob_ptr = this->getAgentProbPtr(a_agents,lev,mfi,d);
+                auto prob_ptr = this->getAgentProbPtr(a_agents, lev, mfi, d);
                 //auto mask_arr = a_mask[mfi].array();
                 auto lparm = a_agents.getDiseaseParameters_d(d);
+                Real social_scale = 1.0_prt;  // TODO this should vary based on cell
+                Real infect = lparm->infect;
+                infect *= (1.0_rt - lparm->vac_eff);
 
-                ParallelForRNG( bins_ptr->numItems(),
-                                [=] AMREX_GPU_DEVICE (int ii, RandomEngine const& /*engine*/)
-                                noexcept
-                {
-                    auto i = inds[ii];
-                    int i_cell = binner(pstruct_ptr[i]);
+                ParallelFor(bins_school.numItems(), [=] AMREX_GPU_DEVICE (int ii) noexcept {
+                    auto infectious_i = inds[ii];
+                    int i_cell = binner(ptd, infectious_i);
                     auto cell_start = offsets[i_cell];
-                    auto cell_stop  = offsets[i_cell+1];
-
-                    AMREX_ALWAYS_ASSERT( (Long) i < np);
-                    if ( notSusceptible<ACTD>(i, ptd, d) )  { return; }
-                    if ( isHospitalized(i, ptd) )  { return; }
-
-                    //Real i_mask = mask_arr(home_i_ptr[i], home_j_ptr[i], 0);
-                    for (auto jj = cell_start; jj < cell_stop; ++jj) {
-
-                        auto j = inds[jj];
-                        AMREX_ALWAYS_ASSERT( (Long) j < np);
-                        //Real j_mask = mask_arr(home_i_ptr[j], home_j_ptr[j], 0);
-                        if (i == j) continue;
-                        if ( isHospitalized(j, ptd) )  { continue; }
-
-                        if ( isInfectious<ACTD>(j, ptd, d) ) {
-                            Real social_scale = 1.0_prt;  // TODO this should vary based on cell
-                            binaryInteractionSchool<ACTD>(  j, i,
-                                                            ptd,
-                                                            lparm,
-                                                            social_scale,
-                                                            prob_ptr,
-                                                            i );
-
+                    auto cell_stop = offsets[i_cell + 1];
+                    AMREX_ALWAYS_ASSERT((Long)infectious_i < np);
+                    // Doing infectious first requires an atomic operation for GPUs, but generally requires far fewer operations
+                    // because there are usually more susceptible agents than infectious. This can be a large performance
+                    // difference for CPU only runs.
+                    if (isInfectious(infectious_i, ptd, d) &&  // infectious
+                        !isHospitalized(infectious_i, ptd) &&  // not in hospital
+                        school_ptr[infectious_i] > 0 &&        // at school
+                        !withdrawn_ptr[infectious_i] &&        // not withdrawn
+                        random_travel_ptr[infectious_i] < 0)   // not traveling
+                    {
+                        //Real i_mask = mask_arr(home_i_ptr[i], home_j_ptr[i], 0);
+                        for (auto jj = cell_start; jj < cell_stop; ++jj) {
+                            auto susceptible_i = inds[jj];
+                            AMREX_ALWAYS_ASSERT((Long)susceptible_i < np);
+                            if (infectious_i != susceptible_i &&
+                                isSusceptible(susceptible_i, ptd, d) &&
+                                !isHospitalized(susceptible_i, ptd) &&
+                                work_nborhood_ptr[infectious_i] == work_nborhood_ptr[susceptible_i] &&
+                                school_ptr[susceptible_i] > 0 &&
+                                !withdrawn_ptr[susceptible_i] &&
+                                random_travel_ptr[susceptible_i] < 0)
+                            {
+                                binaryInteractionSchool(infectious_i, susceptible_i, ptd, lparm, social_scale, prob_ptr);
+                            }
                         }
                     }
                 });

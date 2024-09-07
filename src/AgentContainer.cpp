@@ -654,13 +654,11 @@ void AgentContainer::interactDay (MultiFab& a_mask_behavior /*!< Masking behavio
     if (haveInteractionModel(ExaEpi::InteractionNames::work)) {
         m_interactions[ExaEpi::InteractionNames::work]->interactAgents(*this, a_mask_behavior);
     }
-    /*
     if (haveInteractionModel(ExaEpi::InteractionNames::school)) {
-        m_interactions[ExaEpi::InteractionNames::school]->interactAgents( *this, a_mask_behavior );
+        m_interactions[ExaEpi::InteractionNames::school]->interactAgents(*this, a_mask_behavior);
     }
-    */
     if (haveInteractionModel(ExaEpi::InteractionNames::nborhood)) {
-        m_interactions[ExaEpi::InteractionNames::nborhood]->interactAgents( *this, a_mask_behavior );
+        m_interactions[ExaEpi::InteractionNames::nborhood]->interactAgents(*this, a_mask_behavior);
     }
     m_hospital->interactAgents(*this, a_mask_behavior);
 }

@@ -85,7 +85,7 @@ static void binaryInteractionNborhood (const int infectious_i, /*!< Index of inf
     // Should always be in the same community = same cell
     // Neighborhood?
     if (nborhood_infectious_i == nborhood_susceptible_i) {
-        if (school_ptr[infectious_i] < 0 ) { // not attending school, use _SC contacts
+        if (school_ptr[infectious_i] < 0) { // not attending school, use _SC contacts
             prob *= 1.0_prt - infect * a_lparm->xmit_hood_SC[age_group_ptr[susceptible_i]] * a_social_scale;
         } else {
             prob *= 1.0_prt - infect * a_lparm->xmit_hood[age_group_ptr[susceptible_i]] * a_social_scale;
