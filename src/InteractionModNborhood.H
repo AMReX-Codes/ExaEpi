@@ -52,24 +52,15 @@ static void binaryInteractionNborhood (const int infectious_i, /*!< Index of inf
                                         const DiseaseParm* const a_lparm, /*!< disease paramters */
                                         const Real a_social_scale, /*!< Social scale */
                                         ParticleReal* const a_prob_ptr, /*!< infection probability */
-                                        const bool a_at_work_ptr, /*!< whether agents are at work or at home */
-                                        const int a_d /*!< disease index */)
+                                        const bool a_at_work_ptr /*!< whether agents are at work or at home */)
 {
     Real infect = a_lparm->infect;
     infect *= (1.0_rt - a_lparm->vac_eff);
 
     auto age_group_ptr = a_ptd.m_idata[IntIdx::age_group];
     auto nborhood_ptr = a_ptd.m_idata[IntIdx::nborhood];
-    auto school_ptr = a_ptd.m_idata[IntIdx::school];
-    auto withdrawn_ptr = a_ptd.m_idata[IntIdx::withdrawn];
-    auto random_travel_ptr = a_ptd.m_idata[IntIdx::random_travel];
     auto work_nborhood_ptr = a_ptd.m_idata[IntIdx::work_nborhood];
-
-    if (infectious_i == susceptible_i) return;             // same agents
-    if (!isSusceptible(susceptible_i, a_ptd, a_d)) return; // not susceptible
-    if (isHospitalized(susceptible_i, a_ptd)) return;      // in hospital
-    if (withdrawn_ptr[susceptible_i]) return;              // withdrawn
-    if (random_travel_ptr[susceptible_i] >= 0) return;     // on random travel
+    auto school_ptr = a_ptd.m_idata[IntIdx::school];
 
     if (a_at_work_ptr) {
         AMREX_ALWAYS_ASSERT(a_ptd.m_idata[IntIdx::work_i][infectious_i] == a_ptd.m_idata[IntIdx::work_i][susceptible_i] &&
@@ -199,6 +190,7 @@ void InteractionModNborhood<AC,ACT,ACTD,A>::interactAgents (AC& a_agents, /*!< A
                 auto prob_ptr = this->getAgentProbPtr(a_agents, lev, mfi, d);
                 //auto mask_arr = a_mask[mfi].array();
                 auto lparm = a_agents.getDiseaseParameters_d(d);
+                Real social_scale = 1.0_prt;  // TODO this should vary based on cell
 
                 ParallelFor(bins_nborhood.numItems(), [=] AMREX_GPU_DEVICE (int ii) noexcept {
                     auto infectious_i = inds[ii];
@@ -217,9 +209,15 @@ void InteractionModNborhood<AC,ACT,ACTD,A>::interactAgents (AC& a_agents, /*!< A
                             auto susceptible_i = inds[jj];
                             AMREX_ALWAYS_ASSERT((Long)susceptible_i < np);
                             //Real j_mask = mask_arr(home_i_ptr[j], home_j_ptr[j], 0);
-                            Real social_scale = 1.0_prt;  // TODO this should vary based on cell
-                            binaryInteractionNborhood<ACTD>(infectious_i, susceptible_i, ptd, lparm, social_scale, prob_ptr,
-                                                            flag_at_work, d);
+                            if (infectious_i != susceptible_i &&
+                                isSusceptible(susceptible_i, ptd, d) &&
+                                !isHospitalized(susceptible_i, ptd) &&
+                                !withdrawn_ptr[susceptible_i] &&
+                                random_travel_ptr[susceptible_i] < 0)
+                            {
+                                binaryInteractionNborhood<ACTD>(infectious_i, susceptible_i, ptd, lparm, social_scale, prob_ptr,
+                                                                flag_at_work);
+                            }
                         }
                     }
                 });

@@ -58,8 +58,7 @@ static void binaryInteractionHome (const int infectious_i, /*!< Index of infecti
                                    const PTDType& a_ptd, /*!< Particle tile data */
                                    const DiseaseParm* const a_lparm,  /*!< disease paramters */
                                    const Real a_social_scale, /*!< Social scale */
-                                   ParticleReal* const a_prob_ptr, /*!< infection probability */
-                                   const int a_d   /*!< disease index */)
+                                   ParticleReal* const a_prob_ptr /*!< infection probability */)
 {
     Real infect = a_lparm->infect;
     infect *= (1.0_rt - a_lparm->vac_eff);
@@ -68,12 +67,6 @@ static void binaryInteractionHome (const int infectious_i, /*!< Index of infecti
     auto family_ptr = a_ptd.m_idata[IntIdx::family];
     auto school_ptr = a_ptd.m_idata[IntIdx::school];
     auto withdrawn_ptr = a_ptd.m_idata[IntIdx::withdrawn];
-    auto random_travel_ptr = a_ptd.m_idata[IntIdx::random_travel];
-
-    if (infectious_i == susceptible_i) return;          // same agents
-    if (!isSusceptible(susceptible_i, a_ptd, a_d)) return; // not susceptible
-    if (isHospitalized(susceptible_i, a_ptd)) return;      // in hospital
-    if (random_travel_ptr[susceptible_i] >= 0) return;  // on random travel
 
     AMREX_ALWAYS_ASSERT(a_ptd.m_idata[IntIdx::home_i][infectious_i] == a_ptd.m_idata[IntIdx::home_i][susceptible_i] &&
                         a_ptd.m_idata[IntIdx::home_j][infectious_i] == a_ptd.m_idata[IntIdx::home_j][susceptible_i]);
@@ -220,6 +213,7 @@ void InteractionModHome<AC,ACT,ACTD,A>::interactAgents(AC& a_agents, /*!< Agent 
                 auto prob_ptr = this->getAgentProbPtr(a_agents, lev, mfi, d);
                 //auto mask_arr = a_mask[mfi].array();
                 auto lparm = a_agents.getDiseaseParameters_d(d);
+                Real social_scale = 1.0_prt;  // TODO this should vary based on cell
 
                 ParallelFor(bins_home.numItems(), [=] AMREX_GPU_DEVICE (int ii) noexcept {
                     auto infectious_i = inds[ii];
@@ -236,8 +230,13 @@ void InteractionModHome<AC,ACT,ACTD,A>::interactAgents(AC& a_agents, /*!< Agent 
                         for (auto jj = cell_start; jj < cell_stop; ++jj) {
                             auto susceptible_i = inds[jj];
                             AMREX_ALWAYS_ASSERT((Long)susceptible_i < np);
-                            Real social_scale = 1.0_prt;  // TODO this should vary based on cell
-                            binaryInteractionHome<ACTD>(infectious_i, susceptible_i, ptd, lparm, social_scale, prob_ptr, d);
+                            if (infectious_i != susceptible_i &&
+                                isSusceptible(susceptible_i, ptd, d) &&
+                                !isHospitalized(susceptible_i, ptd) &&
+                                random_travel_ptr[susceptible_i] < 0)
+                            {
+                                binaryInteractionHome<ACTD>(infectious_i, susceptible_i, ptd, lparm, social_scale, prob_ptr);
+                            }
                         }
                     }
                 });

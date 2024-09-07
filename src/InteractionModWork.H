@@ -51,22 +51,10 @@ static void binaryInteractionWork (const int infectious_i, /*!< Index of infecti
                                    const PTDType& a_ptd, /*!< Particle tile data */
                                    const DiseaseParm* const a_lparm,  /*!< disease paramters */
                                    const Real a_work_scale, /*!< work scale */
-                                   ParticleReal* const a_prob_ptr, /*!< infection probability */
-                                   const int a_d   /*!< disease index */)
+                                   ParticleReal* const a_prob_ptr /*!< infection probability */)
 {
     Real infect = a_lparm->infect;
     infect *= (1.0_rt - a_lparm->vac_eff);
-
-    auto withdrawn_ptr = a_ptd.m_idata[IntIdx::withdrawn];
-    auto random_travel_ptr = a_ptd.m_idata[IntIdx::random_travel];
-
-    //Real j_mask = mask_arr(home_i_ptr[j], home_j_ptr[j], 0);
-    if (infectious_i == susceptible_i) return;          // same agents
-    if (!isSusceptible(susceptible_i, a_ptd, a_d)) return; // not susceptible
-    if (isHospitalized(susceptible_i, a_ptd)) return;      // in hospital
-    if (!isAtWork(susceptible_i, a_ptd)) return;        // not at work
-    if (withdrawn_ptr[susceptible_i]) return;           // withdrawn
-    if (random_travel_ptr[susceptible_i] >= 0) return;  // on random travel
 
     AMREX_ALWAYS_ASSERT(a_ptd.m_idata[IntIdx::workgroup][infectious_i] == a_ptd.m_idata[IntIdx::workgroup][susceptible_i]);
     AMREX_ALWAYS_ASSERT(a_ptd.m_idata[IntIdx::work_i][infectious_i] == a_ptd.m_idata[IntIdx::work_i][susceptible_i] &&
@@ -199,7 +187,15 @@ void InteractionModWork<AC,ACT,ACTD,A>::interactAgents(AC& a_agents,
                         for (auto jj = cell_start; jj < cell_stop; ++jj) {
                             auto susceptible_i = inds[jj];
                             AMREX_ALWAYS_ASSERT((Long)susceptible_i < np);
-                            binaryInteractionWork(infectious_i, susceptible_i, ptd, lparm, work_scale, prob_ptr, d);
+                            if (infectious_i != susceptible_i &&
+                                isSusceptible(susceptible_i, ptd, d) &&
+                                !isHospitalized(susceptible_i, ptd) &&
+                                isAtWork(susceptible_i, ptd) &&
+                                !withdrawn_ptr[susceptible_i] &&
+                                random_travel_ptr[susceptible_i] < 0)
+                            {
+                                binaryInteractionWork(infectious_i, susceptible_i, ptd, lparm, work_scale, prob_ptr);
+                            }
                         }
                     }
                 });
