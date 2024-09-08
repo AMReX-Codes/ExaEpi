@@ -56,9 +56,6 @@ static void binaryInteractionSchool (const int infectious_i, /*!< Index of infec
     Real infect = a_lparm->infect;
     infect *= (1.0_rt - a_lparm->vac_eff);
 
-    if (a_ptd.m_idata[IntIdx::nborhood][infectious_i] != a_ptd.m_idata[IntIdx::nborhood][susceptible_i]) return;
-    if (a_ptd.m_idata[IntIdx::work_nborhood][infectious_i] != a_ptd.m_idata[IntIdx::work_nborhood][susceptible_i]) return;
-
     AMREX_ALWAYS_ASSERT(a_ptd.m_idata[IntIdx::school][infectious_i] == a_ptd.m_idata[IntIdx::school][susceptible_i]);
     AMREX_ALWAYS_ASSERT(a_ptd.m_idata[IntIdx::work_i][infectious_i] == a_ptd.m_idata[IntIdx::work_i][susceptible_i] &&
                         a_ptd.m_idata[IntIdx::work_j][infectious_i] == a_ptd.m_idata[IntIdx::work_j][susceptible_i]);
