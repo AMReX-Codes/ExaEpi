@@ -14,8 +14,8 @@ using namespace amrex;
 template <typename PTDType>
 struct SchoolBinner
 {
-    SchoolBinner(const Geometry &geom, const IntVect &bin_size, const Box &box, const int max_school, const int max_work_nborhood) :
-                 bin_size(bin_size), box(box), max_school(max_school), max_work_nborhood(max_work_nborhood) {
+    SchoolBinner(const Geometry &geom, const IntVect &bin_size, const Box &box, const int max_school) :
+                 bin_size(bin_size), box(box), max_school(max_school) {
         dxi = geom.InvCellSizeArray();
         plo = geom.ProbLoArray();
         domain = geom.Domain();
@@ -27,8 +27,7 @@ struct SchoolBinner
         auto iv = getParticleCell(ptd, i, plo, dxi, domain);
         auto tid = getTileIndex(iv, box, true, bin_size, tbx);
         auto school = ptd.m_idata[IntIdx::school][i];
-        auto work_nborhood = ptd.m_idata[IntIdx::work_nborhood][i];
-        return static_cast<unsigned int>((tid * max_school + school) * max_work_nborhood + work_nborhood);
+        return static_cast<unsigned int>(tid * max_school + school);
     }
 
   private:
@@ -39,7 +38,6 @@ struct SchoolBinner
     IntVect bin_size;
     Box box;
     int max_school;
-    int max_work_nborhood;
 };
 
 /*! \brief One-on-one interaction between an infectious agent and a susceptible agent.
@@ -58,8 +56,10 @@ static void binaryInteractionSchool (const int infectious_i, /*!< Index of infec
     Real infect = a_lparm->infect;
     infect *= (1.0_rt - a_lparm->vac_eff);
 
+    if (a_ptd.m_idata[IntIdx::nborhood][infectious_i] != a_ptd.m_idata[IntIdx::nborhood][susceptible_i]) return;
+    if (a_ptd.m_idata[IntIdx::work_nborhood][infectious_i] != a_ptd.m_idata[IntIdx::work_nborhood][susceptible_i]) return;
+
     AMREX_ALWAYS_ASSERT(a_ptd.m_idata[IntIdx::school][infectious_i] == a_ptd.m_idata[IntIdx::school][susceptible_i]);
-    AMREX_ALWAYS_ASSERT(a_ptd.m_idata[IntIdx::work_nborhood][infectious_i] == a_ptd.m_idata[IntIdx::work_nborhood][susceptible_i]);
     AMREX_ALWAYS_ASSERT(a_ptd.m_idata[IntIdx::work_i][infectious_i] == a_ptd.m_idata[IntIdx::work_i][susceptible_i] &&
                         a_ptd.m_idata[IntIdx::work_j][infectious_i] == a_ptd.m_idata[IntIdx::work_j][susceptible_i]);
 
@@ -68,10 +68,17 @@ static void binaryInteractionSchool (const int infectious_i, /*!< Index of infec
     auto school_ptr = a_ptd.m_idata[IntIdx::school];
 
     // binned so that infectious and susceptible are in the same school
-    int school = school_ptr[infectious_i];
+    int school = school_ptr[susceptible_i];
     //infect *= i_mask;
     //infect *= j_mask;
     ParticleReal prob = 1.0_prt;
+    if (nborhood_ptr[infectious_i] == nborhood_ptr[susceptible_i]) {
+        if (school > 5) {             // Playgroup
+            prob *= 1.0_prt - infect * a_lparm->xmit_school[6] * a_social_scale;
+        } else if (school == 5) {     // Day care
+            prob *= 1.0_prt - infect * a_lparm->xmit_school[5] * a_social_scale;
+        }
+    }
     // Elementary/middle/high school in common
     if (school > 0 && school < 5) {
         if (age_group_ptr[infectious_i] <= 1) {  // Transmitter i is a child
@@ -82,14 +89,6 @@ static void binaryInteractionSchool (const int infectious_i, /*!< Index of infec
             }
         } else if (age_group_ptr[susceptible_i] <= 1) {  // Adult teacher/staff -> child student
             prob *= 1.0_prt - infect * a_lparm->xmit_sch_a2c[school] * a_social_scale;
-        }
-    } else {
-        if (nborhood_ptr[infectious_i] == nborhood_ptr[susceptible_i]) {
-            if (school > 5) {             // Playgroup
-                prob *= 1.0_prt - infect * a_lparm->xmit_school[6] * a_social_scale;
-            } else if (school == 5) {     // Day care
-                prob *= 1.0_prt - infect * a_lparm->xmit_school[5] * a_social_scale;
-            }
         }
     }
     Gpu::Atomic::Multiply(&a_prob_ptr[susceptible_i], prob);
@@ -108,10 +107,10 @@ class InteractionModSchool : public InteractionModel<AC,ACT,ACTD,A>
         virtual ~InteractionModSchool() = default;
 
         /*! \brief Simulate agent interaction at school */
-        virtual void interactAgents( AC&, MultiFab& ) override;
+        virtual void interactAgents(AC&, MultiFab&) override;
 
         /*! \brief Simulate agent interaction at school */
-        virtual void interactAgents( AC&, MultiFab&, AC& ) override {
+        virtual void interactAgents(AC&, MultiFab&, AC&) override {
             amrex::Abort("Do not use this interface for this interaction model");
         }
 
@@ -177,19 +176,16 @@ void InteractionModSchool<AC,ACT,ACTD,A>::interactAgents(AC& a_agents, /*!< Agen
             auto random_travel_ptr = soa.GetIntData(IntIdx::random_travel).data();
 
             int max_school = 0;
-            int max_work_nborhood = 0;
             for (int i = 0; i < np; i++) {
                 max_school = max(max_school, school_ptr[i]);
-                max_work_nborhood = max(max_work_nborhood, work_nborhood_ptr[i]);
             }
             max_school++;
-            max_work_nborhood++;
 
             // agents are binned by community + workgroup. These values can change from one time step to the next so they
             // have to be recomputed (rebuild the bins) every time step
-            SchoolBinner<ACTD> binner(a_agents.Geom(lev), bin_size, mfi.validbox(), max_school, max_work_nborhood);
+            SchoolBinner<ACTD> binner(a_agents.Geom(lev), bin_size, mfi.validbox(), max_school);
             DenseBins<ACTD> bins_school;
-            bins_school.build(BinPolicy::GPU, np, ptd, num_tiles * max_school * max_work_nborhood, binner);
+            bins_school.build(BinPolicy::GPU, np, ptd, num_tiles * max_school, binner);
 
             AMREX_ALWAYS_ASSERT(bins_school.numBins() >= 0);
             auto inds = bins_school.permutationPtr();
@@ -225,7 +221,6 @@ void InteractionModSchool<AC,ACT,ACTD,A>::interactAgents(AC& a_agents, /*!< Agen
                             if (infectious_i != susceptible_i &&
                                 isSusceptible(susceptible_i, ptd, d) &&
                                 !isHospitalized(susceptible_i, ptd) &&
-                                work_nborhood_ptr[infectious_i] == work_nborhood_ptr[susceptible_i] &&
                                 school_ptr[susceptible_i] > 0 &&
                                 !withdrawn_ptr[susceptible_i] &&
                                 random_travel_ptr[susceptible_i] < 0)
