@@ -204,7 +204,7 @@ void AgentContainer::moveAgentsToWork ()
     m_at_work = true;
 
     Redistribute();
-    AMREX_ALWAYS_ASSERT(OK());
+    AMREX_ASSERT(OK());
 }
 
 /*! \brief Move agents to home
@@ -252,7 +252,7 @@ void AgentContainer::moveAgentsToHome ()
     m_at_work = false;
 
     Redistribute();
-    AMREX_ALWAYS_ASSERT(OK());
+    AMREX_ASSERT(OK());
 }
 
 /*! \brief Move agents randomly
@@ -303,6 +303,9 @@ void AgentContainer::moveRandomTravel ()
             });
         }
     }
+
+    Redistribute();
+    AMREX_ALWAYS_ASSERT(OK());
 }
 
 /*! \brief Return agents from random travel
@@ -351,6 +354,8 @@ void AgentContainer::returnRandomTravel (const AgentContainer& on_travel_pc)
             }
         }
     }
+    Redistribute();
+    AMREX_ALWAYS_ASSERT(OK());
 }
 
 /*! \brief Updates disease status of each agent */
