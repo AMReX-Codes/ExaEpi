@@ -86,8 +86,8 @@ static void binaryInteractionRandom ( const int a_i, /*!< Index of infectious ag
 }
 
 /*! \brief Class describing agent interactions for random travel */
-template <typename AC, typename ACT, typename ACTD, typename A>
-class InteractionModRandom : public InteractionModel<AC,ACT,ACTD,A>
+template <typename PCType, typename PTDType, typename PType>
+class InteractionModRandom : public InteractionModel<PCType, PTDType, PType>
 {
     public:
 
@@ -98,12 +98,12 @@ class InteractionModRandom : public InteractionModel<AC,ACT,ACTD,A>
         virtual ~InteractionModRandom() = default;
 
         /*! \brief Simulate agent interaction for random travel */
-        void interactAgents( AC&, MultiFab&) override {
+        void interactAgents( PCType&, MultiFab&) override {
             amrex::Abort("Do not use this interface for this interaction model");
         }
 
         /*! \brief Simulate agent interaction for random travel */
-        void interactAgents( AC&, MultiFab&, AC&) override ;
+        void interactAgents( PCType&, MultiFab&, PCType&) override ;
 
     protected:
 
@@ -112,10 +112,10 @@ class InteractionModRandom : public InteractionModel<AC,ACT,ACTD,A>
 
 /*! Simulate the interactions for agents on random travel
 */
-template <typename AC, typename ACT, typename ACTD, typename A>
-void InteractionModRandom<AC,ACT,ACTD,A>::interactAgents(AC& a_agents, /*!< Agent container */
-                                                         MultiFab& /*a_mask*/, /*!< Masking behavior */
-                                                         AC& a_on_random_travel)
+template <typename PCType, typename PTDType, typename PType>
+void InteractionModRandom<PCType, PTDType, PType>::interactAgents(PCType& a_agents, /*!< Agent container */
+                                                                  MultiFab& /*a_mask*/, /*!< Masking behavior */
+                                                                  PCType& a_on_random_travel)
 {
     BL_PROFILE("InteractionModRandom::interactAgents");
     int n_disease = a_agents.numDiseases();
@@ -149,7 +149,7 @@ void InteractionModRandom<AC,ACT,ACTD,A>::interactAgents(AC& a_agents, /*!< Agen
             auto& aos   = ptile.GetArrayOfStructs();
             const auto np = aos.numParticles();
 
-            auto binner = GetRandomBin<ACTD>{plo, dxi, domain, bin_size, mfi.validbox()};
+            auto binner = GetRandomBin<PTDType>{plo, dxi, domain, bin_size, mfi.validbox()};
             AMREX_ALWAYS_ASSERT(bins_ptr->numBins() >= 0);
             AMREX_ALWAYS_ASSERT(travel_bins_ptr->numBins() >= 0);
             auto inds = bins_ptr->permutationPtr();
@@ -171,7 +171,7 @@ void InteractionModRandom<AC,ACT,ACTD,A>::interactAgents(AC& a_agents, /*!< Agen
 
                     AMREX_ALWAYS_ASSERT( (Long) i < np);
 
-                    if ( notSusceptible<ACTD>(i, ptd, d) )  { return; }
+                    if ( notSusceptible<PTDType>(i, ptd, d) )  { return; }
 
                     //Real i_mask = mask_arr(home_i_ptr[i], home_j_ptr[i], 0);
                     for (auto jj = cell_start; jj < cell_stop; ++jj) {
@@ -182,9 +182,9 @@ void InteractionModRandom<AC,ACT,ACTD,A>::interactAgents(AC& a_agents, /*!< Agen
                         //Real j_mask = mask_arr(home_i_ptr[j], home_j_ptr[j], 0);
                         //if (i == j) continue;
 
-                        if ( isInfectious<ACTD>(j, travel_ptd, d) ) {
+                        if ( isInfectious<PTDType>(j, travel_ptd, d) ) {
                             Real social_scale = 1.0_prt;  // TODO this should vary based on cell
-                            binaryInteractionRandom<ACTD>( j, i, travel_ptd, ptd, lparm, social_scale, prob_ptr );
+                            binaryInteractionRandom<PTDType>( j, i, travel_ptd, ptd, lparm, social_scale, prob_ptr );
                         }
                     }
                 });
@@ -233,7 +233,7 @@ void InteractionModRandom<AC,ACT,ACTD,A>::interactAgents(AC& a_agents, /*!< Agen
 
                     AMREX_ALWAYS_ASSERT( (Long) i < np);
 
-                    if ( notSusceptible<ACTD>(i, ptd, d) )  { return; }
+                    if ( notSusceptible<PTDType>(i, ptd, d) )  { return; }
 
                     //Real i_mask = mask_arr(home_i_ptr[i], home_j_ptr[i], 0);
                     for (auto jj = cell_start; jj < cell_stop; ++jj) {
@@ -244,9 +244,9 @@ void InteractionModRandom<AC,ACT,ACTD,A>::interactAgents(AC& a_agents, /*!< Agen
                         //Real j_mask = mask_arr(home_i_ptr[j], home_j_ptr[j], 0);
                         //if (i == j) continue;
 
-                        if ( isInfectious<ACTD>(j, ptd, d) ) {
+                        if ( isInfectious<PTDType>(j, ptd, d) ) {
                             Real social_scale = 1.0_prt;  // TODO this should vary based on cell
-                            binaryInteractionRandom<ACTD>( j, i, ptd, travel_ptd, lparm, social_scale, prob_ptr );
+                            binaryInteractionRandom<PTDType>( j, i, ptd, travel_ptd, lparm, social_scale, prob_ptr );
                         }
                     }
                 });

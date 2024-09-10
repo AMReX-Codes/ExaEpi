@@ -80,8 +80,8 @@ struct NborhoodCandidate {
 
 
 /*! \brief Class describing agent interactions in the neighborhood/community */
-template <typename AC, typename ACT, typename ACTD, typename A>
-class InteractionModNborhood : public InteractionModel<AC,ACT,ACTD,A>
+template <typename PCType, typename PTDType, typename PType>
+class InteractionModNborhood : public InteractionModel<PCType, PTDType, PType>
 {
     public:
 
@@ -92,17 +92,17 @@ class InteractionModNborhood : public InteractionModel<AC,ACT,ACTD,A>
         virtual ~InteractionModNborhood() = default;
 
         /*! \brief Simulate agent interaction in the neighborhood/community */
-        virtual void interactAgents (AC& agents, MultiFab&) override {
+        virtual void interactAgents (PCType& agents, MultiFab&) override {
             // passing -1 for the binning group indicates bin only by community (cell)
             if (agents.isAtWork()) {
-                interactAgentsImpl<AC, ACTD, NborhoodCandidate<ACTD>, BinaryInteractionNborhood<true, ACTD>>(agents, -1);
+                interactAgentsImpl<PCType, PTDType, NborhoodCandidate<PTDType>, BinaryInteractionNborhood<true, PTDType>>(agents, -1);
             } else {
-                interactAgentsImpl<AC, ACTD, NborhoodCandidate<ACTD>, BinaryInteractionNborhood<false, ACTD>>(agents, -1);
+                interactAgentsImpl<PCType, PTDType, NborhoodCandidate<PTDType>, BinaryInteractionNborhood<false, PTDType>>(agents, -1);
             }
         }
 
         /*! \brief Simulate agent interaction in the neighborhood/community */
-        virtual void interactAgents (AC&, MultiFab&, AC&) override {
+        virtual void interactAgents (PCType&, MultiFab&, PCType&) override {
             amrex::Abort("Do not use this interface for this interaction model");
         }
 

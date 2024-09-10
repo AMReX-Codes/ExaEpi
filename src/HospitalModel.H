@@ -12,8 +12,8 @@
 using namespace amrex;
 
 /*! \brief Class describing agent interactions and treatment at hospital */
-template <typename AC, typename ACT, typename ACTD, typename A>
-class HospitalModel : public InteractionModel<AC,ACT,ACTD,A>
+template <typename PCType, typename PTDType, typename PType>
+class HospitalModel : public InteractionModel<PCType, PTDType, PType>
 {
     public:
 
@@ -21,22 +21,22 @@ class HospitalModel : public InteractionModel<AC,ACT,ACTD,A>
         HospitalModel() { }
 
         /*! \brief default destructor */
-        virtual ~HospitalModel() = default;
+        virtual ~HospitalModel () = default;
 
         /*! \brief Simulate agent interaction at hospital */
-        virtual void interactAgents( AC&, MultiFab& ) override
+        virtual void interactAgents (PCType&, MultiFab&) override
         {
             // not yet implemented
         }
 
         /*! \brief Simulate agent interaction in the hospital for agents on travel */
-        virtual void interactAgents( AC&, MultiFab&, AC& ) override {}
+        virtual void interactAgents (PCType&, MultiFab&, PCType&) override {}
 
         using MFPtr = std::unique_ptr<MultiFab>;
         using MFPtrVec = std::vector<MFPtr>;
 
         /*! \brief Simulate treatment of agents in a hospital */
-        virtual void treatAgents( AC&, MFPtrVec& );
+        virtual void treatAgents (PCType&, MFPtrVec&);
 
     protected:
 
@@ -51,9 +51,9 @@ class HospitalModel : public InteractionModel<AC,ACT,ACTD,A>
       + Else: implement the treatment
               discharge once treatment is complete
 */
-template <typename AC, typename ACT, typename ACTD, typename A>
-void HospitalModel<AC,ACT,ACTD,A>::treatAgents(AC& a_agents, /*!< Agent container */
-                                               MFPtrVec& a_dstats /*!< disease stats */ )
+template <typename PCType, typename PTDType, typename PType>
+void HospitalModel<PCType, PTDType, PType>::treatAgents(PCType& a_agents, /*!< Agent container */
+                                                        MFPtrVec& a_dstats /*!< disease stats */ )
 {
     BL_PROFILE("HospitalModel::interactAgents");
     int n_disease = a_agents.numDiseases();
@@ -74,7 +74,7 @@ void HospitalModel<AC,ACT,ACTD,A>::treatAgents(AC& a_agents, /*!< Agent containe
             const auto& ptd = ptile.getParticleTileData();
             auto& soa   = ptile.GetStructOfArrays();
             auto& aos   = ptile.GetArrayOfStructs();
-            A* pstruct = &(aos[0]);
+            PType* pstruct = &(aos[0]);
             const auto np = ptile.numParticles();
 
             auto age_group_ptr = soa.GetIntData(IntIdx::age_group).data();
@@ -240,7 +240,7 @@ void HospitalModel<AC,ACT,ACTD,A>::treatAgents(AC& a_agents, /*!< Agent containe
                         hosp_i_ptr[i] = -1;
                         hosp_j_ptr[i] = -1;
                         withdrawn_ptr[i] = 0;
-                        A& p = pstruct[i];
+                        PType& p = pstruct[i];
                         p.pos(0) = (home_i_ptr[i] + 0.5_prt)*dx[0];
                         p.pos(1) = (home_j_ptr[i] + 0.5_prt)*dx[1];
                     }

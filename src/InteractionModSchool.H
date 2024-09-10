@@ -77,8 +77,8 @@ struct SchoolCandidate {
 
 
 /*! \brief Class describing agent interactions at school */
-template <typename AC, typename ACT, typename ACTD, typename A>
-class InteractionModSchool : public InteractionModel<AC,ACT,ACTD,A>
+template <typename PCType, typename PTDType, typename PType>
+class InteractionModSchool : public InteractionModel<PCType, PTDType, PType>
 {
     public:
 
@@ -89,12 +89,12 @@ class InteractionModSchool : public InteractionModel<AC,ACT,ACTD,A>
         virtual ~InteractionModSchool() = default;
 
         /*! \brief Simulate agent interaction at school */
-        virtual void interactAgents (AC& agents, MultiFab&) override {
-            interactAgentsImpl<AC, ACTD, SchoolCandidate<ACTD>, BinaryInteractionSchool<ACTD>>(agents, IntIdx::school);
+        virtual void interactAgents (PCType& agents, MultiFab&) override {
+            interactAgentsImpl<PCType, PTDType, SchoolCandidate<PTDType>, BinaryInteractionSchool<PTDType>>(agents, IntIdx::school);
         }
 
         /*! \brief Simulate agent interaction at school */
-        virtual void interactAgents (AC&, MultiFab&, AC&) override {
+        virtual void interactAgents (PCType&, MultiFab&, PCType&) override {
             amrex::Abort("Do not use this interface for this interaction model");
         }
 

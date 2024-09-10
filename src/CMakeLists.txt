@@ -15,7 +15,7 @@ set(_sources
          IO.H
          IO.cpp
          InteractionModel.H
-         InteractionModGeneric.H
+         #InteractionModGeneric.H
          InteractionModHome.H
          InteractionModNborhood.H
          InteractionModRandom.H

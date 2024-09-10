@@ -33,7 +33,7 @@ class AgentContainer
     using PType = ParticleType;
     using PTileType = ParticleTileType;
     using PTDType = PTileType::ParticleTileDataType;
-    using IntModel = InteractionModel<PCType,PTileType,PTDType,PType>;
+    using IntModel = InteractionModel<PCType, PTDType, PType>;
 
     using MFPtr = std::unique_ptr<MultiFab>;
     using MFPtrVec = std::vector<MFPtr>;
@@ -168,8 +168,8 @@ protected:
         see AgentContainer::interactAgentsRandom() */
     std::map<std::pair<int, int>, amrex::DenseBins<PTDType> > m_bins_random;
 
-    std::map<std::string,IntModel*> m_interactions; /*!< Map of interaction models */
-    std::unique_ptr<HospitalModel<PCType,PTileType,PTDType,PType>> m_hospital; /*!< hospital model */
+    std::map<std::string, IntModel*> m_interactions; /*!< Map of interaction models */
+    std::unique_ptr<HospitalModel<PCType, PTDType, PType>> m_hospital; /*!< hospital model */
 
     /*! Flag to indicate if agents are at work */
     bool m_at_work;

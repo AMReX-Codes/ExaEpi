@@ -21,10 +21,10 @@ template <typename PTDType>
 struct BinaryInteractionHome {
     AMREX_GPU_DEVICE
     ParticleReal operator() (const int infectious_i, /*!< Index of infectious agent */
-                                    const int susceptible_i, /*!< Index of susceptible agent */
-                                    const PTDType& a_ptd, /*!< Particle tile data */
-                                    const DiseaseParm* const a_lparm,  /*!< disease paramters */
-                                    const Real a_social_scale /*!< Social scale */) const noexcept {
+                             const int susceptible_i, /*!< Index of susceptible agent */
+                             const PTDType& a_ptd, /*!< Particle tile data */
+                             const DiseaseParm* const a_lparm,  /*!< disease paramters */
+                             const Real a_social_scale /*!< Social scale */) const noexcept {
         Real infect = a_lparm->infect;
         infect *= (1.0_rt - a_lparm->vac_eff);
 
@@ -84,8 +84,8 @@ struct HomeCandidate {
 };
 
 /*! \brief Class describing agent interactions at home */
-template <typename AC, typename ACT, typename ACTD, typename A>
-class InteractionModHome : public InteractionModel<AC,ACT,ACTD,A>
+template <typename PCType, typename PTDType, typename PType>
+class InteractionModHome : public InteractionModel<PCType, PTDType, PType>
 {
     public:
 
@@ -96,12 +96,12 @@ class InteractionModHome : public InteractionModel<AC,ACT,ACTD,A>
         virtual ~InteractionModHome() = default;
 
         /*! \brief Simulate agent interaction at home */
-        virtual void interactAgents (AC& agents, MultiFab&) override {
-            interactAgentsImpl<AC, ACTD, HomeCandidate<ACTD>, BinaryInteractionHome<ACTD>>(agents, IntIdx::nborhood);
+        virtual void interactAgents (PCType& agents, MultiFab&) override {
+            interactAgentsImpl<PCType, PTDType, HomeCandidate<PTDType>, BinaryInteractionHome<PTDType>>(agents, IntIdx::nborhood);
         }
 
         /*! \brief Simulate agent interaction at home */
-        virtual void interactAgents (AC&, MultiFab&, AC&) override {
+        virtual void interactAgents (PCType&, MultiFab&, PCType&) override {
             amrex::Abort("Do not use this interface for this interaction model");
         }
 

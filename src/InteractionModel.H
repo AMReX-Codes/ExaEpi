@@ -23,7 +23,8 @@ namespace ExaEpi
     /*! \brief Name of models */
     namespace InteractionNames
     {
-        const std::string generic = "generic";
+        // The generic model is never used.
+        //const std::string generic = "generic";
         const std::string home = "home";
         const std::string work = "work";
         const std::string school = "school";
@@ -41,31 +42,30 @@ namespace ExaEpi
  *    inheriting from this class, InteractionModel::getAgentAttribs() is called
  *    to set these pointers before using them.
  */
-template <  typename AC /*!< agent container type */,
-            typename ACT, /*!< agent container tile type */
-            typename ACTD, /*!< agent container tile data type */
-            typename A /*!< agent type */>
+template <typename PCType /*!< agent container type */,
+          typename PTDType /*!< agent container tile data type */,
+          typename PType /*!< agent type */>
 class InteractionModel
 {
     public:
 
         /*! \brief null constructor */
-        InteractionModel<AC,ACT,ACTD,A>() { }
+        InteractionModel<PCType, PTDType, PType> () {}
 
         /*! \brief default destructor */
-        virtual ~InteractionModel<AC,ACT,ACTD,A>() = default;
+        virtual ~InteractionModel<PCType, PTDType, PType> () = default;
 
         /*! \brief Interact agents for a model */
-        virtual void interactAgents(AC&, MultiFab&) = 0;
+        virtual void interactAgents(PCType&, MultiFab&) = 0;
 
         /*! \brief Interact agents for a model */
-        virtual void interactAgents(AC&, MultiFab&, AC&) = 0;
+        virtual void interactAgents(PCType&, MultiFab&, PCType&) = 0;
 
     protected:
 
 
         /*! \brief Get probability pointer from agent container */
-        inline ParticleReal* getAgentProbPtr (  AC&           a_agents,  /*!< agent container */
+        inline ParticleReal* getAgentProbPtr (  PCType&           a_agents,  /*!< agent container */
                                                 const int     a_lev,     /*!< level */
                                                 const MFIter& a_mfi,     /*!< multifab iterator*/
                                                 const int     a_d_idx    /*!< disease index */ )
@@ -78,7 +78,7 @@ class InteractionModel
         }
 
         /*! \brief Make particle bins for interactions at a given model */
-        virtual void makeBins(  AC&                 a_agents,   /*!< agent container */
+        virtual void makeBins(  PCType&                 a_agents,   /*!< agent container */
                                 const IntVect&      a_bin_size, /*!< bin size */
                                 const int           a_lev,      /*!< level */
                                 const std::string&  a_mod       /*!< interaction model */ )
@@ -215,7 +215,9 @@ void interactAgentsImpl(AgentContainer& agents, int bin_idx)
             // have to be recomputed (rebuild the bins) every time step
             Binner<PTDType> binner(agents.Geom(lev), bin_size, mfi.validbox(), max_group, bin_idx);
             DenseBins<PTDType> bins;
-            bins.build(BinPolicy::GPU, np, ptd, num_tiles * max_group, binner);
+            // The GPU bin policy is faster, but non-deterministic.
+            // bins.build(BinPolicy::GPU, np, ptd, num_tiles * max_group, binner);
+            bins.build(BinPolicy::Serial, np, ptd, num_tiles * max_group, binner);
 
             AMREX_ALWAYS_ASSERT(bins.numBins() >= 0);
             auto inds = bins.permutationPtr();

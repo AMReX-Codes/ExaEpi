@@ -70,14 +70,14 @@ AgentContainer::AgentContainer (const amrex::Geometry            & a_geom,  /*!<
 
         /* Create the interaction model objects and push to container */
         m_interactions.clear();
-        m_interactions[InteractionNames::generic] = new InteractionModGeneric<PCType,PTileType,PTDType,PType>;
-        m_interactions[InteractionNames::home] = new InteractionModHome<PCType,PTileType,PTDType,PType>;
-        m_interactions[InteractionNames::work] = new InteractionModWork<PCType,PTileType,PTDType,PType>;
-        m_interactions[InteractionNames::school] = new InteractionModSchool<PCType,PTileType,PTDType,PType>;
-        m_interactions[InteractionNames::nborhood] = new InteractionModNborhood<PCType,PTileType,PTDType,PType>;
-        m_interactions[InteractionNames::random] = new InteractionModRandom<PCType,PTileType, PTDType, PType>;
+        //m_interactions[InteractionNames::generic] = new InteractionModGeneric<PCType,PTileType,PTDType,PType>;
+        m_interactions[InteractionNames::home] = new InteractionModHome<PCType, PTDType, PType>;
+        m_interactions[InteractionNames::work] = new InteractionModWork<PCType, PTDType, PType>;
+        m_interactions[InteractionNames::school] = new InteractionModSchool<PCType, PTDType, PType>;
+        m_interactions[InteractionNames::nborhood] = new InteractionModNborhood<PCType, PTDType, PType>;
+        m_interactions[InteractionNames::random] = new InteractionModRandom<PCType, PTDType, PType>;
 
-        m_hospital = std::make_unique<HospitalModel<PCType,PTileType,PTDType,PType>>();
+        m_hospital = std::make_unique<HospitalModel<PCType, PTDType, PType>>();
     }
 
     m_h_parm.resize(m_num_diseases);

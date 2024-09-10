@@ -49,8 +49,8 @@ struct WorkCandidate {
 
 
 /*! \brief Class describing agent interactions at work */
-template <typename AC, typename ACT, typename ACTD, typename A>
-class InteractionModWork : public InteractionModel<AC,ACT,ACTD,A>
+template <typename PCType, typename PTDType, typename PType>
+class InteractionModWork : public InteractionModel<PCType, PTDType, PType>
 {
     public:
 
@@ -61,12 +61,12 @@ class InteractionModWork : public InteractionModel<AC,ACT,ACTD,A>
         virtual ~InteractionModWork () = default;
 
         /*! \brief Simulate agent interaction at work */
-        virtual void interactAgents (AC& agents, MultiFab&) override {
-            interactAgentsImpl<AC, ACTD, WorkCandidate<ACTD>, BinaryInteractionWork<ACTD>>(agents, IntIdx::workgroup);
+        virtual void interactAgents (PCType& agents, MultiFab&) override {
+            interactAgentsImpl<PCType, PTDType, WorkCandidate<PTDType>, BinaryInteractionWork<PTDType>>(agents, IntIdx::workgroup);
         }
 
         /*! \brief Simulate agent interaction at work */
-        virtual void interactAgents (AC&, MultiFab&, AC&) override {
+        virtual void interactAgents (PCType&, MultiFab&, PCType&) override {
             amrex::Abort("Do not use this interface for this interaction model");
         }
 
