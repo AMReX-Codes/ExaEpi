@@ -148,7 +148,6 @@ void InteractionModRandom<AC,ACT,ACTD,A>::interactAgents(AC& a_agents, /*!< Agen
 
             auto& aos   = ptile.GetArrayOfStructs();
             const auto np = aos.numParticles();
-            auto pstruct_ptr = aos().dataPtr();
 
             auto binner = GetRandomBin<ACTD>{plo, dxi, domain, bin_size, mfi.validbox()};
             AMREX_ALWAYS_ASSERT(bins_ptr->numBins() >= 0);

@@ -98,7 +98,7 @@ class InteractionModHome : public InteractionModel<AC,ACT,ACTD,A>
         /*! \brief Simulate agent interaction at home */
         virtual void interactAgents (AC& agents, MultiFab&) override {
             interactAgentsImpl<AC, ACTD, HomeCandidate<ACTD>, BinaryInteractionHome<ACTD>>(agents, IntIdx::nborhood);
-        };
+        }
 
         /*! \brief Simulate agent interaction at home */
         virtual void interactAgents (AC&, MultiFab&, AC&) override {

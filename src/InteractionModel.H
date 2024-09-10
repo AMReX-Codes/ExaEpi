@@ -97,7 +97,6 @@ class InteractionModel
                 auto& ptile = a_agents.ParticlesAt(a_lev, mfi);
                 auto& aos   = ptile.GetArrayOfStructs();
                 const auto np = aos.numParticles();
-                auto pstruct_ptr = aos().dataPtr();
                 const auto& ptd = ptile.getParticleTileData();
 
                 const Box& box = mfi.validbox();
@@ -202,12 +201,10 @@ void interactAgentsImpl(AgentContainer& agents, int bin_idx)
             const auto np = ptile.GetArrayOfStructs().numParticles();
             auto& soa = ptile.GetStructOfArrays();
             auto num_tiles = numTilesInBox(mfi.validbox(), true, bin_size);
-            auto bingroup_ptr = soa.GetIntData(bin_idx).data();
-            auto withdrawn_ptr = soa.GetIntData(IntIdx::withdrawn).data();
-            auto random_travel_ptr = soa.GetIntData(IntIdx::random_travel).data();
 
             int max_group = 0;
             if (bin_idx != -1) {
+                auto bingroup_ptr = soa.GetIntData(bin_idx).data();
                 for (int i = 0; i < np; i++) {
                     max_group = max(max_group, bingroup_ptr[i]);
                 }
