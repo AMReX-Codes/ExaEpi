@@ -117,8 +117,8 @@ class InteractionModel
 template <typename PTDType>
 struct Binner
 {
-    Binner(const Geometry &geom, const IntVect &bin_size, const Box &box, const int max_group, const int bin_idx) :
-           bin_size(bin_size), box(box), max_group(max_group), bin_idx(bin_idx) {
+    Binner(const Geometry &geom, const IntVect &_bin_size, const Box &_box, const int _max_group, const int _bin_idx) :
+           bin_size(_bin_size), box(_box), max_group(_max_group), bin_idx(_bin_idx) {
         dxi = geom.InvCellSizeArray();
         plo = geom.ProbLoArray();
         domain = geom.Domain();
