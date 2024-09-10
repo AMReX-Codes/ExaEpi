@@ -94,7 +94,7 @@ class InteractionModel
                 auto pair_ind = std::make_pair(mfi.index(), mfi.LocalTileIndex());
                 auto bins_ptr = a_agents.getBins(pair_ind, a_mod);
 
-                if (bins_ptr->numBins() < 0) {
+                //if (bins_ptr->numBins() < 0) {
 
                     auto& ptile = a_agents.ParticlesAt(a_lev, mfi);
                     auto& aos   = ptile.GetArrayOfStructs();
@@ -105,10 +105,11 @@ class InteractionModel
                     int ntiles = numTilesInBox(box, true, a_bin_size);
 
                     auto binner = GetParticleBin{plo, dxi, domain, a_bin_size, box};
-                    bins_ptr->build(BinPolicy::Serial, np, pstruct_ptr, ntiles, binner);
+                    //bins_ptr->build(BinPolicy::Serial, np, pstruct_ptr, ntiles, binner);
+                    bins_ptr->build(BinPolicy::GPU, np, pstruct_ptr, ntiles, binner);
 
                     AMREX_ALWAYS_ASSERT(np == bins_ptr->numItems());
-                }
+                //}
 
                 Gpu::synchronize();
             }
