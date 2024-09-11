@@ -60,7 +60,7 @@ public:
 
     void moveAgentsRandomWalk ();
 
-    void moveRandomTravel ();
+    void moveRandomTravel (const amrex::Real random_travel_prob);
 
     void returnRandomTravel (const AgentContainer& on_travel_pc);
 

@@ -330,7 +330,7 @@ void runAgent ()
             }
 
             if ((params.random_travel_int > 0) && (i % params.random_travel_int == 0)) {
-                pc.moveRandomTravel();
+                pc.moveRandomTravel(params.random_travel_prob);
                 using SrcData = AgentContainer::ParticleTileType::ConstParticleTileDataType;
                 on_travel_pc.copyParticles(pc,
                                            [=] AMREX_GPU_HOST_DEVICE (const SrcData& src, int ip) {

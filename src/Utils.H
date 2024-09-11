@@ -28,6 +28,7 @@ struct TestParams
     int plot_int;                       /*!< plot interval (see ExaEpi::IO::writePlotFile) */
     int random_travel_int;              /*!< steps between random travel events
                                              (see AgentContainer::moveRandomTravel) */
+    amrex::Real random_travel_prob;     /*!< probability of an agent going on random travel */
     short ic_type;                      /*!< initialization type (see ExaEpi::ICType) */
 
     int num_diseases;   /*!< Number of diseases to track */

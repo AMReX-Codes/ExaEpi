@@ -259,7 +259,7 @@ void AgentContainer::moveAgentsToHome ()
 
     For each agent, set its position to a random location with a probabilty of 0.01%
 */
-void AgentContainer::moveRandomTravel ()
+void AgentContainer::moveRandomTravel (const amrex::Real random_travel_prob)
 {
     BL_PROFILE("AgentContainer::moveRandomTravel");
 
@@ -289,10 +289,9 @@ void AgentContainer::moveRandomTravel ()
             amrex::ParallelForRNG( np,
             [=] AMREX_GPU_DEVICE (int i, RandomEngine const& engine) noexcept
             {
-                if (!isHospitalized(i, ptd)) {
+                if (!isHospitalized(i, ptd) && !withdrawn_ptr[i]) {
                     ParticleType& p = pstruct[i];
-                    if (withdrawn_ptr[i] == 1) {return ;}
-                    if (amrex::Random(engine) < 0.0001) {
+                    if (amrex::Random(engine) < random_travel_prob) {
                         random_travel_ptr[i] = i;
                         int i_random = int( amrex::Real(i_max)*amrex::Random(engine));
                         int j_random = int( amrex::Real(j_max)*amrex::Random(engine));
@@ -346,6 +345,8 @@ void AgentContainer::returnRandomTravel (const AgentContainer& on_travel_pc)
                     [=] AMREX_GPU_DEVICE (int i) noexcept
                     {
                         int dst_index = random_travel_ptr_travel[i];
+                        if (prob_ptr_travel[i] != 1.0) Print() << i << " " << prob_ptr_travel[i] << "\n";
+                        Print() << dst_index << " " << prob_ptr[dst_index] << "\n";
                         prob_ptr[dst_index] += prob_ptr_travel[i];
                         AMREX_ALWAYS_ASSERT(random_travel_ptr[dst_index] = dst_index);
                         AMREX_ALWAYS_ASSERT(random_travel_ptr[dst_index] >= 0);
