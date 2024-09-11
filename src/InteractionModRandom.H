@@ -108,6 +108,42 @@ class InteractionModRandom : public InteractionModel<PCType, PTDType, PType>
     protected:
 
     private:
+
+        /*! \brief Make particle bins for interactions at a given model */
+        void makeBins (PCType&             a_agents,   /*!< agent container */
+                       const IntVect&      a_bin_size, /*!< bin size */
+                       const int           a_lev,      /*!< level */
+                       const std::string&  a_mod       /*!< interaction model */ )
+        {
+            BL_PROFILE("InteractionModel::makeBins");
+            const Geometry& geom = a_agents.Geom(a_lev);
+            const auto dxi = geom.InvCellSizeArray();
+            const auto plo = geom.ProbLoArray();
+            const auto domain = geom.Domain();
+
+            for(MFIter mfi = a_agents.MakeMFIter(a_lev, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+
+                auto pair_ind = std::make_pair(mfi.index(), mfi.LocalTileIndex());
+                auto bins_ptr = a_agents.getBins(pair_ind, a_mod);
+
+                auto& ptile = a_agents.ParticlesAt(a_lev, mfi);
+                auto& aos   = ptile.GetArrayOfStructs();
+                const auto np = aos.numParticles();
+                const auto& ptd = ptile.getParticleTileData();
+
+                const Box& box = mfi.validbox();
+                int ntiles = numTilesInBox(box, true, a_bin_size);
+
+                auto binner = GetParticleBin{plo, dxi, domain, a_bin_size, box};
+                bins_ptr->build(BinPolicy::Serial, np, ptd, ntiles, binner);
+
+                AMREX_ALWAYS_ASSERT(np == bins_ptr->numItems());
+
+                Gpu::synchronize();
+            }
+        }
+
+
 };
 
 /*! Simulate the interactions for agents on random travel
@@ -128,8 +164,8 @@ void InteractionModRandom<PCType, PTDType, PType>::interactAgents(PCType& a_agen
         const auto plo = geom.ProbLoArray();
         const auto domain = geom.Domain();
 
-        this->makeBins( a_agents, bin_size, lev, ExaEpi::InteractionNames::home );
-        this->makeBins( a_on_random_travel, bin_size, lev, ExaEpi::InteractionNames::random );
+        makeBins( a_agents, bin_size, lev, ExaEpi::InteractionNames::home );
+        makeBins( a_on_random_travel, bin_size, lev, ExaEpi::InteractionNames::random );
 
         // we make two passes here, in the first case, agents on random travel infect local agents
 #ifdef AMREX_USE_OMP
@@ -148,6 +184,7 @@ void InteractionModRandom<PCType, PTDType, PType>::interactAgents(PCType& a_agen
 
             auto& aos   = ptile.GetArrayOfStructs();
             const auto np = aos.numParticles();
+            auto& soa   = ptile.GetStructOfArrays();
 
             auto binner = GetRandomBin<PTDType>{plo, dxi, domain, bin_size, mfi.validbox()};
             AMREX_ALWAYS_ASSERT(bins_ptr->numBins() >= 0);
@@ -157,8 +194,8 @@ void InteractionModRandom<PCType, PTDType, PType>::interactAgents(PCType& a_agen
             auto travel_offsets = travel_bins_ptr->offsetsPtr();
 
             for (int d = 0; d < n_disease; d++) {
-
-                auto prob_ptr = this->getAgentProbPtr(a_agents,lev,mfi,d);
+                int r_RT = RealIdx::nattribs;
+                auto prob_ptr = soa.GetRealData(r_RT + r0(d) + RealIdxDisease::prob).data();
                 //auto mask_arr = a_mask[mfi].array();
                 auto lparm = a_agents.getDiseaseParameters_d(d);
 
@@ -210,6 +247,7 @@ void InteractionModRandom<PCType, PTDType, PType>::interactAgents(PCType& a_agen
             auto& aos   = ptile.GetArrayOfStructs();
             const auto np = aos.numParticles();
             auto pstruct_ptr = aos().dataPtr();
+            auto& soa   = ptile.GetStructOfArrays();
 
             auto binner = GetParticleBin{plo, dxi, domain, bin_size, mfi.validbox()};
             AMREX_ALWAYS_ASSERT(bins_ptr->numBins() >= 0);
@@ -219,8 +257,8 @@ void InteractionModRandom<PCType, PTDType, PType>::interactAgents(PCType& a_agen
             auto travel_inds = travel_bins_ptr->permutationPtr();
 
             for (int d = 0; d < n_disease; d++) {
-
-                auto prob_ptr = this->getAgentProbPtr(a_on_random_travel,lev,mfi,d);
+                int r_RT = RealIdx::nattribs;
+                auto prob_ptr = soa.GetRealData(r_RT + r0(d) + RealIdxDisease::prob).data();
                 //auto mask_arr = a_mask[mfi].array();
                 auto lparm = a_agents.getDiseaseParameters_d(d);
 

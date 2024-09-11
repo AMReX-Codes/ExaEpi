@@ -63,54 +63,6 @@ class InteractionModel
 
     protected:
 
-
-        /*! \brief Get probability pointer from agent container */
-        inline ParticleReal* getAgentProbPtr (  PCType&           a_agents,  /*!< agent container */
-                                                const int     a_lev,     /*!< level */
-                                                const MFIter& a_mfi,     /*!< multifab iterator*/
-                                                const int     a_d_idx    /*!< disease index */ )
-        {
-            BL_PROFILE("InteractionModel::getAgentProbPtr");
-            auto& ptile = a_agents.ParticlesAt(a_lev, a_mfi);
-            auto& soa   = ptile.GetStructOfArrays();
-            int r_RT = RealIdx::nattribs;
-            return soa.GetRealData(r_RT+r0(a_d_idx)+RealIdxDisease::prob).data();
-        }
-
-        /*! \brief Make particle bins for interactions at a given model */
-        virtual void makeBins(  PCType&                 a_agents,   /*!< agent container */
-                                const IntVect&      a_bin_size, /*!< bin size */
-                                const int           a_lev,      /*!< level */
-                                const std::string&  a_mod       /*!< interaction model */ )
-        {
-            BL_PROFILE("InteractionModel::makeBins");
-            const Geometry& geom = a_agents.Geom(a_lev);
-            const auto dxi = geom.InvCellSizeArray();
-            const auto plo = geom.ProbLoArray();
-            const auto domain = geom.Domain();
-
-            for(MFIter mfi = a_agents.MakeMFIter(a_lev, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
-
-                auto pair_ind = std::make_pair(mfi.index(), mfi.LocalTileIndex());
-                auto bins_ptr = a_agents.getBins(pair_ind, a_mod);
-
-                auto& ptile = a_agents.ParticlesAt(a_lev, mfi);
-                auto& aos   = ptile.GetArrayOfStructs();
-                const auto np = aos.numParticles();
-                const auto& ptd = ptile.getParticleTileData();
-
-                const Box& box = mfi.validbox();
-                int ntiles = numTilesInBox(box, true, a_bin_size);
-
-                auto binner = GetParticleBin{plo, dxi, domain, a_bin_size, box};
-                bins_ptr->build(BinPolicy::Serial, np, ptd, ntiles, binner);
-
-                AMREX_ALWAYS_ASSERT(np == bins_ptr->numItems());
-
-                Gpu::synchronize();
-            }
-        }
-
     private:
 };
 
