@@ -74,7 +74,8 @@ AgentContainer::AgentContainer (const amrex::Geometry            & a_geom,  /*!<
         m_interactions[InteractionNames::home] = new InteractionModHome<PCType, PTDType, PType>;
         m_interactions[InteractionNames::work] = new InteractionModWork<PCType, PTDType, PType>;
         m_interactions[InteractionNames::school] = new InteractionModSchool<PCType, PTDType, PType>;
-        m_interactions[InteractionNames::nborhood] = new InteractionModNborhood<PCType, PTDType, PType>;
+        m_interactions[InteractionNames::home_nborhood] = new InteractionModHomeNborhood<PCType, PTDType, PType>;
+        m_interactions[InteractionNames::work_nborhood] = new InteractionModWorkNborhood<PCType, PTDType, PType>;
 
         m_hospital = std::make_unique<HospitalModel<PCType, PTDType, PType>>();
     }
@@ -645,8 +646,8 @@ void AgentContainer::interactDay (MultiFab& a_mask_behavior /*!< Masking behavio
     if (haveInteractionModel(ExaEpi::InteractionNames::school)) {
         m_interactions[ExaEpi::InteractionNames::school]->interactAgents(*this, a_mask_behavior);
     }
-    if (haveInteractionModel(ExaEpi::InteractionNames::nborhood)) {
-        m_interactions[ExaEpi::InteractionNames::nborhood]->interactAgents(*this, a_mask_behavior);
+    if (haveInteractionModel(ExaEpi::InteractionNames::work_nborhood)) {
+        m_interactions[ExaEpi::InteractionNames::work_nborhood]->interactAgents(*this, a_mask_behavior);
     }
     m_hospital->interactAgents(*this, a_mask_behavior);
 }
@@ -664,7 +665,7 @@ void AgentContainer::interactNight (MultiFab& a_mask_behavior /*!< Masking behav
     if (haveInteractionModel(ExaEpi::InteractionNames::home)) {
         m_interactions[ExaEpi::InteractionNames::home]->interactAgents(*this, a_mask_behavior);
     }
-    if (haveInteractionModel(ExaEpi::InteractionNames::nborhood)) {
-        m_interactions[ExaEpi::InteractionNames::nborhood]->interactAgents(*this, a_mask_behavior);
+    if (haveInteractionModel(ExaEpi::InteractionNames::home_nborhood)) {
+        m_interactions[ExaEpi::InteractionNames::home_nborhood]->interactAgents(*this, a_mask_behavior);
     }
 }

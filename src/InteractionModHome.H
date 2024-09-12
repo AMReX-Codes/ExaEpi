@@ -97,7 +97,8 @@ class InteractionModHome : public InteractionModel<PCType, PTDType, PType>
 
         /*! \brief Simulate agent interaction at home */
         virtual void interactAgents (PCType& agents, MultiFab&) override {
-            interactAgentsImpl<PCType, PTDType, HomeCandidate<PTDType>, BinaryInteractionHome<PTDType>>(agents, IntIdx::nborhood);
+            interactAgentsImpl<InteractionModHome<PCType, PTDType, PType>, PCType, PTDType,
+                               HomeCandidate<PTDType>, BinaryInteractionHome<PTDType>>(*this, agents, IntIdx::nborhood);
         }
 
     protected:

@@ -62,7 +62,9 @@ class InteractionModWork : public InteractionModel<PCType, PTDType, PType>
 
         /*! \brief Simulate agent interaction at work */
         virtual void interactAgents (PCType& agents, MultiFab&) override {
-            interactAgentsImpl<PCType, PTDType, WorkCandidate<PTDType>, BinaryInteractionWork<PTDType>>(agents, IntIdx::workgroup);
+            interactAgentsImpl<InteractionModWork<PCType, PTDType, PType>, PCType, PTDType,
+                               WorkCandidate<PTDType>,
+                               BinaryInteractionWork<PTDType>>(*this, agents, IntIdx::workgroup);
         }
 
     protected:

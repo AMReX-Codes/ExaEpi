@@ -17,7 +17,8 @@ set(_sources
          InteractionModel.H
          #InteractionModGeneric.H
          InteractionModHome.H
-         InteractionModNborhood.H
+         InteractionModHomeNborhood.H
+         InteractionModWorkNborhood.H
          InteractionModSchool.H
          InteractionModWork.H
          InteractionModelLibrary.H

@@ -28,7 +28,8 @@ namespace ExaEpi
         const std::string home = "home";
         const std::string work = "work";
         const std::string school = "school";
-        const std::string nborhood = "neighborhood";
+        const std::string home_nborhood = "home_neighborhood";
+        const std::string work_nborhood = "work_neighborhood";
         const std::string transit = "transit";
         const std::string random = "random";
     }
@@ -50,7 +51,7 @@ class InteractionModel
     public:
 
         /*! \brief null constructor */
-        InteractionModel<PCType, PTDType, PType> () : max_group(0) {}
+        InteractionModel<PCType, PTDType, PType> () {}
 
         /*! \brief default destructor */
         virtual ~InteractionModel<PCType, PTDType, PType> () = default;
@@ -58,45 +59,49 @@ class InteractionModel
         /*! \brief Interact agents for a model */
         virtual void interactAgents(PCType&, MultiFab&) = 0;
 
-    protected:
+        std::pair<amrex::DenseBins<PTDType>*, bool> getBins(const std::pair<int, int> &pair_idx) {
+            bool found = false;
+            if (m_bins.find(pair_idx) != m_bins.end()) found = true;
+            return {&m_bins[pair_idx], found};
+        }
 
     private:
 
-        int max_group;
+        std::map<std::pair<int, int>, amrex::DenseBins<PTDType> > m_bins;
 };
 
 template <typename PTDType>
 struct Binner
 {
-    Binner(const Geometry &geom, const IntVect &_bin_size, const Box &_box, const int _max_group, const int _bin_idx) :
-           bin_size(_bin_size), box(_box), max_group(_max_group), bin_idx(_bin_idx) {
-        dxi = geom.InvCellSizeArray();
-        plo = geom.ProbLoArray();
-        domain = geom.Domain();
-    }
-
-    AMREX_GPU_HOST_DEVICE
-    unsigned int operator() (const PTDType& ptd, int i) const noexcept {
-        Box tbx;
-        auto iv = getParticleCell(ptd, i, plo, dxi, domain);
-        auto tid = getTileIndex(iv, box, true, bin_size, tbx);
-        if (bin_idx != -1) {
-            auto group = ptd.m_idata[bin_idx][i];
-            return static_cast<unsigned int>(tid * max_group + group);
-        } else {
-            return static_cast<unsigned int>(tid);
+        Binner(const Geometry &geom, const IntVect &_bin_size, const Box &_box, const int _max_group, const int _bin_idx) :
+            bin_size(_bin_size), box(_box), max_group(_max_group), bin_idx(_bin_idx) {
+            dxi = geom.InvCellSizeArray();
+            plo = geom.ProbLoArray();
+            domain = geom.Domain();
         }
-    }
 
-private:
+        AMREX_GPU_HOST_DEVICE
+        unsigned int operator() (const PTDType& ptd, int i) const noexcept {
+            Box tbx;
+            auto iv = getParticleCell(ptd, i, plo, dxi, domain);
+            auto tid = getTileIndex(iv, box, true, bin_size, tbx);
+            if (bin_idx != -1) {
+                auto group = ptd.m_idata[bin_idx][i];
+                return static_cast<unsigned int>(tid * max_group + group);
+            } else {
+                return static_cast<unsigned int>(tid);
+            }
+        }
 
-    GpuArray<Real,AMREX_SPACEDIM> plo;
-    GpuArray<Real,AMREX_SPACEDIM> dxi;
-    Box domain;
-    IntVect bin_size;
-    Box box;
-    int max_group;
-    int bin_idx;
+    private:
+
+        GpuArray<Real,AMREX_SPACEDIM> plo;
+        GpuArray<Real,AMREX_SPACEDIM> dxi;
+        Box domain;
+        IntVect bin_size;
+        Box box;
+        int max_group;
+        int bin_idx;
 };
 
 
@@ -132,8 +137,8 @@ private:
       + If B is an adult, use the appropriate transmission probability (#DiseaseParm::xmit_adult_SC or
         #DiseaseParm::xmit_adult) depending on whether B works at a school or not (#IntIdx::school)
 */
-template <typename AgentContainer, typename PTDType, typename CandidateFunc, typename BinaryInteractionFunc>
-void interactAgentsImpl(AgentContainer& agents, int bin_idx)
+template <typename IModel, typename AgentContainer, typename PTDType, typename CandidateFunc, typename BinaryInteractionFunc>
+void interactAgentsImpl(IModel &interaction_model, AgentContainer& agents, int bin_idx)
 {
     BL_PROFILE("interactAgentsimpl");
     int n_disease = agents.numDiseases();
@@ -170,24 +175,27 @@ void interactAgentsImpl(AgentContainer& agents, int bin_idx)
             // agents are binned by community + another group. These values can change from one time step to the next so they
             // have to be recomputed (rebuild the bins) every time step
             Binner<PTDType> binner(agents.Geom(lev), bin_size, mfi.validbox(), max_group, bin_idx);
-            DenseBins<PTDType> bins;
-            // The GPU bin policy is faster, but non-deterministic.
-            // bins.build(BinPolicy::GPU, np, ptd, num_tiles * max_group, binner);
-            bins.build(BinPolicy::Serial, np, ptd, num_tiles * max_group, binner);
+            auto [bins_ptr, found] = interaction_model.getBins({mfi.index(), mfi.LocalTileIndex()});
+            // If Redistribute() changes the order of particles (the default), then we need to rebuild each time step
+            //if (!found) {
+                // FIXME: there should be a command-line option to switch between the GPU and serial versions
+                // The GPU bin policy is faster, but non-deterministic.
+                // bins.build(BinPolicy::GPU, np, ptd, num_tiles * max_group, binner);
+                bins_ptr->build(BinPolicy::Serial, np, ptd, num_tiles * max_group, binner);
+            //}
 
-            AMREX_ALWAYS_ASSERT(bins.numBins() >= 0);
-            auto inds = bins.permutationPtr();
-            auto offsets = bins.offsetsPtr();
+            AMREX_ALWAYS_ASSERT(bins_ptr->numBins() >= 0);
+            auto inds = bins_ptr->permutationPtr();
+            auto offsets = bins_ptr->offsetsPtr();
 
             for (int d = 0; d < n_disease; d++) {
-                int r_RT = RealIdx::nattribs;
-                auto prob_ptr = soa.GetRealData(r_RT + r0(d) + RealIdxDisease::prob).data();
+                auto prob_ptr = soa.GetRealData(RealIdx::nattribs + r0(d) + RealIdxDisease::prob).data();
                 auto lparm = agents.getDiseaseParameters_d(d);
                 Real scale = 1.0_prt;  // TODO this should vary based on cell
                 Real infect = lparm->infect;
                 infect *= (1.0_rt - lparm->vac_eff);
 
-                ParallelFor(bins.numItems(), [=] AMREX_GPU_DEVICE (int ii) noexcept {
+                ParallelFor(bins_ptr->numItems(), [=] AMREX_GPU_DEVICE (int ii) noexcept {
                     auto infectious_i = inds[ii];
                     int i_cell = binner(ptd, infectious_i);
                     auto cell_start = offsets[i_cell];

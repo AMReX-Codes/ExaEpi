@@ -7,7 +7,8 @@
 #include "InteractionModel.H"
 //#include "InteractionModGeneric.H"
 #include "InteractionModHome.H"
-#include "InteractionModNborhood.H"
+#include "InteractionModHomeNborhood.H"
+#include "InteractionModWorkNborhood.H"
 #include "InteractionModSchool.H"
 #include "InteractionModWork.H"
 

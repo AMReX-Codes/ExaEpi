@@ -90,7 +90,9 @@ class InteractionModSchool : public InteractionModel<PCType, PTDType, PType>
 
         /*! \brief Simulate agent interaction at school */
         virtual void interactAgents (PCType& agents, MultiFab&) override {
-            interactAgentsImpl<PCType, PTDType, SchoolCandidate<PTDType>, BinaryInteractionSchool<PTDType>>(agents, IntIdx::school);
+            interactAgentsImpl<InteractionModSchool<PCType, PTDType, PType>, PCType, PTDType,
+                               SchoolCandidate<PTDType>,
+                               BinaryInteractionSchool<PTDType>>(*this, agents, IntIdx::school);
         }
 
     protected:
