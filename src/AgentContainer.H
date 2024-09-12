@@ -74,11 +74,11 @@ public:
 
     std::array<amrex::Long, 9> getTotals (const int);
 
+    int getMaxGroup(const int group_idx);
+
     void moveAgentsToWork ();
 
     void moveAgentsToHome ();
-
-    amrex::DenseBins<PTDType>* getBins(const std::pair<int,int>& a_idx, const std::string& a_mod_name);
 
     /*! \brief Return flag indicating if agents are at work */
     inline bool isAtWork() const {
@@ -174,6 +174,8 @@ protected:
 
     /*! Disease status update model */
     DiseaseStatus<PCType,PTileType,PTDType,PType> m_disease_status;
+
+    Array<int, IntIdx::nattribs> max_attribute_values;
 
     /*! \brief queries if a given interaction type (model) is available */
     inline bool haveInteractionModel( const std::string& a_mod_name ) const {

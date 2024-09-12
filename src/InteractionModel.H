@@ -50,7 +50,7 @@ class InteractionModel
     public:
 
         /*! \brief null constructor */
-        InteractionModel<PCType, PTDType, PType> () {}
+        InteractionModel<PCType, PTDType, PType> () : max_group(0) {}
 
         /*! \brief default destructor */
         virtual ~InteractionModel<PCType, PTDType, PType> () = default;
@@ -61,6 +61,8 @@ class InteractionModel
     protected:
 
     private:
+
+        int max_group;
 };
 
 template <typename PTDType>
@@ -153,12 +155,17 @@ void interactAgentsImpl(AgentContainer& agents, int bin_idx)
 
             int max_group = 0;
             if (bin_idx != -1) {
+                max_group = agents.getMaxGroup(bin_idx);
+#ifdef DEBUG
                 auto bingroup_ptr = soa.GetIntData(bin_idx).data();
                 for (int i = 0; i < np; i++) {
-                    max_group = max(max_group, bingroup_ptr[i]);
+                    AMREX_ASSERT(bingroup_ptr[i] <= max_group);
                 }
+#endif
             }
             max_group++;
+            // max group should never be larger than the total number of particles
+            AMREX_ALWAYS_ASSERT(max_group <= np);
 
             // agents are binned by community + another group. These values can change from one time step to the next so they
             // have to be recomputed (rebuild the bins) every time step

@@ -99,28 +99,10 @@ AgentContainer::AgentContainer (const amrex::Geometry            & a_geom,  /*!<
         std::memcpy(m_d_parm[d], m_h_parm[d], sizeof(DiseaseParm));
 #endif
     }
+
+    max_attribute_values.fill(0);
 }
 
-/*! \brief Return bin pointer at a given mfi, tile and model name */
-DenseBins<AgentContainer::PTDType>* AgentContainer::getBins (const std::pair<int,int>& a_idx,
-                                                             const std::string& a_mod_name)
-{
-    BL_PROFILE("AgentContainer::getBins");
-    if (a_mod_name == ExaEpi::InteractionNames::home) {
-        return &m_bins_home[a_idx];
-    } else if (    (a_mod_name == ExaEpi::InteractionNames::work)
-                || (a_mod_name == ExaEpi::InteractionNames::school) ) {
-        return &m_bins_work[a_idx];
-    } else if (a_mod_name == ExaEpi::InteractionNames::nborhood) {
-        if (m_at_work) { return &m_bins_work[a_idx]; }
-        else           { return &m_bins_home[a_idx]; }
-    } else if (a_mod_name == ExaEpi::InteractionNames::random) {
-        return &m_bins_random[a_idx];
-    } else {
-        amrex::Abort("Invalid a_mod_name!");
-        return nullptr;
-    }
-}
 
 /*! \brief Send agents on a random walk around the neighborhood
 
@@ -321,7 +303,6 @@ void AgentContainer::returnRandomTravel ()
         for (MFIter mfi = MakeMFIter(lev, TilingIfNotGPU()); mfi.isValid(); ++mfi)
         {
             auto& ptile = plev[{mfi.index(), mfi.LocalTileIndex()}];
-            const auto& ptd = ptile.getParticleTileData();
             auto& aos   = ptile.GetArrayOfStructs();
             ParticleType* pstruct = &(aos[0]);
             const size_t np = aos.numParticles();
@@ -605,6 +586,21 @@ std::array<Long, 9> AgentContainer::getTotals (const int a_d /*!< disease index 
                                   amrex::get<8>(r)};
     ParallelDescriptor::ReduceLongSum(&counts[0], 9, ParallelDescriptor::IOProcessorNumber());
     return counts;
+}
+
+int AgentContainer::getMaxGroup (const int group_idx) {
+    BL_PROFILE("getMaxGroup");
+    if (max_attribute_values[group_idx] == 0) {
+        amrex::ReduceOps<ReduceOpMax> reduce_ops;
+        auto r = amrex::ParticleReduce<ReduceData<int>> (*this,
+            [=] AMREX_GPU_DEVICE (const AgentContainer::ParticleTileType::ConstParticleTileDataType& ptd, const int i) noexcept
+            -> GpuTuple<int>
+            {
+                return {ptd.m_idata[group_idx][i]};
+            }, reduce_ops);
+        max_attribute_values[group_idx] = amrex::get<0>(r);
+    }
+    return max_attribute_values[group_idx];
 }
 
 /*! \brief Interaction and movement of agents during morning commute
