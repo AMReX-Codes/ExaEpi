@@ -29,9 +29,6 @@ class HospitalModel : public InteractionModel<PCType, PTDType, PType>
             // not yet implemented
         }
 
-        /*! \brief Simulate agent interaction in the hospital for agents on travel */
-        virtual void interactAgents (PCType&, MultiFab&, PCType&) override {}
-
         using MFPtr = std::unique_ptr<MultiFab>;
         using MFPtrVec = std::vector<MFPtr>;
 

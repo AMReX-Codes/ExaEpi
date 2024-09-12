@@ -93,11 +93,6 @@ class InteractionModSchool : public InteractionModel<PCType, PTDType, PType>
             interactAgentsImpl<PCType, PTDType, SchoolCandidate<PTDType>, BinaryInteractionSchool<PTDType>>(agents, IntIdx::school);
         }
 
-        /*! \brief Simulate agent interaction at school */
-        virtual void interactAgents (PCType&, MultiFab&, PCType&) override {
-            amrex::Abort("Do not use this interface for this interaction model");
-        }
-
     protected:
 
     private:

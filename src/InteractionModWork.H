@@ -65,11 +65,6 @@ class InteractionModWork : public InteractionModel<PCType, PTDType, PType>
             interactAgentsImpl<PCType, PTDType, WorkCandidate<PTDType>, BinaryInteractionWork<PTDType>>(agents, IntIdx::workgroup);
         }
 
-        /*! \brief Simulate agent interaction at work */
-        virtual void interactAgents (PCType&, MultiFab&, PCType&) override {
-            amrex::Abort("Do not use this interface for this interaction model");
-        }
-
     protected:
 
     private:

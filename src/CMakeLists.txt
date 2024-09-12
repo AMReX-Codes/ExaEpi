@@ -18,7 +18,6 @@ set(_sources
          #InteractionModGeneric.H
          InteractionModHome.H
          InteractionModNborhood.H
-         InteractionModRandom.H
          InteractionModSchool.H
          InteractionModWork.H
          InteractionModelLibrary.H

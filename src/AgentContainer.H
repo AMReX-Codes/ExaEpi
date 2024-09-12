@@ -56,13 +56,11 @@ public:
 
     void interactNight(amrex::MultiFab&);
 
-    void interactRandomTravel(amrex::MultiFab&, AgentContainer& on_travel_pc);
-
     void moveAgentsRandomWalk ();
 
     void moveRandomTravel (const amrex::Real random_travel_prob);
 
-    void returnRandomTravel (const AgentContainer& on_travel_pc);
+    void returnRandomTravel ();
 
     void updateStatus (MFPtrVec&);
 

@@ -100,11 +100,6 @@ class InteractionModHome : public InteractionModel<PCType, PTDType, PType>
             interactAgentsImpl<PCType, PTDType, HomeCandidate<PTDType>, BinaryInteractionHome<PTDType>>(agents, IntIdx::nborhood);
         }
 
-        /*! \brief Simulate agent interaction at home */
-        virtual void interactAgents (PCType&, MultiFab&, PCType&) override {
-            amrex::Abort("Do not use this interface for this interaction model");
-        }
-
     protected:
 
     private:

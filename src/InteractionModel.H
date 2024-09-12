@@ -58,9 +58,6 @@ class InteractionModel
         /*! \brief Interact agents for a model */
         virtual void interactAgents(PCType&, MultiFab&) = 0;
 
-        /*! \brief Interact agents for a model */
-        virtual void interactAgents(PCType&, MultiFab&, PCType&) = 0;
-
     protected:
 
     private:

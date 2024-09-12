@@ -75,7 +75,6 @@ AgentContainer::AgentContainer (const amrex::Geometry            & a_geom,  /*!<
         m_interactions[InteractionNames::work] = new InteractionModWork<PCType, PTDType, PType>;
         m_interactions[InteractionNames::school] = new InteractionModSchool<PCType, PTDType, PType>;
         m_interactions[InteractionNames::nborhood] = new InteractionModNborhood<PCType, PTDType, PType>;
-        m_interactions[InteractionNames::random] = new InteractionModRandom<PCType, PTDType, PType>;
 
         m_hospital = std::make_unique<HospitalModel<PCType, PTDType, PType>>();
     }
@@ -242,8 +241,8 @@ void AgentContainer::moveAgentsToHome ()
             {
                 if (!isHospitalized(ip, ptd)) {
                     ParticleType& p = pstruct[ip];
-                    p.pos(0) = (home_i_ptr[ip] + 0.5_prt)*dx[0];
-                    p.pos(1) = (home_j_ptr[ip] + 0.5_prt)*dx[1];
+                    p.pos(0) = (home_i_ptr[ip] + 0.5_prt) * dx[0];
+                    p.pos(1) = (home_j_ptr[ip] + 0.5_prt) * dx[1];
                 }
             });
         }
@@ -273,11 +272,9 @@ void AgentContainer::moveRandomTravel (const amrex::Real random_travel_prob)
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
 #endif
-        for(MFIter mfi = MakeMFIter(lev, TilingIfNotGPU()); mfi.isValid(); ++mfi)
+        for (MFIter mfi = MakeMFIter(lev, TilingIfNotGPU()); mfi.isValid(); ++mfi)
         {
-            int gid = mfi.index();
-            int tid = mfi.LocalTileIndex();
-            auto& ptile = plev[std::make_pair(gid, tid)];
+            auto& ptile = plev[{mfi.index(), mfi.LocalTileIndex()}];
             const auto& ptd = ptile.getParticleTileData();
             auto& aos   = ptile.GetArrayOfStructs();
             ParticleType* pstruct = &(aos[0]);
@@ -303,56 +300,45 @@ void AgentContainer::moveRandomTravel (const amrex::Real random_travel_prob)
         }
     }
 
-    Redistribute();
-    AMREX_ALWAYS_ASSERT(OK());
+    // Don't need to redistribute here because it happens after agents move to work
+    //Redistribute();
 }
 
 /*! \brief Return agents from random travel
 */
-void AgentContainer::returnRandomTravel (const AgentContainer& on_travel_pc)
+void AgentContainer::returnRandomTravel ()
 {
     BL_PROFILE("AgentContainer::returnRandomTravel");
 
     for (int lev = 0; lev <= finestLevel(); ++lev)
     {
         auto& plev  = GetParticles(lev);
-        const auto& plev_travel = on_travel_pc.GetParticles(lev);
+        const auto dx = Geom(lev).CellSizeArray();
 
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
 #endif
-        for(MFIter mfi = MakeMFIter(lev, TilingIfNotGPU()); mfi.isValid(); ++mfi)
+        for (MFIter mfi = MakeMFIter(lev, TilingIfNotGPU()); mfi.isValid(); ++mfi)
         {
-            int gid = mfi.index();
-            int tid = mfi.LocalTileIndex();
-            auto& ptile = plev[std::make_pair(gid, tid)];
+            auto& ptile = plev[{mfi.index(), mfi.LocalTileIndex()}];
+            const auto& ptd = ptile.getParticleTileData();
+            auto& aos   = ptile.GetArrayOfStructs();
+            ParticleType* pstruct = &(aos[0]);
+            const size_t np = aos.numParticles();
             auto& soa   = ptile.GetStructOfArrays();
             auto random_travel_ptr = soa.GetIntData(IntIdx::random_travel).data();
+            auto home_i_ptr = soa.GetIntData(IntIdx::home_i).data();
+            auto home_j_ptr = soa.GetIntData(IntIdx::home_j).data();
 
-            const auto& ptile_travel = plev_travel.at(std::make_pair(gid, tid));
-            const auto& aos_travel   = ptile_travel.GetArrayOfStructs();
-            const size_t np_travel = aos_travel.numParticles();
-            auto& soa_travel= ptile_travel.GetStructOfArrays();
-            auto random_travel_ptr_travel = soa_travel.GetIntData(IntIdx::random_travel).data();
-
-            int r_RT = RealIdx::nattribs;
-            int n_disease = m_num_diseases;
-            for (int d = 0; d < n_disease; d++) {
-                auto prob_ptr        = soa.GetRealData(r_RT+r0(d)+RealIdxDisease::prob).data();
-                auto prob_ptr_travel = soa_travel.GetRealData(r_RT+r0(d)+RealIdxDisease::prob).data();
-
-                amrex::ParallelFor( np_travel,
-                    [=] AMREX_GPU_DEVICE (int i) noexcept
-                    {
-                        int dst_index = random_travel_ptr_travel[i];
-                        if (prob_ptr_travel[i] != 1.0) Print() << i << " " << prob_ptr_travel[i] << "\n";
-                        Print() << dst_index << " " << prob_ptr[dst_index] << "\n";
-                        prob_ptr[dst_index] += prob_ptr_travel[i];
-                        AMREX_ALWAYS_ASSERT(random_travel_ptr[dst_index] = dst_index);
-                        AMREX_ALWAYS_ASSERT(random_travel_ptr[dst_index] >= 0);
-                        random_travel_ptr[dst_index] = -1;
-                    });
-            }
+            amrex::ParallelFor (np, [=] AMREX_GPU_DEVICE (int i) noexcept
+            {
+                if (random_travel_ptr[i] >= 0) {
+                    ParticleType& p = pstruct[i];
+                    random_travel_ptr[i] = -1;
+                    p.pos(0) = (home_i_ptr[i] + 0.5_prt) * dx[0];
+                    p.pos(1) = (home_j_ptr[i] + 0.5_prt) * dx[1];
+                }
+            });
         }
     }
     Redistribute();
@@ -684,15 +670,5 @@ void AgentContainer::interactNight (MultiFab& a_mask_behavior /*!< Masking behav
     }
     if (haveInteractionModel(ExaEpi::InteractionNames::nborhood)) {
         m_interactions[ExaEpi::InteractionNames::nborhood]->interactAgents(*this, a_mask_behavior);
-    }
-}
-
-/*! \brief Interaction with agents on random travel */
-void AgentContainer::interactRandomTravel (MultiFab& a_mask_behavior, /*!< Masking behavior */
-                                           AgentContainer& on_travel_pc /*< agents that are on random_travel */)
-{
-    BL_PROFILE("AgentContainer::interactNight");
-    if (haveInteractionModel(ExaEpi::InteractionNames::random)) {
-        m_interactions[ExaEpi::InteractionNames::random]->interactAgents(*this, a_mask_behavior, on_travel_pc);
     }
 }
