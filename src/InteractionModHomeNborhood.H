@@ -28,7 +28,6 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE
         auto age_group_ptr = a_ptd.m_idata[IntIdx::age_group];
         auto nborhood_ptr = a_ptd.m_idata[IntIdx::nborhood];
         auto school_ptr = a_ptd.m_idata[IntIdx::school];
-        auto random_travel_ptr = a_ptd.m_idata[IntIdx::random_travel];
 
         AMREX_ALWAYS_ASSERT(a_ptd.m_idata[IntIdx::home_i][infectious_i] == a_ptd.m_idata[IntIdx::home_i][susceptible_i] &&
                             a_ptd.m_idata[IntIdx::home_j][infectious_i] == a_ptd.m_idata[IntIdx::home_j][susceptible_i]);
