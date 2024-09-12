@@ -90,7 +90,7 @@ class InteractionModHome : public InteractionModel<PCType, PTDType, PType>
     public:
 
         /*! \brief null constructor */
-        InteractionModHome() { }
+        InteractionModHome(bool _fast_bin) : InteractionModel<PCType, PTDType, PType>(_fast_bin) {}
 
         /*! \brief default destructor */
         virtual ~InteractionModHome() = default;

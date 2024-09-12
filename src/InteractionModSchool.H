@@ -83,10 +83,10 @@ class InteractionModSchool : public InteractionModel<PCType, PTDType, PType>
     public:
 
         /*! \brief null constructor */
-        InteractionModSchool() { }
+        InteractionModSchool (bool _fast_bin) : InteractionModel<PCType, PTDType, PType>(_fast_bin) {}
 
         /*! \brief default destructor */
-        virtual ~InteractionModSchool() = default;
+        virtual ~InteractionModSchool () = default;
 
         /*! \brief Simulate agent interaction at school */
         virtual void interactAgents (PCType& agents, MultiFab&) override {

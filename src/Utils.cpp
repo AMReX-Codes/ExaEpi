@@ -119,5 +119,7 @@ void ExaEpi::Utils::get_test_params (   TestParams& params,         /*!< Test pa
         ULong cpu_seed = (ULong) seed;
         amrex::ResetRandomSeed(cpu_seed, gpu_seed);
     }
+
+    pp.query("fast", params.fast);
 }
 

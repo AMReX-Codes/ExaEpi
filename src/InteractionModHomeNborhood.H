@@ -78,10 +78,10 @@ class InteractionModHomeNborhood : public InteractionModel<PCType, PTDType, PTyp
     public:
 
         /*! \brief null constructor */
-        InteractionModHomeNborhood() { }
+        InteractionModHomeNborhood (bool _fast_bin) : InteractionModel<PCType, PTDType, PType>(_fast_bin) {}
 
         /*! \brief default destructor */
-        virtual ~InteractionModHomeNborhood() = default;
+        virtual ~InteractionModHomeNborhood () = default;
 
         /*! \brief Simulate agent interaction in the neighborhood/community */
         virtual void interactAgents (PCType& agents, MultiFab&) override {

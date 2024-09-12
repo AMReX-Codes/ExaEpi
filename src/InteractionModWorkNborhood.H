@@ -80,7 +80,7 @@ class InteractionModWorkNborhood : public InteractionModel<PCType, PTDType, PTyp
     public:
 
         /*! \brief null constructor */
-        InteractionModWorkNborhood() { }
+        InteractionModWorkNborhood (bool _fast_bin) : InteractionModel<PCType, PTDType, PType>(_fast_bin) {}
 
         /*! \brief default destructor */
         virtual ~InteractionModWorkNborhood() = default;

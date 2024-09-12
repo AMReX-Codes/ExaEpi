@@ -51,7 +51,7 @@ class InteractionModel
     public:
 
         /*! \brief null constructor */
-        InteractionModel<PCType, PTDType, PType> () {}
+        InteractionModel<PCType, PTDType, PType> (bool _fast_bin) : fast_bin(_fast_bin) {}
 
         /*! \brief default destructor */
         virtual ~InteractionModel<PCType, PTDType, PType> () = default;
@@ -64,6 +64,8 @@ class InteractionModel
             if (m_bins.find(pair_idx) != m_bins.end()) found = true;
             return {&m_bins[pair_idx], found};
         }
+
+        bool fast_bin;
 
     private:
 
@@ -180,8 +182,10 @@ void interactAgentsImpl(IModel &interaction_model, AgentContainer& agents, int b
             //if (!found) {
                 // FIXME: there should be a command-line option to switch between the GPU and serial versions
                 // The GPU bin policy is faster, but non-deterministic.
-                // bins.build(BinPolicy::GPU, np, ptd, num_tiles * max_group, binner);
-                bins_ptr->build(BinPolicy::Serial, np, ptd, num_tiles * max_group, binner);
+                if (interaction_model.fast_bin)
+                    bins_ptr->build(BinPolicy::GPU, np, ptd, num_tiles * max_group, binner);
+                else
+                    bins_ptr->build(BinPolicy::Serial, np, ptd, num_tiles * max_group, binner);
             //}
 
             AMREX_ALWAYS_ASSERT(bins_ptr->numBins() >= 0);
