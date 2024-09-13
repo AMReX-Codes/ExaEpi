@@ -908,12 +908,13 @@ void CensusData::assignTeachersAndWorkgroup (AgentContainer& pc       /*!< Agent
     + Sum up number of infected agents over all processors and return that value.
 */
 int infect_random_community (AgentContainer& pc, /*!< Agent container (particle container)*/
-                            CensusData &censusData,
-                            std::map<std::pair<int, int>,
-                            amrex::DenseBins<AgentContainer::ParticleType> >& bin_map, /*!< Map of dense bins with agents */
-                            int unit, /*!< Unit number to infect */
-                            const int d_idx, /*!< Disease index */
-                            int ninfect /*!< Target number of agents to infect */ ) {
+                             CensusData &censusData,
+                             std::map<std::pair<int, int>,
+                             DenseBins<AgentContainer::ParticleType> >& bin_map, /*!< Map of dense bins with agents */
+                             int unit, /*!< Unit number to infect */
+                             const int d_idx, /*!< Disease index */
+                             int ninfect, /*!< Target number of agents to infect */
+                             const bool fast_bin /*!< Use GPU binning - fast but non-deterministic */  ) {
 
     auto &demo = censusData.demo;
     // chose random community
@@ -952,7 +953,8 @@ int infect_random_community (AgentContainer& pc, /*!< Agent container (particle 
 
         auto binner = GetParticleBin{plo, dxi, domain, bin_size, box};
         if (bins.numBins() < 0) {
-            bins.build(BinPolicy::Serial, np, pstruct_ptr, ntiles, binner);
+            if (fast_bin) bins.build(BinPolicy::GPU, np, pstruct_ptr, ntiles, binner);
+            else bins.build(BinPolicy::Serial, np, pstruct_ptr, ntiles, binner);
         }
         auto inds = bins.permutationPtr();
         auto offsets = bins.offsetsPtr();
@@ -1040,7 +1042,8 @@ int infect_random_community (AgentContainer& pc, /*!< Agent container (particle 
 */
 void CensusData::setInitialCasesFromFile (AgentContainer& pc, /*!< Agent container (particle container) */
                                           const std::vector<CaseData>& cases, /*!< Case data */
-                                          const std::vector<std::string>& d_names /*!< Disease names */)
+                                          const std::vector<std::string>& d_names, /*!< Disease names */
+                                          const bool fast_bin)
 {
     BL_PROFILE("setInitialCasesFromFile");
 
@@ -1062,7 +1065,7 @@ void CensusData::setInitialCasesFromFile (AgentContainer& pc, /*!< Agent contain
                     int u=0;
                     int i=0;
                     while (i < cases[d].Size_hubs[ihub]) {
-                        int nSuccesses = infect_random_community(pc, *this, bin_map, units[u], d, ntry);
+                        int nSuccesses = infect_random_community(pc, *this, bin_map, units[u], d, ntry, fast_bin);
                         ninf += nSuccesses;
                         i+= nSuccesses;
                         u=(u+1)%units.size(); //sometimes we infect fewer than ntry, but switch to next unit anyway
@@ -1077,7 +1080,8 @@ void CensusData::setInitialCasesFromFile (AgentContainer& pc, /*!< Agent contain
 
 void CensusData::setInitialCasesRandom (AgentContainer& pc, /*!< Agent container (particle container) */
                                         std::vector<int> num_cases, /*!< Number of initial cases */
-                                        const std::vector<std::string>& d_names /*!< Disease names */)
+                                        const std::vector<std::string>& d_names, /*!< Disease names */
+                                        const bool fast_bin)
 {
     BL_PROFILE("setInitialCasesRandom");
 
@@ -1090,7 +1094,7 @@ void CensusData::setInitialCasesRandom (AgentContainer& pc, /*!< Agent container
         for (int ihub = 0; ihub < num_cases[d]; ++ihub) {
             int i = 0;
             while (i < 1) {
-                int nSuccesses = infect_random_community(pc, *this, bin_map, -1, d, 1);
+                int nSuccesses = infect_random_community(pc, *this, bin_map, -1, d, 1, fast_bin);
                 ninf += nSuccesses;
                 i+= nSuccesses;
             }

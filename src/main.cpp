@@ -181,9 +181,9 @@ void runAgent ()
             censusData.initAgents(pc, params.nborhood_size);
             censusData.read_workerflow(pc, params.workerflow_filename, params.workgroup_size);
             if (params.initial_case_type[0] == "file") {
-                censusData.setInitialCasesFromFile(pc, cases, params.disease_names);
+                censusData.setInitialCasesFromFile(pc, cases, params.disease_names, params.fast);
             } else {
-                censusData.setInitialCasesRandom(pc, params.num_initial_cases, params.disease_names);
+                censusData.setInitialCasesRandom(pc, params.num_initial_cases, params.disease_names, params.fast);
             }
         } else if (params.ic_type == ICType::UrbanPop) {
             Abort("UrbanPop not yet implemented");
