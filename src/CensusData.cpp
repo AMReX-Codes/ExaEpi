@@ -506,6 +506,8 @@ void CensusData::initAgents (AgentContainer& pc,       /*!< Agents */
     demo.CopyToHostAsync(demo.Unit_on_proc_d, demo.Unit_on_proc);
     amrex::Gpu::streamSynchronize();
 
+    /*
+    // Note: this hack depends on managed memory
     std::ofstream outf("agents." + std::to_string(ParallelDescriptor::MyProc()) + ".csv");
     for (MFIter mfi = pc.MakeMFIter(0, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
         auto& ptile = pc.ParticlesAt(0, mfi);
@@ -518,7 +520,7 @@ void CensusData::initAgents (AgentContainer& pc,       /*!< Agents */
         }
     }
     outf.close();
-
+    */
 }
 
 /*! \brief Read worker flow data from file and set work location for agents

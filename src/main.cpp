@@ -2,6 +2,8 @@
     \brief **Main**: Contains main() and runAgent()
 */
 
+#include <chrono>
+
 #include <AMReX.H>
 #include <AMReX_iMultiFab.H>
 #include <AMReX_ParmParse.H>
@@ -216,7 +218,7 @@ void runAgent ()
         BL_PROFILE_REGION("Evolution");
         for (int i = 0; i < params.nsteps; ++i)
         {
-            amrex::Print() << "Simulating day " << i << " " << std::flush;
+            auto start_time = std::chrono::high_resolution_clock::now();
 
             if ((params.plot_int > 0) && (i % params.plot_int == 0)) {
                 ExaEpi::IO::writePlotFile(pc, censusData, params.num_diseases, params.disease_names, cur_time, i);
@@ -282,8 +284,6 @@ void runAgent ()
 
                 if (ParallelDescriptor::IOProcessor())
                 {
-                    amrex::Print() << " " << counts[1] << " infected, " << counts[4] << " deaths\n";
-
                     // total number of deaths computed on agents and on mesh should be the same...
                     if (mmc[3] != counts[4]) {
                         amrex::Print() << mmc[3] << " " << counts[4] << "\n";
@@ -354,6 +354,16 @@ void runAgent ()
             pc.infectAgents();
 
             cur_time += 1.0_rt; // time step is one day
+
+            std::chrono::duration<double> elapsed_time = std::chrono::high_resolution_clock::now() - start_time;
+
+            Print() << "[Day " << cur_time <<  " " << std::fixed << std::setprecision(1) << elapsed_time.count() << "s] ";
+            for (int d = 0; d < params.num_diseases; d++) {
+                auto counts = pc.getTotals(d);
+                if (d > 0) Print() << "; ";
+                Print() << params.disease_names[d] << ": " << counts[1] << " infected, " << counts[4] << " deaths";
+            }
+            Print() << "\n";
         }
     }
 
