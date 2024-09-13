@@ -142,7 +142,7 @@ void DiseaseStatus<AC,ACT,ACTD,A>::updateAgents(AC& a_agents, /*!< Agent contain
                 auto prob_ptr = soa.GetRealData(r_RT+r0(d)+RealIdxDisease::prob).data();
                 auto latent_period_ptr = soa.GetRealData(r_RT+r0(d)+RealIdxDisease::latent_period).data();
                 auto infectious_period_ptr = soa.GetRealData(r_RT+r0(d)+RealIdxDisease::infectious_period).data();
-                auto symptomdev_period_ptr = soa.GetRealData(r_RT+r0(d)+RealIdxDisease::symptomdev_period).data();
+                auto incubation_period_ptr = soa.GetRealData(r_RT+r0(d)+RealIdxDisease::incubation_period).data();
 
                 auto* disease_parm_d = a_agents.getDiseaseParameters_d(d);
                 auto* disease_parm_h = a_agents.getDiseaseParameters_h(d);
@@ -175,7 +175,7 @@ void DiseaseStatus<AC,ACT,ACTD,A>::updateAgents(AC& a_agents, /*!< Agent contain
                                 symptomatic_ptr[i] = SymptomStatus::presymptomatic;
                             }
                         }
-                        if (counter_ptr[i] == Math::floor(symptomdev_period_ptr[i])) {
+                        if (counter_ptr[i] == Math::floor(incubation_period_ptr[i])) {
                             if (symptomatic_ptr[i] != SymptomStatus::asymptomatic) {
                                 symptomatic_ptr[i] = SymptomStatus::symptomatic;
                             }

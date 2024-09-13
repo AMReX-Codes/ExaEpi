@@ -31,7 +31,7 @@ struct RealIdxDisease
         prob,                   /*!< Probability of infection */
         latent_period,          /*!< Time until infectious */
         infectious_period,      /*!< Length of time infectious */
-        symptomdev_period,      /*!< Time until symptoms would develop */
+        incubation_period,      /*!< Time until symptoms would develop */
         nattribs                /*!< number of real-type attribute*/
     };
 };
