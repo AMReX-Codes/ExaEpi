@@ -165,9 +165,9 @@ void interactAgentsImpl(IModel &interaction_model, AgentContainer& agents, int b
                 max_group = agents.getMaxGroup(bin_idx);
 #ifdef DEBUG
                 auto bingroup_ptr = soa.GetIntData(bin_idx).data();
-                for (int i = 0; i < np; i++) {
+                ParallelFor(np, [=] AMREX_GPU_DEVICE (int i) noexcept {
                     AMREX_ASSERT(bingroup_ptr[i] <= max_group);
-                }
+                });
 #endif
             }
             max_group++;
@@ -196,8 +196,6 @@ void interactAgentsImpl(IModel &interaction_model, AgentContainer& agents, int b
                 auto prob_ptr = soa.GetRealData(RealIdx::nattribs + r0(d) + RealIdxDisease::prob).data();
                 auto lparm = agents.getDiseaseParameters_d(d);
                 Real scale = 1.0_prt;  // TODO this should vary based on cell
-                Real infect = lparm->infect;
-                infect *= (1.0_rt - lparm->vac_eff);
 
                 ParallelFor(bins_ptr->numItems(), [=] AMREX_GPU_DEVICE (int ii) noexcept {
                     auto infectious_i = inds[ii];
