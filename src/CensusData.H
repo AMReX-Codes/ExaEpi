@@ -51,7 +51,7 @@ struct CensusData
                                 const std::vector<std::string>& names);
 
   private:
-    void assignTeachersAndWorkgroup (AgentContainer& pc);
+    void assignTeachersAndWorkgroup (AgentContainer& pc, const int workgroup_size);
 
 };
 

@@ -684,10 +684,11 @@ void CensusData::read_workerflow (AgentContainer& pc,           /*!< Agent conta
             }
         });
     }
-    assignTeachersAndWorkgroup(pc);
+    assignTeachersAndWorkgroup(pc, workgroup_size);
 }
 
-void CensusData::assignTeachersAndWorkgroup (AgentContainer& pc       /*!< Agent container (particle container) */)
+void CensusData::assignTeachersAndWorkgroup (AgentContainer& pc       /*!< Agent container (particle container) */,
+                                             const int workgroup_size)
 
 {
     const Box& domain = pc.Geom(0).Domain();
@@ -745,8 +746,7 @@ void CensusData::assignTeachersAndWorkgroup (AgentContainer& pc       /*!< Agent
             int to = 0;
             while (comm_to >= Start[to+1]) { to++; }
 
-            if (total_teacher_unit.data()[to] && (age_group_ptr[ip] == 2 || age_group_ptr[ip] == 3) && workgroup_ptr[ip] > 0)
-            {
+            if (total_teacher_unit.data()[to] && (age_group_ptr[ip] == 2 || age_group_ptr[ip] == 3) && workgroup_ptr[ip] > 0) {
                 int elem3_teacher  = elem3_teacher_counts_ptr[comm_to];
                 int elem4_teacher  = elem4_teacher_counts_ptr[comm_to];
                 int middle_teacher = middle_teacher_counts_ptr[comm_to];
@@ -755,10 +755,7 @@ void CensusData::assignTeachersAndWorkgroup (AgentContainer& pc       /*!< Agent
                 int total          = total_teacher_counts_ptr[comm_to];
 
                 // 50% chance of being a teacher if in working-age population (until max_teacher_numb is met)
-                if (amrex::Random() < 0.50 && (elem3_teacher + elem4_teacher
-                                                    + middle_teacher + high_teacher
-                                                    + daycr_teacher) < total)
-                {
+                if ((elem3_teacher + elem4_teacher + middle_teacher + high_teacher + daycr_teacher) < total) {
                     int available_slots[5] = {
                         elem3_teacher  < elem3_teacher_counts.data()[comm_to],
                         elem4_teacher  < elem4_teacher_counts.data()[comm_to],
@@ -767,9 +764,9 @@ void CensusData::assignTeachersAndWorkgroup (AgentContainer& pc       /*!< Agent
                         daycr_teacher  < daycr_teacher_counts.data()[comm_to]
                     };
 
-                    int total_available = available_slots[0] + available_slots[1] + available_slots[2] + available_slots[3] + available_slots[4];
-                    if (total_available > 0)
-                    {
+                    int total_available = available_slots[0] + available_slots[1] + available_slots[2] + available_slots[3] +
+                                          available_slots[4];
+                    if (total_available > 0) {
                         int choice = amrex::Random_int(total_available);
                         if (choice < available_slots[0]) {
                             school_ptr[ip] = 3;  // elementary school for kids in Neighbordhood 1 & 2
@@ -798,11 +795,10 @@ void CensusData::assignTeachersAndWorkgroup (AgentContainer& pc       /*!< Agent
                             daycr_teacher_counts_ptr[comm_to]++;
                         }
                     }
-                }
-                else{
-                    constexpr int WG_size = 20;
+                } else {
+                    AMREX_ALWAYS_ASSERT(Ndaywork[to] > total_teacher_unit.data()[to]);
                     unsigned int number = (unsigned int) rint( ((Real) Ndaywork[to] - total_teacher_unit.data()[to] ) /
-                                ((Real) WG_size * (Start[to+1] - Start[to])) );
+                                ((Real) workgroup_size * (Start[to+1] - Start[to])) );
 
                     if (number) {
                         workgroup_ptr[ip] = 6 + amrex::Random_int(number);
