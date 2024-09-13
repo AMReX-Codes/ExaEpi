@@ -141,9 +141,9 @@ void runAgent ()
             }
 
             File << std::setw(5) << "Day"
-                 << std::setw(10) << "Never"
+                 << std::setw(10) << "Susceptible"
                  << std::setw(10) << "Infected"
-                 << std::setw(10) << "Immune"
+                 << std::setw(10) << "Recovered"
                  << std::setw(10) << "Deaths"
                  << std::setw(15) << "Hospitalized"
                  << std::setw(15) << "Ventilated"
