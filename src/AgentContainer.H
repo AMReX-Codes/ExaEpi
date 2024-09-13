@@ -26,14 +26,14 @@
 
 /*! \brief Derived class from ParticleContainer that defines agents and their functions */
 class AgentContainer
-    : public amrex::ParticleContainer<0, 1, RealIdx::nattribs, IntIdx::nattribs>
+    : public amrex::ParticleContainer<0, 0, RealIdx::nattribs, IntIdx::nattribs>
 {
 
     using PCType = AgentContainer;
     using PType = ParticleType;
     using PTileType = ParticleTileType;
     using PTDType = PTileType::ParticleTileDataType;
-    using IntModel = InteractionModel<PCType,PTileType,PTDType,PType>;
+    using IntModel = InteractionModel<PCType, PTDType, PType>;
 
     using MFPtr = std::unique_ptr<MultiFab>;
     using MFPtrVec = std::vector<MFPtr>;
@@ -44,7 +44,8 @@ public:
                     const amrex::DistributionMapping & a_dmap,
                     const amrex::BoxArray            & a_ba,
                     const int                        & a_num_diseases,
-                    const std::vector<std::string>   & a_disease_names);
+                    const std::vector<std::string>   & a_disease_names,
+                    const bool                       fast);
 
     void morningCommute(amrex::MultiFab&);
 
@@ -56,13 +57,11 @@ public:
 
     void interactNight(amrex::MultiFab&);
 
-    void interactRandomTravel(amrex::MultiFab&, AgentContainer& on_travel_pc);
-
     void moveAgentsRandomWalk ();
 
-    void moveRandomTravel ();
+    void moveRandomTravel (const amrex::Real random_travel_prob);
 
-    void returnRandomTravel (const AgentContainer& on_travel_pc);
+    void returnRandomTravel ();
 
     void updateStatus (MFPtrVec&);
 
@@ -76,11 +75,11 @@ public:
 
     std::array<amrex::Long, 9> getTotals (const int);
 
+    int getMaxGroup(const int group_idx);
+
     void moveAgentsToWork ();
 
     void moveAgentsToHome ();
-
-    amrex::DenseBins<PType>* getBins(const std::pair<int,int>& a_idx, const std::string& a_mod_name);
 
     /*! \brief Return flag indicating if agents are at work */
     inline bool isAtWork() const {
@@ -158,24 +157,16 @@ protected:
     std::vector<DiseaseParm*> m_h_parm;    /*!< Disease parameters */
     std::vector<DiseaseParm*> m_d_parm;    /*!< Disease parameters (GPU device) */
 
-    /*! Map of home bins (of agents) indexed by MultiFab iterator and tile index;
-        see AgentContainer::interactAgentsHomeWork() */
-    std::map<std::pair<int, int>, amrex::DenseBins<PType> > m_bins_home;
-    /*! Map of work bins (of agents) indexed by MultiFab iterator and tile index;
-        see AgentContainer::interactAgentsHomeWork() */
-    std::map<std::pair<int, int>, amrex::DenseBins<PType> > m_bins_work;
-    /*! Map of random travel bins (of agents) indexed by MultiFab iterator and tile index;
-        see AgentContainer::interactAgentsRandom() */
-    std::map<std::pair<int, int>, amrex::DenseBins<PType> > m_bins_random;
-
-    std::map<std::string,IntModel*> m_interactions; /*!< Map of interaction models */
-    std::unique_ptr<HospitalModel<PCType,PTileType,PTDType,PType>> m_hospital; /*!< hospital model */
+    std::map<std::string, IntModel*> m_interactions; /*!< Map of interaction models */
+    std::unique_ptr<HospitalModel<PCType, PTDType, PType>> m_hospital; /*!< hospital model */
 
     /*! Flag to indicate if agents are at work */
     bool m_at_work;
 
     /*! Disease status update model */
     DiseaseStatus<PCType,PTileType,PTDType,PType> m_disease_status;
+
+    Array<int, IntIdx::nattribs> max_attribute_values;
 
     /*! \brief queries if a given interaction type (model) is available */
     inline bool haveInteractionModel( const std::string& a_mod_name ) const {
