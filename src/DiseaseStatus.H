@@ -184,31 +184,28 @@ void DiseaseStatus<AC,ACT,ACTD,A>::updateAgents(AC& a_agents, /*!< Agent contain
                                 &&  (Random(engine) < symptomatic_withdraw_compliance)) {
                                 withdrawn_ptr[i] = 1;
                             }
-                        }
-                        if (counter_ptr[i] < latent_period_ptr[i]) {
-                            // latent phase
-                            return;
-                        }
-                        if (counter_ptr[i] == Math::ceil(latent_period_ptr[i])) {
-                            int flag_ICU_i = 0, flag_vent_i = 0;
-                            Real num_days = 0;
-                            disease_parm_d->check_hospitalization( num_days,
-                                                                   flag_ICU_i,
-                                                                   flag_vent_i,
-                                                                   age_group_ptr[i],
-                                                                   u50frac,
-                                                                   engine );
-                            timer_ptr[i] = ParticleReal(num_days);
-                            if (timer_ptr[i] > 0) { flag_hosp_ptr[i] = 1; }
-                            if (flag_ICU_i) { flag_ICU_ptr[i] = 1; }
-                            if (flag_vent_i) { flag_vent_ptr[i] = 1; }
-                        } else {
-                            if (!isHospitalized(i,ptd)) {
-                                if (counter_ptr[i] >= (latent_period_ptr[i] + infectious_period_ptr[i])) {
-                                    status_ptr[i] = Status::immune;
-                                    counter_ptr[i] = amrex::RandomNormal(immune_length_mean, immune_length_std, engine);
-                                    symptomatic_ptr[i] = SymptomStatus::presymptomatic;
-                                    withdrawn_ptr[i] = 0;
+
+                            if (symptomatic_ptr[i] == SymptomStatus::symptomatic) {
+                                int flag_ICU_i = 0, flag_vent_i = 0;
+                                Real num_days = 0;
+                                disease_parm_d->check_hospitalization( num_days,
+                                                                       flag_ICU_i,
+                                                                       flag_vent_i,
+                                                                       age_group_ptr[i],
+                                                                       u50frac,
+                                                                       engine );
+                                timer_ptr[i] = ParticleReal(num_days);
+                                if (timer_ptr[i] > 0) { flag_hosp_ptr[i] = 1; }
+                                if (flag_ICU_i) { flag_ICU_ptr[i] = 1; }
+                                if (flag_vent_i) { flag_vent_ptr[i] = 1; }
+                            } else {
+                                if (!isHospitalized(i,ptd)) {
+                                    if (counter_ptr[i] >= (latent_period_ptr[i] + infectious_period_ptr[i])) {
+                                        status_ptr[i] = Status::immune;
+                                        counter_ptr[i] = amrex::RandomNormal(immune_length_mean, immune_length_std, engine);
+                                        symptomatic_ptr[i] = SymptomStatus::presymptomatic;
+                                        withdrawn_ptr[i] = 0;
+                                    }
                                 }
                             }
                         }
