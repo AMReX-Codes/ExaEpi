@@ -50,7 +50,6 @@ struct CensusData
                                 std::vector<int> num_cases,
                                 const std::vector<std::string>& names);
 
-  private:
     void assignTeachersAndWorkgroup (AgentContainer& pc);
 
 };
