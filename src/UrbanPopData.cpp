@@ -40,7 +40,7 @@ using ParallelDescriptor::NProcs;
 struct XYLoc {
     int x,y;
 
-    XYLoc(int x, int y) : x(x), y(y) {}
+    XYLoc(int _x, int _y) : x(_x), y(_y) {}
 
     bool operator==(const XYLoc &other) const {
         return x == other.x && y == other.y;
@@ -143,8 +143,8 @@ void UrbanPopData::construct_geom (const std::string &fname, Geometry &geom, Box
     auto all_block_groups = read_block_groups_file(fname);
     min_lat = 1000;
     min_lng = 1000;
-    float max_lat = -1000;
-    float max_lng = -1000;
+    Real max_lat = -1000;
+    Real max_lng = -1000;
     block_group_workers.clear();
     for (auto &block_group : all_block_groups) {
         min_lng = min(block_group.lng, min_lng);
@@ -156,7 +156,7 @@ void UrbanPopData::construct_geom (const std::string &fname, Geometry &geom, Box
     Print() << "lng " << min_lng << ", " << max_lng << " lat " << min_lat << ", " << max_lat << "\n";
 
     // grid spacing is 1/10th minute of arc at the equator, which is about 0.12 regular miles
-    float gspacing = 0.1 / 60.0;
+    Real gspacing = 0.1_prt / 60.0_prt;
     // add a margin
     min_lng -= gspacing;
     max_lng += gspacing;
@@ -166,8 +166,8 @@ void UrbanPopData::construct_geom (const std::string &fname, Geometry &geom, Box
     // the boundaries of the problem in real coordinates, i.e. latituted and longitude.
     RealBox rbox({AMREX_D_DECL(min_lng, min_lat, 0)}, {AMREX_D_DECL(max_lng, max_lat, 0)});
     // the number of grid points in a direction
-    int grid_x = (max_lng - min_lng) / gspacing - 1;
-    int grid_y = (max_lat - min_lat) / gspacing - 1;
+    int grid_x = (int)((max_lng - min_lng) / gspacing) - 1;
+    int grid_y = (int)((max_lat - min_lat) / gspacing) - 1;
     Print() << "gspacing " << gspacing << " grid " << grid_x << ", " << grid_y << "\n";
     // the grid that overlays the domain, with the grid size in x and y directions
     Box base_domain(IntVect(AMREX_D_DECL(0, 0, 0)), IntVect(AMREX_D_DECL(grid_x, grid_y, 0)));
@@ -184,7 +184,7 @@ void UrbanPopData::construct_geom (const std::string &fname, Geometry &geom, Box
     // create a box array with a single box representing the domain
     ba.define(geom.Domain());
     // split the box array by forcing the box size to be limited to a given number of grid points
-    ba.maxSize(0.25 * grid_x / NProcs());
+    ba.maxSize((int)((0.25 * grid_x) / NProcs()));
     //ba.maxSize(0.25 * grid_x / 8);
     Print() << "Number of boxes: " << ba.size() << "\n";
     // for checking that no x,y locations are duplicated
@@ -194,8 +194,8 @@ void UrbanPopData::construct_geom (const std::string &fname, Geometry &geom, Box
     for (auto &block_group : all_block_groups) {
         // FIXME: check that the x,y calculated here are unique
         // convert lat/long coords to grid coords
-        block_group.x = (block_group.lng - min_lng) / gspacing_x;
-        block_group.y = (block_group.lat - min_lat) / gspacing_y;
+        block_group.x = (int)((block_group.lng - min_lng) / gspacing_x);
+        block_group.y = (int)((block_group.lat - min_lat) / gspacing_y);
         XYLoc xy_loc(block_group.x, block_group.y);
         auto it = xy_locs.find(xy_loc);
         if (it != xy_locs.end()) Abort("Found duplicate x,y location; need to decrease gspacing\n");
