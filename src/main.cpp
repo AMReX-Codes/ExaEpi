@@ -214,6 +214,9 @@ void runAgent ()
     }
 
     amrex::Real cur_time = 0;
+
+    Vector<Long> num_infected(params.num_diseases, 0);
+
     {
         BL_PROFILE_REGION("Evolution");
         for (int i = 0; i < params.nsteps; ++i)
@@ -238,6 +241,7 @@ void runAgent ()
                     step_of_peak[d] = i;
                 }
                 cumulative_deaths[d] = counts[4];
+                num_infected[d] = counts[1];
 
                 Real mmc[4] = {0, 0, 0, 0};
 #ifdef AMREX_USE_GPU
@@ -353,17 +357,16 @@ void runAgent ()
             // Infect agents based on their interactions
             pc.infectAgents();
 
-            cur_time += 1.0_rt; // time step is one day
-
             std::chrono::duration<double> elapsed_time = std::chrono::high_resolution_clock::now() - start_time;
 
             Print() << "[Day " << cur_time <<  " " << std::fixed << std::setprecision(1) << elapsed_time.count() << "s] ";
             for (int d = 0; d < params.num_diseases; d++) {
-                auto counts = pc.getTotals(d);
                 if (d > 0) Print() << "; ";
-                Print() << params.disease_names[d] << ": " << counts[1] << " infected, " << counts[4] << " deaths";
+                Print() << params.disease_names[d] << ": " << num_infected[d] << " infected, " << cumulative_deaths[d] << " deaths";
             }
             Print() << "\n";
+
+            cur_time += 1.0_rt; // time step is one day
         }
     }
 
