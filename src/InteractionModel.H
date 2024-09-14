@@ -195,8 +195,9 @@ void interactAgentsImpl(IModel &interaction_model, AgentContainer& agents, int b
             for (int d = 0; d < n_disease; d++) {
                 auto prob_ptr = soa.GetRealData(RealIdx::nattribs + r0(d) + RealIdxDisease::prob).data();
                 auto lparm = agents.getDiseaseParameters_d(d);
+                auto lparm_h = agents.getDiseaseParameters_h(d);
                 Real scale = 1.0_prt;  // TODO this should vary based on cell
-                Real infect = lparm->infect * (1.0_rt - lparm->vac_eff);
+                Real infect = lparm_h->infect * (1.0_rt - lparm_h->vac_eff);
 
                 ParallelFor(bins_ptr->numItems(), [=] AMREX_GPU_DEVICE (int ii) noexcept {
                     auto infectious_i = inds[ii];
