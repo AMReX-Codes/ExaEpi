@@ -27,7 +27,6 @@ struct BinaryInteractionHome {
                              const Real a_social_scale /*!< Social scale */) const noexcept {
         auto age_group_ptr = a_ptd.m_idata[IntIdx::age_group];
         auto family_ptr = a_ptd.m_idata[IntIdx::family];
-        auto school_ptr = a_ptd.m_idata[IntIdx::school];
         auto withdrawn_ptr = a_ptd.m_idata[IntIdx::withdrawn];
 
         AMREX_ALWAYS_ASSERT(a_ptd.m_idata[IntIdx::home_i][infectious_i] == a_ptd.m_idata[IntIdx::home_i][susceptible_i] &&

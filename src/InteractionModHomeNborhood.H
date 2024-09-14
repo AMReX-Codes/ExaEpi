@@ -22,9 +22,7 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE
                              const PTDType& a_ptd, /*!< Particle tile data */
                              const DiseaseParm* const a_lparm, /*!< disease paramters */
                              const Real a_social_scale /*!< Social scale */) const noexcept {
-        auto age_group_ptr = a_ptd.m_idata[IntIdx::age_group];
         auto nborhood_ptr = a_ptd.m_idata[IntIdx::nborhood];
-        auto school_ptr = a_ptd.m_idata[IntIdx::school];
 
         AMREX_ALWAYS_ASSERT(a_ptd.m_idata[IntIdx::home_i][infectious_i] == a_ptd.m_idata[IntIdx::home_i][susceptible_i] &&
                             a_ptd.m_idata[IntIdx::home_j][infectious_i] == a_ptd.m_idata[IntIdx::home_j][susceptible_i]);
