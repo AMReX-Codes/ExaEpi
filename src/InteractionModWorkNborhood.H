@@ -22,9 +22,6 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE
                              const PTDType& a_ptd, /*!< Particle tile data */
                              const DiseaseParm* const a_lparm, /*!< disease paramters */
                              const Real a_social_scale /*!< Social scale */) const noexcept {
-        Real infect = a_lparm->infect;
-        infect *= (1.0_rt - a_lparm->vac_eff) * a_social_scale;
-
         auto age_group_ptr = a_ptd.m_idata[IntIdx::age_group];
         auto nborhood_ptr = a_ptd.m_idata[IntIdx::nborhood];
         auto work_nborhood_ptr = a_ptd.m_idata[IntIdx::work_nborhood];
@@ -45,9 +42,9 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE
         // Should always be in the same community = same cell
         // Neighborhood?
         if (nborhood_infectious == nborhood_susceptible) {
-            return infectProb(a_ptd, infectious_i, susceptible_i, a_lparm->xmit_hood_SC, a_lparm->xmit_hood, infect);
+            return infectProb(a_ptd, infectious_i, susceptible_i, a_lparm->xmit_hood_SC, a_lparm->xmit_hood) * a_social_scale;
         } else { // Community?
-            return infectProb(a_ptd, infectious_i, susceptible_i, a_lparm->xmit_comm_SC, a_lparm->xmit_comm, infect);
+            return infectProb(a_ptd, infectious_i, susceptible_i, a_lparm->xmit_comm_SC, a_lparm->xmit_comm) * a_social_scale;
         }
     }
 };

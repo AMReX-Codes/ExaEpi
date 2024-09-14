@@ -44,16 +44,12 @@ struct BinaryInteractionWork {
                              const PTDType& a_ptd,
                              const DiseaseParm* const a_lparm,
                              const Real a_work_scale) const noexcept {
-        Real infect = a_lparm->infect;
-        infect *= (1.0_rt - a_lparm->vac_eff);
-
         AMREX_ALWAYS_ASSERT(a_ptd.m_idata[IntIdx::workgroup][infectious_i] == a_ptd.m_idata[IntIdx::workgroup][susceptible_i]);
         AMREX_ALWAYS_ASSERT(a_ptd.m_idata[IntIdx::work_i][infectious_i] == a_ptd.m_idata[IntIdx::work_i][susceptible_i] &&
                             a_ptd.m_idata[IntIdx::work_j][infectious_i] == a_ptd.m_idata[IntIdx::work_j][susceptible_i]);
         //infect *= i_mask;
         //infect *= j_mask;
-        ParticleReal prob = 1.0_prt - infect * a_lparm->xmit_work * a_work_scale;
-        return prob;
+        return a_lparm->xmit_work * a_work_scale;
     }
 };
 

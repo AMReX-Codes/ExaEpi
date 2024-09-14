@@ -25,9 +25,6 @@ struct BinaryInteractionHome {
                              const PTDType& a_ptd, /*!< Particle tile data */
                              const DiseaseParm* const a_lparm,  /*!< disease paramters */
                              const Real a_social_scale /*!< Social scale */) const noexcept {
-        Real infect = a_lparm->infect;
-        infect *= (1.0_rt - a_lparm->vac_eff);
-
         auto age_group_ptr = a_ptd.m_idata[IntIdx::age_group];
         auto family_ptr = a_ptd.m_idata[IntIdx::family];
         auto school_ptr = a_ptd.m_idata[IntIdx::school];
@@ -42,21 +39,20 @@ struct BinaryInteractionHome {
         if (family_ptr[infectious_i] == family_ptr[susceptible_i]) {
             // at home, within a family
             if (age_group_ptr[infectious_i] <= 1) {  // Transmitter i is a child
-                return infectProb(a_ptd, infectious_i, susceptible_i, a_lparm->xmit_child_SC, a_lparm->xmit_child, infect);
+                return infectProb(a_ptd, infectious_i, susceptible_i, a_lparm->xmit_child_SC, a_lparm->xmit_child);
             } else {
-                return infectProb(a_ptd, infectious_i, susceptible_i, a_lparm->xmit_adult_SC, a_lparm->xmit_adult, infect);
+                return infectProb(a_ptd, infectious_i, susceptible_i, a_lparm->xmit_adult_SC, a_lparm->xmit_adult);
             }
         } else if (family_ptr[infectious_i] / FAMILIES_PER_CLUSTER == family_ptr[susceptible_i] / FAMILIES_PER_CLUSTER &&
                    !withdrawn_ptr[infectious_i] && !withdrawn_ptr[susceptible_i]) {
-            infect *= a_social_scale;
             // family cluster
             if (age_group_ptr[infectious_i] <= 1) {  // Transmitter i is a child
-                return infectProb(a_ptd, infectious_i, susceptible_i, a_lparm->xmit_nc_child_SC, a_lparm->xmit_nc_child, infect);
+                return infectProb(a_ptd, infectious_i, susceptible_i, a_lparm->xmit_nc_child_SC, a_lparm->xmit_nc_child) * a_social_scale;
             } else {
-                return infectProb(a_ptd, infectious_i, susceptible_i, a_lparm->xmit_nc_adult_SC, a_lparm->xmit_nc_adult, infect);
+                return infectProb(a_ptd, infectious_i, susceptible_i, a_lparm->xmit_nc_adult_SC, a_lparm->xmit_nc_adult) * a_social_scale;
             }
         }
-        return 1.0_prt;
+        return 0.0_prt;
     }
 };
 

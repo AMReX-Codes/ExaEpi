@@ -23,9 +23,6 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE
                              const PTDType& a_ptd, /*!< Particle tile data */
                              const DiseaseParm* const a_lparm, /*!< disease paramters */
                              const Real a_social_scale  /*!< Social scale */) const noexcept {
-        Real infect = a_lparm->infect;
-        infect *= (1.0_rt - a_lparm->vac_eff);
-
         AMREX_ALWAYS_ASSERT(a_ptd.m_idata[IntIdx::school][infectious_i] == a_ptd.m_idata[IntIdx::school][susceptible_i]);
         AMREX_ALWAYS_ASSERT(a_ptd.m_idata[IntIdx::work_i][infectious_i] == a_ptd.m_idata[IntIdx::work_i][susceptible_i] &&
                             a_ptd.m_idata[IntIdx::work_j][infectious_i] == a_ptd.m_idata[IntIdx::work_j][susceptible_i]);
@@ -38,27 +35,27 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE
         int school = school_ptr[susceptible_i];
         //infect *= i_mask;
         //infect *= j_mask;
-        ParticleReal prob = 1.0_prt;
-        if (nborhood_ptr[infectious_i] == nborhood_ptr[susceptible_i]) {
-            if (school > 5) {             // Playgroup
-                prob *= 1.0_prt - infect * a_lparm->xmit_school[6] * a_social_scale;
-            } else if (school == 5) {     // Day care
-                prob *= 1.0_prt - infect * a_lparm->xmit_school[5] * a_social_scale;
-            }
-        }
         // Elementary/middle/high school in common
         if (school > 0 && school < 5) {
             if (age_group_ptr[infectious_i] <= 1) {  // Transmitter i is a child
                 if (age_group_ptr[susceptible_i] <= 1) {  // Receiver j is a child
-                    prob *= 1.0_prt - infect * a_lparm->xmit_school[school] * a_social_scale;
+                    return a_lparm->xmit_school[school] * a_social_scale;
                 } else {  // Child student -> adult teacher/staff transmission
-                    prob  *= 1.0_prt - infect * a_lparm->xmit_sch_c2a[school] * a_social_scale;
+                    return a_lparm->xmit_sch_c2a[school] * a_social_scale;
                 }
             } else if (age_group_ptr[susceptible_i] <= 1) {  // Adult teacher/staff -> child student
-                prob *= 1.0_prt - infect * a_lparm->xmit_sch_a2c[school] * a_social_scale;
+                return a_lparm->xmit_sch_a2c[school] * a_social_scale;
+            }
+        } else {
+            if (nborhood_ptr[infectious_i] == nborhood_ptr[susceptible_i]) {
+                if (school > 5) {             // Playgroup
+                    return a_lparm->xmit_school[6] * a_social_scale;
+                } else if (school == 5) {     // Day care
+                    return a_lparm->xmit_school[5] * a_social_scale;
+                }
             }
         }
-        return prob;
+        return 0.0_prt;
     }
 };
 
