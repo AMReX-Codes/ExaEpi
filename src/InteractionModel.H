@@ -216,7 +216,7 @@ void interactAgentsImpl(IModel &interaction_model, AgentContainer& agents, int b
                             if (infectious_i != susceptible_i &&
                                 isSusceptible(susceptible_i, ptd, d) &&
                                 isCandidate(susceptible_i, ptd)) {
-                                auto prob = 1.0_prt - infect * binaryInteraction(infectious_i, susceptible_i, ptd, lparm, scale);
+                                ParticleReal prob = 1.0_prt - infect * binaryInteraction(infectious_i, susceptible_i, ptd, lparm, scale);
                                 // The atomic operation is needed because we find all the susceptible for each infectious in turn.
                                 // It can be eliminated by switching the order of infectious and susceptible.
                                 Gpu::Atomic::Multiply(&prob_ptr[susceptible_i], prob);
