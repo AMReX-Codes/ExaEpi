@@ -23,7 +23,7 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE
                              const DiseaseParm* const a_lparm, /*!< disease paramters */
                              const Real a_social_scale /*!< Social scale */) const noexcept {
         Real infect = a_lparm->infect;
-        infect *= (1.0_rt - a_lparm->vac_eff);
+        infect *= (1.0_rt - a_lparm->vac_eff) * a_social_scale;
 
         auto age_group_ptr = a_ptd.m_idata[IntIdx::age_group];
         auto nborhood_ptr = a_ptd.m_idata[IntIdx::nborhood];
@@ -37,30 +37,18 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE
 
         //infect *= i_mask;
         //infect *= j_mask;
-        ParticleReal prob = 1.0_prt;
-        // define neighbordhood based on whether agent is in home or work community
-        int nborhood_infectious_i = nborhood_ptr[infectious_i];
-        int nborhood_susceptible_i = nborhood_ptr[susceptible_i];
-        if (age_group_ptr[infectious_i] > 1) nborhood_infectious_i = work_nborhood_ptr[infectious_i];
-        if (age_group_ptr[susceptible_i] > 1) nborhood_susceptible_i = work_nborhood_ptr[susceptible_i];
+        // define neighbordhood based on age of agent
+        int nborhood_infectious = age_group_ptr[infectious_i] > 1 ? work_nborhood_ptr[infectious_i] : nborhood_ptr[infectious_i];
+        int nborhood_susceptible = age_group_ptr[susceptible_i] > 1 ? work_nborhood_ptr[susceptible_i] : nborhood_ptr[susceptible_i];
 
         // school < 0 means a child normally attends school, but not today
         // Should always be in the same community = same cell
         // Neighborhood?
-        if (nborhood_infectious_i == nborhood_susceptible_i) {
-            if (school_ptr[infectious_i] < 0) { // not attending school, use _SC contacts
-                prob *= 1.0_prt - infect * a_lparm->xmit_hood_SC[age_group_ptr[susceptible_i]] * a_social_scale;
-            } else {
-                prob *= 1.0_prt - infect * a_lparm->xmit_hood[age_group_ptr[susceptible_i]] * a_social_scale;
-            }
+        if (nborhood_infectious == nborhood_susceptible) {
+            return infectProb(a_ptd, infectious_i, susceptible_i, a_lparm->xmit_hood_SC, a_lparm->xmit_hood, infect);
         } else { // Community?
-            if (school_ptr[infectious_i] < 0) { // not attending school, use _SC contacts
-                prob *= 1.0_prt - infect * a_lparm->xmit_comm_SC[age_group_ptr[susceptible_i]] * a_social_scale;
-            } else {
-                prob *= 1.0_prt - infect * a_lparm->xmit_comm[age_group_ptr[susceptible_i]] * a_social_scale;
-            }
+            return infectProb(a_ptd, infectious_i, susceptible_i, a_lparm->xmit_comm_SC, a_lparm->xmit_comm, infect);
         }
-        return prob;
     }
 };
 

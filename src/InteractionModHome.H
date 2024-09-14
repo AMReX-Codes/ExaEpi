@@ -39,39 +39,24 @@ struct BinaryInteractionHome {
 
         //infect *= i_mask;
         //infect *= j_mask;
-        ParticleReal prob = 1.0_prt;
         if (family_ptr[infectious_i] == family_ptr[susceptible_i]) {
             // at home, within a family
             if (age_group_ptr[infectious_i] <= 1) {  // Transmitter i is a child
-                if (school_ptr[infectious_i] < 0) { // not attending school, use _SC contacts
-                    prob *= 1.0_prt - infect * a_lparm->xmit_child_SC[age_group_ptr[susceptible_i]];
-                } else {
-                    prob *= 1.0_prt - infect * a_lparm->xmit_child[age_group_ptr[susceptible_i]];
-                }
+                return infectProb(a_ptd, infectious_i, susceptible_i, a_lparm->xmit_child_SC, a_lparm->xmit_child, infect);
             } else {
-                if (school_ptr[infectious_i] < 0) { // not attending school, use _SC contacts
-                    prob *= 1.0_prt - infect * a_lparm->xmit_adult_SC[age_group_ptr[susceptible_i]];
-                } else {
-                    prob *= 1.0_prt - infect * a_lparm->xmit_adult[age_group_ptr[susceptible_i]];
-                }
+                return infectProb(a_ptd, infectious_i, susceptible_i, a_lparm->xmit_adult_SC, a_lparm->xmit_adult, infect);
             }
         } else if (family_ptr[infectious_i] / FAMILIES_PER_CLUSTER == family_ptr[susceptible_i] / FAMILIES_PER_CLUSTER &&
                    !withdrawn_ptr[infectious_i] && !withdrawn_ptr[susceptible_i]) {
+            infect *= a_social_scale;
             // family cluster
             if (age_group_ptr[infectious_i] <= 1) {  // Transmitter i is a child
-                if (school_ptr[infectious_i] < 0)  // not attending school, use _SC contacts
-                    prob *= 1.0_prt - infect * a_lparm->xmit_nc_child_SC[age_group_ptr[susceptible_i]] * a_social_scale;
-                else
-                    prob *= 1.0_prt - infect * a_lparm->xmit_nc_child[age_group_ptr[susceptible_i]] * a_social_scale;
+                return infectProb(a_ptd, infectious_i, susceptible_i, a_lparm->xmit_nc_child_SC, a_lparm->xmit_nc_child, infect);
             } else {
-                if (school_ptr[infectious_i] < 0) { // not attending school, use _SC contacts
-                    prob *= 1.0_prt - infect * a_lparm->xmit_nc_adult_SC[age_group_ptr[susceptible_i]] * a_social_scale;
-                } else {
-                    prob *= 1.0_prt - infect * a_lparm->xmit_nc_adult[age_group_ptr[susceptible_i]] * a_social_scale;
-                }
+                return infectProb(a_ptd, infectious_i, susceptible_i, a_lparm->xmit_nc_adult_SC, a_lparm->xmit_nc_adult, infect);
             }
         }
-        return prob;
+        return 1.0_prt;
     }
 };
 

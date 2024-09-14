@@ -230,4 +230,15 @@ void interactAgentsImpl(IModel &interaction_model, AgentContainer& agents, int b
 }
 
 
+template <typename PTDType>
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+Real infectProb(const PTDType &ptd, int infectious_i, int susceptible_i, const Real* xmit_SC, const Real* xmit, const Real infect) {
+    if (ptd.m_idata[IntIdx::school][infectious_i] < 0) { // not attending school, use _SC contacts
+        return 1.0_prt - infect * xmit_SC[ptd.m_idata[IntIdx::age_group][susceptible_i]];
+    } else {
+        return 1.0_prt - infect * xmit[ptd.m_idata[IntIdx::age_group][susceptible_i]];
+    }
+}
+
+
 #endif
