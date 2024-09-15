@@ -244,4 +244,38 @@ Real infectProb(const PTDType &ptd, int infectious_i, int susceptible_i, const R
 }
 
 
+template <typename PTDType>
+struct GetCommunityIndex
+{
+        GetCommunityIndex (const Geometry &geom, const Box &_valid_box) :  valid_box(_valid_box) {
+            dxi = geom.InvCellSizeArray();
+            plo = geom.ProbLoArray();
+            domain = geom.Domain();
+            bin_size = {AMREX_D_DECL(1, 1, 1)};
+        }
+
+        AMREX_GPU_HOST_DEVICE
+        int operator() (const PTDType& ptd, int i) const noexcept {
+            Box tbx;
+            auto iv = getParticleCell(ptd, i, plo, dxi, domain);
+            return getTileIndex(iv, valid_box, true, bin_size, tbx);
+        }
+
+        AMREX_GPU_HOST_DEVICE
+        int max() {
+            return numTilesInBox(valid_box, true, bin_size);
+        }
+
+
+    private:
+
+        GpuArray<Real,AMREX_SPACEDIM> plo;
+        GpuArray<Real,AMREX_SPACEDIM> dxi;
+        Box domain;
+        IntVect bin_size;
+        Box valid_box;
+};
+
+
+
 #endif

@@ -88,12 +88,6 @@ void InteractionModHomeNborhood<PCType, PTDType, PType>::fastInteractHomeNborhoo
     HomeNborhoodCandidate<PTDType> isCandidate;
 
     for (int lev = 0; lev < agents.numLevels(); ++lev) {
-        const auto& geom = agents.Geom(lev);
-        const auto plo = geom.ProbLoArray();
-        const auto dxi = geom.InvCellSizeArray();
-        const auto domain = geom.Domain();
-        IntVect bin_size = {AMREX_D_DECL(1, 1, 1)};
-
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
 #endif
@@ -102,13 +96,12 @@ void InteractionModHomeNborhood<PCType, PTDType, PType>::fastInteractHomeNborhoo
             const auto& ptd = ptile.getParticleTileData();
             const auto np = ptile.GetArrayOfStructs().numParticles();
             auto& soa = ptile.GetStructOfArrays();
-            auto num_tiles = numTilesInBox(mfi.validbox(), true, bin_size);
             auto nborhood_ptr = soa.GetIntData(IntIdx::nborhood).data();
-            auto valid_box = mfi.validbox();
 
+            GetCommunityIndex<PTDType> getCommunityIndex(agents.Geom(lev), mfi.validbox());
+
+            int max_communities = getCommunityIndex.max();
             int max_nborhood = agents.getMaxGroup(IntIdx::nborhood) + 1;
-            int max_communities = num_tiles;
-            // max group should never be larger than the total number of particles
             AMREX_ALWAYS_ASSERT(max_nborhood <= np);
 
             Gpu::DeviceVector<int> infected_community_d(max_communities, 0);
@@ -125,8 +118,7 @@ void InteractionModHomeNborhood<PCType, PTDType, PType>::fastInteractHomeNborhoo
 
                 ParallelFor(np, [=] AMREX_GPU_DEVICE (int i) noexcept {
                     if (isInfectious(i, ptd, d) && isCandidate(i, ptd)) {
-                        Box tbx;
-                        auto community = getTileIndex(getParticleCell(ptd, i, plo, dxi, domain), valid_box, true, bin_size, tbx);
+                        auto community = getCommunityIndex(ptd, i);
                         auto nborhood = nborhood_ptr[i];
                         Gpu::Atomic::Add(&infected_community_d_ptr[community], 1);
                         Gpu::Atomic::Add(&infected_nborhood_d_ptr[community * max_nborhood + nborhood], 1);
@@ -136,16 +128,15 @@ void InteractionModHomeNborhood<PCType, PTDType, PType>::fastInteractHomeNborhoo
 
                 ParallelFor(np, [=] AMREX_GPU_DEVICE (int i) noexcept {
                     if (isSusceptible(i, ptd, d) && isCandidate(i, ptd)) {
-                        Box tbx;
-                        auto community = getTileIndex(getParticleCell(ptd, i, plo, dxi, domain), valid_box, true, bin_size, tbx);
+                        auto community = getCommunityIndex(ptd, i);
                         auto nborhood = nborhood_ptr[i];
                         int num_infected_nborhood = infected_nborhood_d_ptr[community * max_nborhood + nborhood];
                         int num_infected_community = infected_community_d_ptr[community];
                         AMREX_ALWAYS_ASSERT(num_infected_community >= num_infected_nborhood);
-                        ParticleReal comm_prob = 1.0_prt - infect * lparm->xmit_comm[ptd.m_idata[IntIdx::age_group][i]];
-                        prob_ptr[i] *= std::pow(comm_prob, num_infected_community - num_infected_nborhood);
-                        ParticleReal nborhood_prob = 1.0_prt - infect * lparm->xmit_hood[ptd.m_idata[IntIdx::age_group][i]];
-                        prob_ptr[i] *= std::pow(nborhood_prob, num_infected_nborhood);
+                        ParticleReal comm_prob = 1.0_prt - infect * lparm->xmit_comm[ptd.m_idata[IntIdx::age_group][i]] * scale;
+                        prob_ptr[i] *= static_cast<ParticleReal>(std::pow(comm_prob, num_infected_community - num_infected_nborhood));
+                        ParticleReal nborhood_prob = 1.0_prt - infect * lparm->xmit_hood[ptd.m_idata[IntIdx::age_group][i]] * scale;
+                        prob_ptr[i] *= static_cast<ParticleReal>(std::pow(nborhood_prob, num_infected_nborhood));
                     }
                 });
                 Gpu::synchronize();
