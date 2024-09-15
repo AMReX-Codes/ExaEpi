@@ -71,16 +71,90 @@ class InteractionModWorkNborhood : public InteractionModel<PCType, PTDType, PTyp
 
         /*! \brief Simulate agent interaction in the neighborhood/community */
         virtual void interactAgents (PCType& agents, MultiFab&) override {
+            /*
             // passing -1 for the binning group indicates bin only by community (cell)
             interactAgentsImpl<InteractionModWorkNborhood<PCType, PTDType, PType>, PCType, PTDType,
                                 WorkNborhoodCandidate<PTDType>,
                                 BinaryInteractionWorkNborhood<PTDType>>(*this, agents, -1);
+            */
+            fastInteractWorkNborhood(agents);
         }
 
-    protected:
-
     private:
+        void fastInteractWorkNborhood (PCType &agents);
+
 };
+
+template <typename PCType, typename PTDType, typename PType>
+void InteractionModWorkNborhood<PCType, PTDType, PType>::fastInteractWorkNborhood (PCType& agents) {
+    BL_PROFILE(__func__);
+    int n_disease = agents.numDiseases();
+
+    WorkNborhoodCandidate<PTDType> isCandidate;
+
+    for (int lev = 0; lev < agents.numLevels(); ++lev) {
+        const auto& geom = agents.Geom(lev);
+        const auto plo = geom.ProbLoArray();
+        const auto dxi = geom.InvCellSizeArray();
+        const auto domain = geom.Domain();
+        IntVect bin_size = {AMREX_D_DECL(1, 1, 1)};
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (Gpu::notInLaunchRegion())
+#endif
+        for (MFIter mfi = agents.MakeMFIter(lev, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+            auto& ptile = agents.ParticlesAt(lev, mfi);
+            const auto& ptd = ptile.getParticleTileData();
+            const auto np = ptile.GetArrayOfStructs().numParticles();
+            auto& soa = ptile.GetStructOfArrays();
+            auto num_tiles = numTilesInBox(mfi.validbox(), true, bin_size);
+            auto work_nborhood_ptr = soa.GetIntData(IntIdx::work_nborhood).data();
+            auto home_nborhood_ptr = soa.GetIntData(IntIdx::nborhood).data();
+            auto age_group_ptr = soa.GetIntData(IntIdx::age_group).data();
+            Box tbx;
+
+            int max_work_nborhood = agents.getMaxGroup(IntIdx::work_nborhood) + 1;
+            int max_home_nborhood = agents.getMaxGroup(IntIdx::nborhood) + 1;
+            int max_nborhood = max(max_work_nborhood, max_home_nborhood);
+            int max_communities = num_tiles;
+            AMREX_ALWAYS_ASSERT(max_nborhood <= np);
+
+            Vector<int> infected_community(max_communities, 0);
+            Vector<int> infected_nborhood(max_communities * max_nborhood, 0);
+
+            for (int d = 0; d < n_disease; d++) {
+                auto prob_ptr = soa.GetRealData(RealIdx::nattribs + r0(d) + RealIdxDisease::prob).data();
+                auto lparm = agents.getDiseaseParameters_d(d);
+                auto lparm_h = agents.getDiseaseParameters_h(d);
+                Real scale = 1.0_prt;  // TODO this should vary based on cell
+                Real infect = lparm_h->infect * (1.0_rt - lparm_h->vac_eff);
+
+                for (int i = 0; i < np; i++) {
+                    if (isInfectious(i, ptd, d) && isCandidate(i, ptd)) {
+                        auto community = getTileIndex(getParticleCell(ptd, i, plo, dxi, domain), mfi.validbox(), true, bin_size, tbx);
+                        infected_community[community]++;
+                        int nborhood = age_group_ptr[i] > 1 ? work_nborhood_ptr[i] : home_nborhood_ptr[i];
+                        infected_nborhood[community * max_nborhood + nborhood]++;
+                    }
+                }
+
+                for (int i = 0; i < np; i++) {
+                    if (isSusceptible(i, ptd, d) && isCandidate(i, ptd)) {
+                        auto community = getTileIndex(getParticleCell(ptd, i, plo, dxi, domain), mfi.validbox(), true, bin_size, tbx);
+                        int nborhood = age_group_ptr[i] > 1 ? work_nborhood_ptr[i] : home_nborhood_ptr[i];
+                        int num_infected_nborhood = infected_nborhood[community * max_nborhood + nborhood];
+                        int num_infected_community = infected_community[community];
+                        AMREX_ALWAYS_ASSERT(num_infected_community >= num_infected_nborhood);
+                        ParticleReal comm_prob = 1.0_prt - infect * lparm->xmit_comm[ptd.m_idata[IntIdx::age_group][i]];
+                        prob_ptr[i] *= std::pow(comm_prob, num_infected_community - num_infected_nborhood);
+                        ParticleReal nborhood_prob = 1.0_prt - infect * lparm->xmit_hood[ptd.m_idata[IntIdx::age_group][i]];
+                        prob_ptr[i] *= std::pow(nborhood_prob, num_infected_nborhood);
+                    }
+                }
+            }
+        }
+    }
+}
 
 
 #endif
