@@ -212,5 +212,14 @@ bool isHospitalized ( const int      a_idx, /*!< Agent index */
             && (a_ptd.m_idata[IntIdx::hosp_j][a_idx] >= 0) );
 }
 
+/*! \brief Is agent an adult? */
+template <typename PTDType>
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+bool isAnAdult (const int      a_idx, /*!< Agent index */
+                const PTDType& a_ptd  /*!< Particle tile data */ )
+{
+    return a_ptd.m_idata[IntIdx::age_group][a_idx] > 1;
+}
+
 
 #endif

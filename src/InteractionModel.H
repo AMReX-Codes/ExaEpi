@@ -195,7 +195,9 @@ void interactAgentsImpl(IModel &interaction_model, AgentContainer& agents, int b
             for (int d = 0; d < n_disease; d++) {
                 auto prob_ptr = soa.GetRealData(RealIdx::nattribs + r0(d) + RealIdxDisease::prob).data();
                 auto lparm = agents.getDiseaseParameters_d(d);
+                auto lparm_h = agents.getDiseaseParameters_h(d);
                 Real scale = 1.0_prt;  // TODO this should vary based on cell
+                Real infect = lparm_h->infect * (1.0_rt - lparm_h->vac_eff);
 
                 ParallelFor(bins_ptr->numItems(), [=] AMREX_GPU_DEVICE (int ii) noexcept {
                     auto infectious_i = inds[ii];
@@ -214,7 +216,7 @@ void interactAgentsImpl(IModel &interaction_model, AgentContainer& agents, int b
                             if (infectious_i != susceptible_i &&
                                 isSusceptible(susceptible_i, ptd, d) &&
                                 isCandidate(susceptible_i, ptd)) {
-                                auto prob = binaryInteraction(infectious_i, susceptible_i, ptd, lparm, scale);
+                                ParticleReal prob = 1.0_prt - infect * binaryInteraction(infectious_i, susceptible_i, ptd, lparm, scale);
                                 // The atomic operation is needed because we find all the susceptible for each infectious in turn.
                                 // It can be eliminated by switching the order of infectious and susceptible.
                                 Gpu::Atomic::Multiply(&prob_ptr[susceptible_i], prob);
@@ -228,6 +230,52 @@ void interactAgentsImpl(IModel &interaction_model, AgentContainer& agents, int b
     }
 
 }
+
+
+template <typename PTDType>
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+Real infectProb(const PTDType &ptd, int infectious_i, int susceptible_i, const Real* xmit_SC, const Real* xmit) {
+    // school < 0 means a child normally attends school, but not today
+    if (ptd.m_idata[IntIdx::school][infectious_i] < 0) { // not attending school, use _SC contacts
+        return xmit_SC[ptd.m_idata[IntIdx::age_group][susceptible_i]];
+    } else {
+        return xmit[ptd.m_idata[IntIdx::age_group][susceptible_i]];
+    }
+}
+
+
+template <typename PTDType>
+struct GetCommunityIndex
+{
+        GetCommunityIndex (const Geometry &geom, const Box &_valid_box) :  valid_box(_valid_box) {
+            dxi = geom.InvCellSizeArray();
+            plo = geom.ProbLoArray();
+            domain = geom.Domain();
+            bin_size = {AMREX_D_DECL(1, 1, 1)};
+        }
+
+        AMREX_GPU_HOST_DEVICE
+        int operator() (const PTDType& ptd, int i) const noexcept {
+            Box tbx;
+            auto iv = getParticleCell(ptd, i, plo, dxi, domain);
+            return getTileIndex(iv, valid_box, true, bin_size, tbx);
+        }
+
+        AMREX_GPU_HOST_DEVICE
+        int max() {
+            return numTilesInBox(valid_box, true, bin_size);
+        }
+
+
+    private:
+
+        GpuArray<Real,AMREX_SPACEDIM> plo;
+        GpuArray<Real,AMREX_SPACEDIM> dxi;
+        Box domain;
+        IntVect bin_size;
+        Box valid_box;
+};
+
 
 
 #endif
