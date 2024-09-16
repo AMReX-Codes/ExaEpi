@@ -118,10 +118,11 @@ void InteractionModWork<PCType, PTDType, PType>::fastInteractWork (PCType& agent
             int max_workgroup = agents.getMaxGroup(IntIdx::workgroup) + 1;
             AMREX_ALWAYS_ASSERT(max_workgroup <= np);
 
-            Gpu::DeviceVector<int> infected_workgroup_d(max_communities * max_workgroup, 0);
-            auto infected_workgroup_d_ptr = infected_workgroup_d.data();
 
             for (int d = 0; d < n_disease; d++) {
+                Gpu::DeviceVector<int> infected_workgroup_d(max_communities * max_workgroup, 0);
+                auto infected_workgroup_d_ptr = infected_workgroup_d.data();
+
                 auto prob_ptr = soa.GetRealData(RealIdx::nattribs + r0(d) + RealIdxDisease::prob).data();
                 auto lparm = agents.getDiseaseParameters_d(d);
                 auto lparm_h = agents.getDiseaseParameters_h(d);

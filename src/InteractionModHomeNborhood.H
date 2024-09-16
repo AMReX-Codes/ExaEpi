@@ -104,12 +104,12 @@ void InteractionModHomeNborhood<PCType, PTDType, PType>::fastInteractHomeNborhoo
             int max_nborhood = agents.getMaxGroup(IntIdx::nborhood) + 1;
             AMREX_ALWAYS_ASSERT(max_nborhood <= np);
 
-            Gpu::DeviceVector<int> infected_community_d(max_communities, 0);
-            Gpu::DeviceVector<int> infected_nborhood_d(max_communities * max_nborhood, 0);
-            auto infected_community_d_ptr = infected_community_d.data();
-            auto infected_nborhood_d_ptr = infected_nborhood_d.data();
-
             for (int d = 0; d < n_disease; d++) {
+                Gpu::DeviceVector<int> infected_community_d(max_communities, 0);
+                Gpu::DeviceVector<int> infected_nborhood_d(max_communities * max_nborhood, 0);
+                auto infected_community_d_ptr = infected_community_d.data();
+                auto infected_nborhood_d_ptr = infected_nborhood_d.data();
+
                 auto prob_ptr = soa.GetRealData(RealIdx::nattribs + r0(d) + RealIdxDisease::prob).data();
                 auto lparm = agents.getDiseaseParameters_d(d);
                 auto lparm_h = agents.getDiseaseParameters_h(d);
