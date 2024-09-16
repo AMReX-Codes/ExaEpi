@@ -109,6 +109,7 @@ void InteractionModHome<PCType, PTDType, PType>::fastInteractHome (PCType& agent
 
             GetCommunityIndex<PTDType> getCommunityIndex(agents.Geom(lev), mfi.validbox());
 
+            // calculate the max group values for indexing
             int max_communities = getCommunityIndex.max();
             int max_nborhood = agents.getMaxGroup(IntIdx::nborhood) + 1;
             int max_family = agents.getMaxGroup(IntIdx::family) + 1;
@@ -116,7 +117,9 @@ void InteractionModHome<PCType, PTDType, PType>::fastInteractHome (PCType& agent
             AMREX_ALWAYS_ASSERT(max_family <= agents.NumberOfParticlesAtLevel(lev));
 
             for (int d = 0; d < n_disease; d++) {
+                // calculate separately for infected children and infected adults, since they have different transmission rates
                 for (auto adults : {true, false}) {
+                    // set vectors to store counts of infected agents for each group
                     Gpu::DeviceVector<int> infected_family_d(max_communities * max_family, 0);
                     auto infected_family_d_ptr = infected_family_d.data();
                     Gpu::DeviceVector<int> infected_family_not_withdrawn_d(max_communities * max_family, 0);
@@ -129,7 +132,7 @@ void InteractionModHome<PCType, PTDType, PType>::fastInteractHome (PCType& agent
                     auto lparm_h = agents.getDiseaseParameters_h(d);
                     Real scale = 1.0_prt;  // TODO this should vary based on cell
                     Real infect = lparm_h->infect * (1.0_rt - lparm_h->vac_eff);
-
+                    // loop to count infectious agents in each group
                     ParallelFor(np, [=] AMREX_GPU_DEVICE (int i) noexcept {
                         if (isInfectious(i, ptd, d) && isHomeCandidate(i, ptd) && (isAnAdult(i, ptd) == adults)) {
                             auto community = getCommunityIndex(ptd, i);
@@ -142,7 +145,10 @@ void InteractionModHome<PCType, PTDType, PType>::fastInteractHome (PCType& agent
                         }
                     });
                     Gpu::synchronize();
-
+                    // Loop to compute infection probability for each susceptible agent.
+                    // For each agent, find count of infectious agents in each group and use that as the exponent to compute the
+                    // infection probability. In cases where there is an overlap (e.g. infectious agents in same family
+                    // and in neighborhood cluster, adjust the infected counts to avoid double-counting the overlap.
                     ParallelFor(np, [=] AMREX_GPU_DEVICE (int i) noexcept {
                         if (isSusceptible(i, ptd, d) && isHomeCandidate(i, ptd)) {
                             ParticleReal xmit_family_prob = 0;
