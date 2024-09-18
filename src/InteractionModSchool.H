@@ -42,7 +42,7 @@ class InteractionModSchool : public InteractionModel<PCType, PTDType, PType>
 
 template <typename PCType, typename PTDType, typename PType>
 void InteractionModSchool<PCType, PTDType, PType>::interactAgents (PCType& agents, MultiFab&) {
-    BL_PROFILE(__func__);
+    BL_PROFILE("InteractionModSchool::interactAgents");
     int n_disease = agents.numDiseases();
 
     SchoolCandidate<PTDType> isCandidate;

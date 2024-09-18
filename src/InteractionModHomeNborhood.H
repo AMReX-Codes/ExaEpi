@@ -41,7 +41,7 @@ class InteractionModHomeNborhood : public InteractionModel<PCType, PTDType, PTyp
 
 template <typename PCType, typename PTDType, typename PType>
 void InteractionModHomeNborhood<PCType, PTDType, PType>::interactAgents (PCType& agents, MultiFab&) {
-    BL_PROFILE(__func__);
+    BL_PROFILE("InteractionModHomeNborhood::interactAgents");
     int n_disease = agents.numDiseases();
 
     HomeNborhoodCandidate<PTDType> isCandidate;

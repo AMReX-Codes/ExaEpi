@@ -43,7 +43,7 @@ class InteractionModWork : public InteractionModel<PCType, PTDType, PType>
 
 template <typename PCType, typename PTDType, typename PType>
 void InteractionModWork<PCType, PTDType, PType>::interactAgents (PCType& agents, MultiFab&) {
-    BL_PROFILE(__func__);
+    BL_PROFILE("InteractionModWork::interactAgents");
     int n_disease = agents.numDiseases();
 
     WorkCandidate<PTDType> isCandidate;
