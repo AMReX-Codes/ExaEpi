@@ -39,8 +39,7 @@ AgentContainer::AgentContainer (const amrex::Geometry            & a_geom,  /*!<
                                 const amrex::DistributionMapping & a_dmap,  /*!< Distribution mapping */
                                 const amrex::BoxArray            & a_ba,    /*!< Box array */
                                 const int                        & a_num_diseases, /*!< Number of diseases */
-                                const std::vector<std::string>   & a_disease_names, /*!< names of the diseases */
-                                const bool                       fast  /*!< faster but non-deterministic computation*/)
+                                const std::vector<std::string>   & a_disease_names /*!< names of the diseases */)
     : amrex::ParticleContainer< 0,
                                 0,
                                 RealIdx::nattribs,
@@ -72,13 +71,13 @@ AgentContainer::AgentContainer (const amrex::Geometry            & a_geom,  /*!<
         /* Create the interaction model objects and push to container */
         m_interactions.clear();
         //m_interactions[InteractionNames::generic] = new InteractionModGeneric<PCType,PTileType,PTDType,PType>;
-        m_interactions[InteractionNames::home] = new InteractionModHome<PCType, PTDType, PType>(fast);
-        m_interactions[InteractionNames::work] = new InteractionModWork<PCType, PTDType, PType>(fast);
-        m_interactions[InteractionNames::school] = new InteractionModSchool<PCType, PTDType, PType>(fast);
-        m_interactions[InteractionNames::home_nborhood] = new InteractionModHomeNborhood<PCType, PTDType, PType>(fast);
-        m_interactions[InteractionNames::work_nborhood] = new InteractionModWorkNborhood<PCType, PTDType, PType>(fast);
+        m_interactions[InteractionNames::home] = new InteractionModHome<PCType, PTDType, PType>();
+        m_interactions[InteractionNames::work] = new InteractionModWork<PCType, PTDType, PType>();
+        m_interactions[InteractionNames::school] = new InteractionModSchool<PCType, PTDType, PType>();
+        m_interactions[InteractionNames::home_nborhood] = new InteractionModHomeNborhood<PCType, PTDType, PType>();
+        m_interactions[InteractionNames::work_nborhood] = new InteractionModWorkNborhood<PCType, PTDType, PType>();
 
-        m_hospital = std::make_unique<HospitalModel<PCType, PTDType, PType>>(fast);
+        m_hospital = std::make_unique<HospitalModel<PCType, PTDType, PType>>();
     }
 
     m_h_parm.resize(m_num_diseases);

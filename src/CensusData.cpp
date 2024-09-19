@@ -79,20 +79,21 @@ void CensusData::init (ExaEpi::TestParams &params, Geometry &geom, BoxArray &ba,
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
 int assign_school (const int nborhood, const amrex::RandomEngine& engine) {
     int il4 = amrex::Random_int(100, engine);
-    int school = -1;
+    int school = 0;
 
     if (il4 < 36) {
-        school = 3 + (nborhood / 2);  /* elementary school */
+        school = 3 + (nborhood / 2);  // elementary school, in neighborhoods 1 and 2
+        AMREX_ALWAYS_ASSERT(school < 5);
     }
     else if (il4 < 68) {
-        school = 2;  /* middle school */
+        school = 2;  // middle school, one for all neighborhoods
     }
 
     else if (il4 < 93) {
-        school = 1;  /* high school */
+        school = 1;  // high school, one for all neighborhoods
     }
     else {
-        school = 0;  /* not in school, presumably 18-year-olds or some home-schooled */
+        school = 0;  // not in school, presumably 18-year-olds or some home-schooled, etc
     }
     return school;
 }

@@ -18,7 +18,7 @@ class HospitalModel : public InteractionModel<PCType, PTDType, PType>
     public:
 
         /*! \brief null constructor */
-        HospitalModel (bool _fast_bin) : InteractionModel<PCType, PTDType, PType>(_fast_bin) {}
+        HospitalModel () : InteractionModel<PCType, PTDType, PType>() {}
 
         /*! \brief default destructor */
         virtual ~HospitalModel () = default;
