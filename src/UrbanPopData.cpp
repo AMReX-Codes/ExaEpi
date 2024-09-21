@@ -19,6 +19,7 @@
 #include <AMReX_Print.H>
 #include <AMReX_Vector.H>
 
+#include "AgentContainer.H"
 #include "UrbanPopData.H"
 
 
@@ -37,61 +38,45 @@ using ParallelDescriptor::MyProc;
 using ParallelDescriptor::NProcs;
 
 
-struct XYLoc {
-    int x,y;
-
-    XYLoc(int _x, int _y) : x(_x), y(_y) {}
-
-    bool operator==(const XYLoc &other) const {
-        return x == other.x && y == other.y;
-    }
-};
-
-namespace std {
-    template <>
-    struct hash<XYLoc> {
-        size_t operator()(const XYLoc &elem) const {
-            return std::hash<int64_t>{}(elem.x) ^ (std::hash<int64_t>{}(elem.y) << 1);
-        }
-    };
-}
-
-
-bool BlockGroup::read_agents(ifstream &f, float min_lng, float min_lat, float gspacing_x, float gspacing_y) {
-    /*
+bool BlockGroup::read_agents(ifstream &f, Vector<UrbanPopAgent> &agents, amrex::Vector<int>& num_workgroups,
+                             const int workgroup_size) {
     string buf;
+    num_households = 0;
     num_employed = 0;
-    num_military = 0;
+    num_students = 0;
+    AMREX_ALWAYS_ASSERT(home_population > 0);
+    int start_i = agents.size();
+    agents.resize(start_i + home_population);
+    num_workgroups.resize(start_i + home_population);
     // used for counting up the number of unique households
     unordered_set<int> households;
     f.seekg(file_offset);
     // skip the first line - contains the header
     if (file_offset == 0) getline(f, buf);
-    UrbanPopAgent agent;
-    for (int i = 0; i < people.size(); i++) {
+    for (int i = start_i; i < agents.size(); i++) {
+        auto &agent = agents[i];
         if (!agent.read_csv(f))
             Abort("File is corrupted: end of file before read for offset " + to_string(file_offset) + " geoid " +
                   to_string(geoid) + "\n");
-        if (agent.p_id == -1) Abort("File is corrupted: couldn't read agent p_id at offset " + to_string(file_offset) + "\n");
-        if (agent.h_geoid != geoid)
-            Abort("File is corrupted: wrong geoid, read " + to_string(agent.h_geoid) + " expected " + to_string(geoid) + "\n");
-        households.insert(agent.h_id);
-        int work_x = -1;
-        int work_y = -1;
-        if (agent.pr_emp_stat == 2 || agent.pr_emp_stat == 3) {
-            AMREX_ALWAYS_ASSERT(agent.w_lat != -1 && agent.w_long != -1);
-            work_x = (agent.w_long - min_lng) / gspacing_x;
-            work_y = (agent.w_lat - min_lat) / gspacing_y;
-        }
-        people[i].set(agent.h_geoid, agent.w_geoid, work_x, work_y, agent.p_id, agent.h_id, agent.pr_age, agent.pr_emp_stat,
-                      agent.pr_commute);
-        // crude estimate based on employment status
-        if (agent.pr_emp_stat == 2) num_employed++;
-        if (agent.pr_emp_stat == 3) num_military++;
+        if (agent.id == -1) Abort("File is corrupted: couldn't read agent p_id at offset " + to_string(file_offset) + "\n");
+        if (agent.home_geoid != geoid)
+            Abort("File is corrupted: wrong geoid, read " + to_string(agent.home_geoid) + " expected " + to_string(geoid) + "\n");
+        households.insert(agent.household_id);
+        AMREX_ALWAYS_ASSERT(agent.work_lat != -1 && agent.work_lng != -1);
+        if (agent.role == 0) AMREX_ALWAYS_ASSERT(agent.work_lat == agent.home_lat && agent.work_lng == agent.home_lng);
+        if (agent.role == 1) num_employed++;
+        if (agent.role == 2) num_students++;
+    }
+    int this_num_workgroups = num_employed / workgroup_size + 1;
+    for (int i = start_i; i < agents.size(); i++) {
+        // get the work population for the work group
+        num_workgroups[i] = this_num_workgroups;
     }
     num_households = households.size();
-    AMREX_ALWAYS_ASSERT_WITH_MESSAGE(people.size() > 0, "Number of agents must be positive");
-    */
+
+    //Print() << "work population " << work_population << " num workgroups " << work_population / workgroup_size + 1
+    //        << " num workgroup using num employed " << num_employed / workgroup_size + 1 << "\n";
+
     return true;
 }
 
@@ -110,11 +95,11 @@ bool BlockGroup::read(istringstream &iss) {
         file_offset = stol(tokens[3]);
         home_population = stoi(tokens[4]);
         work_population = stoi(tokens[5]);
-        agents.resize(home_population);
+        AMREX_ALWAYS_ASSERT(home_population > 0 || work_population > 0);
     } catch (const std::exception &ex) {
         std::ostringstream os;
         os << "Error reading UrbanPop input file: " << ex.what() << ", line read: " << "'" << buf << "'";
-        amrex::Abort(os.str());
+        Abort(os.str());
     }
     return true;
 }
@@ -122,7 +107,7 @@ bool BlockGroup::read(istringstream &iss) {
 static Vector<BlockGroup> read_block_groups_file(const string &fname) {
     // read in index file and broadcast
     Vector<char> idx_file_ptr;
-    ParallelDescriptor::ReadAndBcastFile(fname, idx_file_ptr);
+    ParallelDescriptor::ReadAndBcastFile(fname  + ".idx", idx_file_ptr);
     string idx_file_ptr_string(idx_file_ptr.dataPtr());
     istringstream idx_file_iss(idx_file_ptr_string, istringstream::in);
 
@@ -138,20 +123,46 @@ static Vector<BlockGroup> read_block_groups_file(const string &fname) {
     return block_groups;
 }
 
-void UrbanPopData::construct_geom (const std::string &fname, Geometry &geom, BoxArray &ba, DistributionMapping &dm) {
+static std::pair<int, double> get_all_load_balance (const long num) {
+    int all = num;
+    ParallelDescriptor::ReduceIntSum(all);
+    int max_num = num;
+    ParallelDescriptor::ReduceIntMax(max_num);
+    double load_balance = (double)all / (double)NProcs() / max_num;
+    return {all, load_balance};
+}
+
+struct LngLatToGrid {
+    Real min_lng, min_lat;
+    Real gspacing_x, gspacing_y;
+
+    LngLatToGrid(Real _min_lng, Real _min_lat, Real _gspacing_x, Real _gspacing_y) :
+        min_lng(_min_lng), min_lat(_min_lat),
+        gspacing_x(_gspacing_x), gspacing_y(_gspacing_y) {}
+
+    AMREX_GPU_HOST_DEVICE
+    void operator() (Real lng, Real lat, int &x, int &y) const {
+        x = (int)((lng - min_lng) / gspacing_x);
+        y = (int)((lat - min_lat) / gspacing_y);
+    }
+};
+
+/*! \brief Read in UrbanPop data from given file
+*/
+void UrbanPopData::init (ExaEpi::TestParams &params, Geometry &geom, BoxArray &ba, DistributionMapping &dm) {
+    BL_PROFILE("UrbanPopData::init");
+    std::string fname = params.urbanpop_filename;
     // every rank reads all the block groups from the index file
     auto all_block_groups = read_block_groups_file(fname);
     min_lat = 1000;
     min_lng = 1000;
-    Real max_lat = -1000;
-    Real max_lng = -1000;
-    block_group_workers.clear();
+    max_lat = -1000;
+    max_lng = -1000;
     for (auto &block_group : all_block_groups) {
         min_lng = min(block_group.lng, min_lng);
         max_lng = max(block_group.lng, max_lng);
         min_lat = min(block_group.lat, min_lat);
         max_lat = max(block_group.lat, max_lat);
-        block_group_workers[block_group.geoid] = block_group.work_population;
     }
     Print() << "lng " << min_lng << ", " << max_lng << " lat " << min_lat << ", " << max_lat << "\n";
 
@@ -181,31 +192,33 @@ void UrbanPopData::construct_geom (const std::string &fname, Geometry &geom, Box
     Print() << "Geometry: " << geom << "\n";
     Print() << "Actual grid spacing: " << gspacing_x << ", "  << gspacing_y << "\n";
 
-    // create a box array with a single box representing the domain
+    LngLatToGrid lnglat_to_grid(min_lng, min_lat, gspacing_x, gspacing_y);
+
+    // create a box array with a single box representing the domain. Every process does this.
     ba.define(geom.Domain());
     // split the box array by forcing the box size to be limited to a given number of grid points
     ba.maxSize((int)((0.25 * grid_x) / NProcs()));
     //ba.maxSize(0.25 * grid_x / 8);
     Print() << "Number of boxes: " << ba.size() << "\n";
-    // for checking that no x,y locations are duplicated
-    std::unordered_set<XYLoc> xy_locs;
+
     // weights set according to population in each box so that they can be uniformly distributed
+    // every process computes the same result - needed before distributing the boxes
     Vector<Long> weights(ba.size(), 0);
     for (auto &block_group : all_block_groups) {
-        // FIXME: check that the x,y calculated here are unique
-        // convert lat/long coords to grid coords
-        block_group.x = (int)((block_group.lng - min_lng) / gspacing_x);
-        block_group.y = (int)((block_group.lat - min_lat) / gspacing_y);
-        XYLoc xy_loc(block_group.x, block_group.y);
-        auto it = xy_locs.find(xy_loc);
-        if (it != xy_locs.end()) Abort("Found duplicate x,y location; need to decrease gspacing\n");
-        else xy_locs.insert(xy_loc);
+        lnglat_to_grid(block_group.lng, block_group.lat, block_group.x, block_group.y);
+        //block_group.x = (int)((block_group.lng - min_lng) / gspacing_x);
+        //block_group.y = (int)((block_group.lat - min_lat) / gspacing_y);
+        //XYLoc xy_loc(block_group.x, block_group.y);
+        auto xy = IntVect(block_group.x, block_group.y);
+        auto it = xy_to_block_groups.find(xy);
+        if (it != xy_to_block_groups.end()) Abort("Found duplicate x,y location; need to decrease gspacing\n");
+        else xy_to_block_groups.insert({xy, block_group});
         int bi_loc = -1;
         for (int bi = 0; bi < ba.size(); bi++) {
             auto bx = ba[bi];
-            if (bx.contains(IntVect(block_group.x, block_group.y))) {
+            if (bx.contains(xy)) {
                 bi_loc = bi;
-                weights[bi] += block_group.agents.size();
+                weights[bi] += block_group.home_population;
                 break;
             }
         }
@@ -217,72 +230,152 @@ void UrbanPopData::construct_geom (const std::string &fname, Geometry &geom, Box
     // distribute the boxes in the array across the processors
     dm.define(ba);
     dm.KnapSackProcessorMap(weights, NProcs());
-
-    block_groups.clear();
-    for (auto &block_group : all_block_groups) {
-        int bi_loc = -1;
-        for (int bi = 0; bi < ba.size(); bi++) {
-            auto bx = ba[bi];
-            // do we own this box?
-            if (bx.contains(IntVect(block_group.x, block_group.y))) {
-                bi_loc = bi;
-                if (dm[bi] == MyProc()) {
-                    block_group.box_i = bi;
-                    block_groups.push_back(block_group);
-                }
-                break;
-            }
-        }
-        if (bi_loc == -1)
-            AllPrint() << MyProc() << ": WARNING: could not find box for " << block_group.x << "," << block_group.y << "\n";
-    }
-}
-
-static std::pair<int, double> get_all_load_balance (long num) {
-    int all = num;
-    ParallelDescriptor::ReduceIntSum(all);
-    int max_num = num;
-    ParallelDescriptor::ReduceIntMax(max_num);
-    double load_balance = (double)all / (double)NProcs() / max_num;
-    return {all, load_balance};
 }
 
 
+void UrbanPopData::initAgents (AgentContainer &pc, const ExaEpi::TestParams &params) {
+    BL_PROFILE("UrbanPopData::init");
 
-/*! \brief Read in UrbanPop data from given file
-*/
-void UrbanPopData::init (ExaEpi::TestParams &params, amrex::Geometry &geom, amrex::BoxArray &ba, amrex::DistributionMapping &dm)
-{
-    BL_PROFILE("UrbanPopData::InitFromFile");
-    construct_geom(params.urbanpop_filename + ".idx", geom, ba, dm);
-    // set up block groups
+    LngLatToGrid lnglat_to_grid(min_lng, min_lat, gspacing_x, gspacing_y);
+
     int home_population = 0;
     int work_population = 0;
-    int my_num_agents = 0;
-    string fname = params.urbanpop_filename + ".csv";
-    ifstream f(fname);
-    if (!f) amrex::Abort("Could not open file " + fname + "\n");
-    for (auto &block_group : block_groups) {
-        my_num_agents += block_group.agents.size();
-        //block_group.read_people(f, min_lng, min_lat, gspacing_x, gspacing_y);
-        home_population += block_group.home_population;
-        work_population += block_group.work_population;
+    int num_households = 0;
+    int num_employed = 0;
+    int num_students = 0;
+    int num_communities = 0;
+    ifstream f(params.urbanpop_filename + ".csv");
+    if (!f) Abort("Could not open file " + params.urbanpop_filename + ".csv" + "\n");
+    // for checking results against original urbanpop data
+    std::ofstream agents_of("agents." + std::to_string(MyProc()) + ".csv");
+
+    for (MFIter mfi = pc.MakeMFIter(0, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+        const Box& tilebox = mfi.tilebox();
+
+        Vector<UrbanPopAgent> agents;
+        Vector<int> num_workgroups;
+        // can't read the agent data from disk on the GPU
+        for (int x = lbound(tilebox).x; x <= ubound(tilebox).x; x++) {
+            for (int y = lbound(tilebox).y; y <= ubound(tilebox).y; y++) {
+                auto xy = IntVect(x, y);
+                auto it = xy_to_block_groups.find(xy);
+                if (it != xy_to_block_groups.end()) {
+                    auto &block_group = it->second;
+                    num_communities++;
+                    home_population += block_group.home_population;
+                    work_population += block_group.work_population;
+                    if (block_group.home_population > 0) {
+                        // now read in the agents for this block group
+                        block_group.read_agents(f, agents, num_workgroups, params.workgroup_size);
+                        num_households += block_group.num_households;
+                        num_employed += block_group.num_employed;
+                        num_students += block_group.num_students;
+                    }
+                }
+            }
+        }
+
+        if (num_communities == 0) continue;
+
+        auto& ptile = pc.GetParticles(0)[{mfi.index(), mfi.LocalTileIndex()}];
+        int myproc = ParallelDescriptor::MyProc();
+        ptile.resize(agents.size());
+        auto aos = &ptile.GetArrayOfStructs()[0];
+        auto agents_ptr = agents.data();
+        auto num_workgroups_ptr = num_workgroups.data();
+        auto& soa = ptile.GetStructOfArrays();
+        auto age_group_ptr = soa.GetIntData(IntIdx::age_group).data();
+        auto family_ptr = soa.GetIntData(IntIdx::family).data();
+        auto home_i_ptr = soa.GetIntData(IntIdx::home_i).data();
+        auto home_j_ptr = soa.GetIntData(IntIdx::home_j).data();
+        auto work_i_ptr = soa.GetIntData(IntIdx::work_i).data();
+        auto work_j_ptr = soa.GetIntData(IntIdx::work_j).data();
+        soa.GetIntData(IntIdx::hosp_i).assign(-1);
+        soa.GetIntData(IntIdx::hosp_j).assign(-1);
+        auto nborhood_ptr = soa.GetIntData(IntIdx::nborhood).data();
+        auto school_ptr = soa.GetIntData(IntIdx::school).data();
+        auto workgroup_ptr = soa.GetIntData(IntIdx::workgroup).data();
+        auto work_nborhood_ptr = soa.GetIntData(IntIdx::work_nborhood).data();
+        soa.GetIntData(IntIdx::withdrawn).assign(0);
+        soa.GetIntData(IntIdx::random_travel).assign(0);
+        int avg_num_workgroups = num_employed / params.workgroup_size / num_communities + 1;
+
+        ParallelForRNG (agents.size(), [=] AMREX_GPU_DEVICE (int i, RandomEngine const& engine) noexcept {
+            auto &p = aos[i];
+            auto &agent = agents_ptr[i];
+            p.id() = agent.id;
+            p.cpu() = myproc;
+            p.pos(0) = agent.home_lng;
+            p.pos(1) = agent.home_lat;
+            // Age group (under 5, 5-17, 18-29, 30-64, 65+)
+            if (agent.age < 5) age_group_ptr[i] = 0;
+            else if (agent.age < 17) age_group_ptr[i] = 1;
+            else if (agent.age < 29) age_group_ptr[i] = 2;
+            else if (agent.age < 64) age_group_ptr[i] = 3;
+            else age_group_ptr[i] = 4;
+            family_ptr[i] = agent.household_id;
+            lnglat_to_grid(agent.home_lng, agent.home_lat, home_i_ptr[i], home_j_ptr[i]);
+            AMREX_ALWAYS_ASSERT(tilebox.contains(IntVect(home_i_ptr[i], home_j_ptr[i])));
+            lnglat_to_grid(agent.work_lng, agent.work_lat, work_i_ptr[i], work_j_ptr[i]);
+            nborhood_ptr[i] = 0;
+            school_ptr[i] = agent.school_id;
+            if (agent.role == 1) {
+                //workgroup_ptr[i] = Random_int(num_workgroups_ptr[i], engine) + 1;
+                workgroup_ptr[i] = Random_int(avg_num_workgroups, engine) + 1;
+                work_nborhood_ptr[i] = 0;
+            } else {
+                workgroup_ptr[i] = 0;
+                work_nborhood_ptr[i] = 0;
+            }
+        });
+
+        auto np = soa.numParticles();
+
+        //for (auto &agent : agents) {
+        //    agents_of << "*," << agent << "\n";
+        //}
+
+        for (int i = 0; i < np; i++) {
+            agents_of << age_group_ptr[i] << " "
+                      << family_ptr[i] << " "
+                      << home_i_ptr[i] << " "
+                      << home_j_ptr[i] << " "
+                      << work_i_ptr[i] << " "
+                      << work_j_ptr[i] << " "
+                      << nborhood_ptr[i] << " "
+                      << school_ptr[i] << " "
+                      << workgroup_ptr[i] << " "
+                      << work_nborhood_ptr[i] << "\n";
+        }
     }
-    //AllPrint() << "<" << MyProc() << ">: " << my_num_agents << " population in " << block_groups.size() << " block groups\n";
-    int my_num_block_groups = block_groups.size();
-    auto [all_num_block_groups, load_balance_block_groups] = get_all_load_balance(my_num_block_groups);
-    auto [all_num_agents, load_balance_agents] = get_all_load_balance(my_num_agents);
+
+    AMREX_ALWAYS_ASSERT(pc.OK());
+    agents_of.close();
+
+    // For some reason this crashes. Ugh
+    // pc.WriteAsciiFile("amrex-agents.csv");
+
+
+    AllPrint() << "Process " << MyProc() << ": population " << home_population << " in " << num_communities << " communities\n";
+    auto [all_num_communities, load_balance_communities] = get_all_load_balance(num_communities);
+    auto [all_num_agents, load_balance_agents] = get_all_load_balance(home_population);
     ParallelContext::BarrierAll();
+
+    //AMREX_ALWAYS_ASSERT(num_employed + num_students == work_population);
 
     ParallelDescriptor::ReduceIntSum(home_population);
     ParallelDescriptor::ReduceIntSum(work_population);
+    ParallelDescriptor::ReduceIntSum(num_households);
+    ParallelDescriptor::ReduceIntSum(num_employed);
+    ParallelDescriptor::ReduceIntSum(num_students);
 
-    amrex::Print() << "Population:  " << all_num_agents << " (balance "
-                                      << std::fixed << std::setprecision(3) << load_balance_agents << ")\n";
-    amrex::Print() << "Home:    " << home_population << "\n";
-    amrex::Print() << "Work:    " << work_population << "\n";
-    //amrex::Print() << "Households:  " << num_households << "\n";
-    amrex::Print() << "Communities: " << all_num_block_groups << " (balance "
-                                      << std::fixed << std::setprecision(3) << load_balance_block_groups << ")\n";
+    AMREX_ALWAYS_ASSERT(home_population == work_population);
+
+    Print() << std::fixed << std::setprecision(2)
+            << "Population:  " << all_num_agents << " (balance " << load_balance_agents << ")\n"
+            << "Employed:    " << num_employed << "\n"
+            << "Students:    " << num_students << "\n"
+            << "Households:  " << num_households << "\n"
+            << "Communities: " << all_num_communities << " (balance " << load_balance_communities << ")\n";
 }
 

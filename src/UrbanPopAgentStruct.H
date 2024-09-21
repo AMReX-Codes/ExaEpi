@@ -14,7 +14,7 @@
 using std::string;
 using float32_t = float;
 
-const size_t NUM_COLS = 16;
+const size_t NUM_COLS = 17;
 
 static string role_descriptions[] = {"nope", "worker", "student"};
 static string naics_descriptions[] = {"edu_med_sca", "con", "prf", "agr_ext", "mfg", "wfh", "ent", "fin", "ret", "srv", "adm", "utl_trn", "whl", "inf"};
@@ -31,6 +31,7 @@ static std::vector<string> split_string(const string &s, char delim) {
 
 struct UrbanPopAgent {
     int64_t id;
+    int32_t household_id;
     int64_t home_geoid;
     float32_t home_lat;
     float32_t home_lng;
@@ -60,21 +61,22 @@ struct UrbanPopAgent {
                 throw std::runtime_error("Incorrect number of tokens, expected " + std::to_string(NUM_COLS) +
                                          " got " + std::to_string(tokens.size()));
             id = stol(tokens[0]);
-            home_geoid = stol(tokens[1]);
-            home_lat = stof(tokens[2]);
-            home_lng = stof(tokens[3]);
-            work_geoid = stol(tokens[4]);
-            work_lat = stof(tokens[5]);
-            work_lng = stof(tokens[6]);
-            age = stoi(tokens[7]);
-            sex = stoi(tokens[8]);
-            race = stoi(tokens[9]);
-            travel = stoi(tokens[10]);
-            veh_occ = stoi(tokens[11]);
-            role = stoi(tokens[12]);
-            naics = stoi(tokens[13]);
-            grade = stoi(tokens[14]);
-            school_id = stoi(tokens[15]);
+            household_id = stoi(tokens[1]);
+            home_geoid = stol(tokens[2]);
+            home_lat = stof(tokens[3]);
+            home_lng = stof(tokens[4]);
+            work_geoid = stol(tokens[5]);
+            work_lat = stof(tokens[6]);
+            work_lng = stof(tokens[7]);
+            age = stoi(tokens[8]);
+            sex = stoi(tokens[9]);
+            race = stoi(tokens[10]);
+            travel = stoi(tokens[11]);
+            veh_occ = stoi(tokens[12]);
+            role = stoi(tokens[13]);
+            naics = stoi(tokens[14]);
+            grade = stoi(tokens[15]);
+            school_id = stoi(tokens[16]);
 
         } catch (const std::exception &ex) {
             std::ostringstream os;
@@ -85,23 +87,24 @@ struct UrbanPopAgent {
     }
 
     friend std::ostream& operator<<(std::ostream& os, const UrbanPopAgent& agent) {
-        os << agent.id << ',';
-        os << agent.home_geoid << ',';
-        os << agent.home_lat << ',';
-        os << agent.home_lng << ',';
-        os << agent.work_geoid << ',';
-        os << agent.work_lat << ',';
-        os << agent.work_lng << ',';
-        os << (int)agent.age << ',';
-        os << (int)agent.sex << ',';
-        os << (int)agent.race << ',';
-        os << (int)agent.travel << ',';
-        os << (int)agent.veh_occ << ',';
+        os << std::fixed << std::setprecision(6);
+        os << agent.id << ",";
+        os << agent.household_id << ",";
+        os << agent.home_geoid << ",";
+        os << agent.home_lat << ",";
+        os << agent.home_lng << ",";
+        os << agent.work_geoid << ",";
+        os << agent.work_lat << ",";
+        os << agent.work_lng << ",";
+        os << (int)agent.age << ",";
+        os << (int)agent.sex << ",";
+        os << (int)agent.race << ",";
+        os << (int)agent.travel << ",";
+        os << (int)agent.veh_occ << ",";
         os << (int)agent.role << (agent.role != -1 ? ":" + role_descriptions[agent.role] : "") << ",";
         os << (int)agent.naics << (agent.naics != -1 ? ":" + naics_descriptions[agent.naics] : "") << ",";
         os << (int)agent.grade << (agent.grade != -1 ? ":" + grade_descriptions[agent.grade] : "") << ",";
-        os << agent.school_id << ',';
-
+        os << agent.school_id;
         return os;
     }
 };

@@ -22,7 +22,7 @@ import scipy.stats
 
 include_fields = [
     'p_id',
-    'hh_id',
+    'h_id',
     'geoid',
     'pr_age',
     'pr_sex',
@@ -116,9 +116,9 @@ using float32_t = float;
 const size_t NUM_COLS = {len(df.columns)};
 
 """
-#const size_t PUMS_ID_LEN = {PUMS_ID_LEN};
-#const size_t NAICS_LEN = {NAICS_LEN};
-#"""
+    #const size_t PUMS_ID_LEN = {PUMS_ID_LEN};
+    #const size_t NAICS_LEN = {NAICS_LEN};
+    #"""
 
     # print out string arrays with category names
     for field_type in df:
@@ -182,18 +182,23 @@ static std::vector<string> split_string(const string &s, char delim) {
     }\n"""
 
     hdr += """
-    friend std::ostream& operator<<(std::ostream& os, const UrbanPopAgent& agent) {\n"""
+    friend std::ostream& operator<<(std::ostream& os, const UrbanPopAgent& agent) {
+        os << std::fixed << std::setprecision(6);\n"""
 
     for i, col in enumerate(df.columns):
         c_type = str(df.dtypes.iloc[i]) + "_t"
         if col in string_fields:
-            hdr += '        os << string(agent.' + col + ', ' + string_fields[col] + ') << ",";\n'
+            hdr += '        os << string(agent.' + col + ', ' + string_fields[col] + ')'
         elif col in categ_types:
             hdr += '        os << (int)agent.' + col + ' << (agent.' + col + ' != -1 ? ":" + ' + col + '_descriptions[agent.' + \
-                   col + '] : "") << ",";\n'
+                   col + '] : "")'
         else:
-            hdr += "        os << " + ("(int)" if c_type == "int8_t" else "") + "agent." + col + " << ',';\n"
+            hdr += "        os << " + ("(int)" if c_type == "int8_t" else "") + "agent." + col
 
+        if i < len(df.columns) - 1:
+            hdr += ' << ",";\n'
+        else:
+            hdr += ";"
         #os << (int)agent.hh_dwg << (agent.hh_dwg != -1 ? ":" + hh_dwg_descriptions[agent.hh_dwg] : "") << ",";
 
     hdr += """
@@ -231,6 +236,8 @@ def process_nt_dt_feather_files(fnames):
 
     print("Processed", len(dfs[-1].index), "records in %.3f s" % (time.time() - start_t))
 
+    df.to_csv("work.csv", sep=' ')
+
     return df
 
 
@@ -259,6 +266,8 @@ def process_feather_files(fnames, out_fname, geoid_locs_map, df_dt_nt):
     if not np.array_equal(df.geoid.values, df_dt_nt.orig_geoid.values):
         print("Mismatched geoids for population vs daytime/nightime")
         sys.exit(0)
+
+    df.to_csv("all.csv", sep=' ')
 
     # remove all not found in include list
     cols_to_purge = set(list(df.columns.values)) - set(include_fields)
@@ -297,9 +306,16 @@ def process_feather_files(fnames, out_fname, geoid_locs_map, df_dt_nt):
     df.insert(df.columns.get_loc("work_lat") + 1, "work_lng", float(0))
     df.work_lng = df.work_lng.astype("float32")
 
-    df["work_geoid"] = df_dt_nt["dest_geoid"].copy(deep=True)
+    df["work_geoid"] = df_dt_nt["dest_geoid"].values
     for col in ["role", "naics", "grade", "school_id"]:
-        df[col] = df_dt_nt[col].copy(deep=True)
+        df[col] = df_dt_nt[col].values
+        if not np.array_equal(df[col].values, df_dt_nt[col].values):
+            print("Mismatched", col, "for population vs daytime/nightime")
+            sys.exit(0)
+
+    if not np.array_equal(df.work_geoid.values, df_dt_nt.dest_geoid.values):
+        print("Mismatched work geoids for population vs daytime/nightime")
+        sys.exit(0)
 
     for field_type in df:
         if field_type not in include_fields:
@@ -375,14 +391,27 @@ def process_feather_files(fnames, out_fname, geoid_locs_map, df_dt_nt):
         work_geoids_map[geoid] = len(subset_df.index)
     print("Found", len(df.home_geoid.unique()), "home locations and", len(work_geoids_map), "work locations")
 
+    df_special = df[['id', 'age', 'role', 'school_id']]
+    df_special = df_special.loc[df_special['school_id'] != '']
+    df_special = df_special.loc[df_special['school_id'] != -1]
+    df_special.to_csv("schools.csv", sep=' ')
+
     # print each geoid in turn so we can track the file offsets
     with open(out_fname_idx, mode='w') as f:
         print("geoid lat lng foff h_pop w_pop", file=f)
         geoids = df.home_geoid.unique()
+        work_geoids = df.work_geoid.unique()
+        if len(work_geoids) > len(geoids):
+            only_work_geoids = list(set(work_geoids) - set(geoids))
+            print("Only work geoids", only_work_geoids)
+            for i, geoid in enumerate(only_work_geoids):
+                work_pop = work_geoids_map[geoid] if geoid in work_geoids_map else 0
+                print(geoid, ' '.join(map(str, geoid_locs_map[geoid])), 0, 0, work_pop, file=f)
+
         for i, geoid in enumerate(geoids):
             foffset = os.stat(out_fname_csv).st_size if i > 0 else 0
             subset_df = df.loc[df['home_geoid'] == geoid]
-            subset_df.to_csv(out_fname_csv, index=True, header=(i == 0), mode='w' if i == 0 else 'a')
+            subset_df.to_csv(out_fname_csv, index=True, header=(i == 0), mode='w' if i == 0 else 'a', float_format="%.6f")
             work_pop = work_geoids_map[geoid] if geoid in work_geoids_map else 0
             print(geoid, ' '.join(map(str, geoid_locs_map[geoid])), foffset, len(subset_df.index), work_pop, file=f)
     print("Wrote", len(df.index), "records in %.3f s" % (time.time() - t))

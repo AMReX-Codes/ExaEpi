@@ -958,7 +958,7 @@ int infect_random_community (AgentContainer& pc, /*!< Agent container (particle 
     for (MFIter mfi(censusData.unit_mf, TilingIfNotGPU()); mfi.isValid(); ++mfi)
     {
         amrex::DenseBins<AgentContainer::ParticleType>& bins = bin_map[std::make_pair(mfi.index(), mfi.LocalTileIndex())];
-        auto& agents_tile = pc.GetParticles(0)[std::make_pair(mfi.index(),mfi.LocalTileIndex())];
+        auto& agents_tile = pc.GetParticles(0)[std::make_pair(mfi.index(), mfi.LocalTileIndex())];
         auto& aos = agents_tile.GetArrayOfStructs();
         auto& soa = agents_tile.GetStructOfArrays();
         const size_t np = aos.numParticles();

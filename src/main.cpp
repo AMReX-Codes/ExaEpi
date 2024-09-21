@@ -122,7 +122,6 @@ void runAgent ()
         censusData.init(params, geom, ba, dm);
     } else if (params.ic_type == ICType::UrbanPop) {
         urbanPopData.init(params, geom, ba, dm);
-        return;
     }
 
     // The default output filename is:
@@ -196,7 +195,8 @@ void runAgent ()
                 censusData.setInitialCasesRandom(pc, params.num_initial_cases, params.disease_names, params.fast);
             }
         } else if (params.ic_type == ICType::UrbanPop) {
-            Abort("UrbanPop not yet implemented");
+            urbanPopData.initAgents(pc, params);
+            return;
         } else {
             Abort("Unimplemented ic_type");
         }

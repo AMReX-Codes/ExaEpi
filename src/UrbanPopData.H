@@ -16,34 +16,35 @@
 
 struct BlockGroup {
     int64_t geoid;
-    float lng;
-    float lat;
+    amrex::Real lng;
+    amrex::Real lat;
     size_t file_offset;
     int box_i;
     int x;
     int y;
     int home_population;
     int work_population;
-    amrex::Vector<UrbanPopAgent> agents;
+    int num_households;
+    int num_employed;
+    int num_students;
 
     bool read(std::istringstream &iss);
-    bool read_agents(std::ifstream &f, float min_lng, float min_lat, float gspacing_x, float gspacing_y);
+    bool read_agents(std::ifstream &f, amrex::Vector<UrbanPopAgent> &agents, amrex::Vector<int>& num_workgroups,
+                     const int workgroup_size);
 };
 
 struct UrbanPopData {
-    // each block group has around 1500 people
-    amrex::Vector<BlockGroup> block_groups;
-    std::unordered_map<int64_t, int> block_group_workers;
-    float min_lng, min_lat;
-    float gspacing_x, gspacing_y;
+    amrex::Real min_lng, min_lat, max_lng, max_lat;
+    amrex::Real gspacing_x, gspacing_y;
 
-    /*! \brief Null constructor */
     UrbanPopData () {}
 
     void init(ExaEpi::TestParams &params, amrex::Geometry &geom, amrex::BoxArray &ba, amrex::DistributionMapping &dm);
 
+    void initAgents(AgentContainer &pc, const ExaEpi::TestParams &params);
+
   private:
 
-    void construct_geom(const std::string &fname, amrex::Geometry &geom, amrex::BoxArray &ba, amrex::DistributionMapping &dm);
+    std::map<IntVect, BlockGroup> xy_to_block_groups;
 
 };

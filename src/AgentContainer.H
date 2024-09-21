@@ -156,7 +156,7 @@ protected:
     std::vector<DiseaseParm*> m_h_parm;    /*!< Disease parameters */
     std::vector<DiseaseParm*> m_d_parm;    /*!< Disease parameters (GPU device) */
 
-    std::map<std::string, IntModel*> m_interactions; /*!< Map of interaction models */
+    std::map<ExaEpi::InteractionNames, IntModel*> m_interactions; /*!< Map of interaction models */
     std::unique_ptr<HospitalModel<PCType, PTDType, PType>> m_hospital; /*!< hospital model */
 
     /*! Flag to indicate if agents are at work */
@@ -168,7 +168,7 @@ protected:
     Array<int, IntIdx::nattribs> max_attribute_values;
 
     /*! \brief queries if a given interaction type (model) is available */
-    inline bool haveInteractionModel( const std::string& a_mod_name ) const {
+    inline bool haveInteractionModel (ExaEpi::InteractionNames a_mod_name) const {
         return (m_interactions.find(a_mod_name) != m_interactions.end());
     }
 

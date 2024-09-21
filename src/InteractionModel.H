@@ -20,19 +20,9 @@ using namespace amrex;
 
 namespace ExaEpi
 {
+
     /*! \brief Name of models */
-    namespace InteractionNames
-    {
-        // The generic model is never used.
-        //const std::string generic = "generic";
-        const std::string home = "home";
-        const std::string work = "work";
-        const std::string school = "school";
-        const std::string home_nborhood = "home_neighborhood";
-        const std::string work_nborhood = "work_neighborhood";
-        const std::string transit = "transit";
-        const std::string random = "random";
-    }
+    AMREX_ENUM(InteractionNames, home, work, school, home_nborhood, work_nborhood, transit, random);
 }
 
 /*! \brief Base class for defining interaction models
