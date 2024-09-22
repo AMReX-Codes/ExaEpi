@@ -291,8 +291,10 @@ void UrbanPopData::initAgents (AgentContainer &pc, const ExaEpi::TestParams &par
         int nborhood_size = params.nborhood_size;
         soa.GetIntData(IntIdx::withdrawn).assign(0);
         soa.GetIntData(IntIdx::random_travel).assign(0);
+        auto np = soa.numParticles();
+        AMREX_ALWAYS_ASSERT(np == agents.size());
 
-        ParallelForRNG (agents.size(), [=] AMREX_GPU_DEVICE (int i, RandomEngine const& engine) noexcept {
+        ParallelForRNG (np, [=] AMREX_GPU_DEVICE (int i, RandomEngine const& engine) noexcept {
             auto &p = aos[i];
             auto &agent = agents_ptr[i];
             p.id() = agent.id;
@@ -327,6 +329,16 @@ void UrbanPopData::initAgents (AgentContainer &pc, const ExaEpi::TestParams &par
         });
 
         // now ensure that all members of the same family have the same home nborhood
+        ParallelFor (np, [=] AMREX_GPU_DEVICE (int i) noexcept {
+            // search forwards to find the last member of the family and use that agent's nborhood
+            int nborhood = nborhood_ptr[i];
+            for (int j = i + 1; j < np; j++) {
+                if (home_i_ptr[i] != home_i_ptr[j] || home_j_ptr[i] != home_j_ptr[j]) break;
+                if (family_ptr[i] != family_ptr[j]) break;
+                nborhood = nborhood_ptr[j];
+            }
+            nborhood_ptr[i] = nborhood;
+        });
 
         // convert device to host to avoid using managed memory. But since the outputs are only for debugging, this is overkill
         //Gpu::HostVector<int> age_group_h(np);
@@ -336,7 +348,6 @@ void UrbanPopData::initAgents (AgentContainer &pc, const ExaEpi::TestParams &par
         bool the_arena_is_managed = false;
         pp.query("the_arena_is_managed", the_arena_is_managed);
         if (the_arena_is_managed) {
-            auto np = soa.numParticles();
             // For CUDA code, need a managed arena for this to work
             for (int i = 0; i < np; i++) {
                 agents_of << aos[i].id() << " "
