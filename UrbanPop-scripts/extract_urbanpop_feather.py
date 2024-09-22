@@ -387,7 +387,7 @@ def process_feather_files(fnames, out_fname, geoid_locs_map, df_dt_nt):
     work_geoids_map = {}
     work_geoids = df.work_geoid.unique()
     for i, geoid in enumerate(work_geoids):
-        subset_df = df.loc[df['work_geoid'] == geoid]
+        subset_df = df.loc[(df['work_geoid'] == geoid) & (df['role'] == 1)]
         work_geoids_map[geoid] = len(subset_df.index)
     print("Found", len(df.home_geoid.unique()), "home locations and", len(work_geoids_map), "work locations")
 
