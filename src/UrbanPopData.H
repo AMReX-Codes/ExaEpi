@@ -45,8 +45,8 @@ struct BlockGroup {
     int num_students;
 
     bool read(std::istringstream &iss);
-    bool read_agents(std::ifstream &f, amrex::Vector<UrbanPopAgent> &agents, amrex::Vector<int>& num_workgroups,
-                     const int workgroup_size, const std::map<IntVect, BlockGroup> &xy_to_block_groups,
+    bool read_agents(std::ifstream &f, amrex::Vector<UrbanPopAgent> &agents, amrex::Vector<int>& group_work_population,
+                     amrex::Vector<int>& group_home_population, const std::map<IntVect, BlockGroup> &xy_to_block_groups,
                      const LngLatToGrid &lnglat_to_grid);
 };
 

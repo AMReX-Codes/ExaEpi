@@ -38,8 +38,8 @@ using ParallelDescriptor::MyProc;
 using ParallelDescriptor::NProcs;
 
 
-bool BlockGroup::read_agents(ifstream &f, Vector<UrbanPopAgent> &agents, amrex::Vector<int>& num_workgroups,
-                             const int workgroup_size, const std::map<IntVect, BlockGroup> &xy_to_block_groups,
+bool BlockGroup::read_agents(ifstream &f, Vector<UrbanPopAgent> &agents, Vector<int>& group_work_populations,
+                             Vector<int>& group_home_populations, const std::map<IntVect, BlockGroup> &xy_to_block_groups,
                              const LngLatToGrid &lnglat_to_grid) {
     string buf;
     num_households = 0;
@@ -48,7 +48,8 @@ bool BlockGroup::read_agents(ifstream &f, Vector<UrbanPopAgent> &agents, amrex::
     AMREX_ALWAYS_ASSERT(home_population > 0);
     int start_i = agents.size();
     agents.resize(start_i + home_population);
-    num_workgroups.resize(start_i + home_population);
+    group_work_populations.resize(start_i + home_population);
+    group_home_populations.resize(start_i + home_population);
     // used for counting up the number of unique households
     unordered_set<int> households;
     f.seekg(file_offset);
@@ -70,13 +71,13 @@ bool BlockGroup::read_agents(ifstream &f, Vector<UrbanPopAgent> &agents, amrex::
             lnglat_to_grid(agent.work_lng, agent.work_lat, work_x, work_y);
             auto it = xy_to_block_groups.find(IntVect(work_x, work_y));
             if (it == xy_to_block_groups.end()) Abort("Cannot find block group for work location");
-            num_workgroups[i] = it->second.work_population / workgroup_size + 1;
-            AMREX_ALWAYS_ASSERT(num_workgroups[i] < 5000 && num_workgroups[i] > 0);
+            group_work_populations[i] = it->second.work_population;
         } else {
-            num_workgroups[i] = 0;
+            group_work_populations[i] = 0;
             if (agent.role == 0) AMREX_ALWAYS_ASSERT(agent.work_lat == agent.home_lat && agent.work_lng == agent.home_lng);
             if (agent.role == 2) num_students++;
         }
+        group_home_populations[i] = home_population;
     }
     num_households = households.size();
 
@@ -233,12 +234,14 @@ void UrbanPopData::initAgents (AgentContainer &pc, const ExaEpi::TestParams &par
     if (!f) Abort("Could not open file " + params.urbanpop_filename + ".csv" + "\n");
     // for checking results against original urbanpop data
     std::ofstream agents_of("agents." + std::to_string(MyProc()) + ".csv");
+    agents_of << "id age family homei homej worki workj nborhood school workgroup worknborhood\n";
 
     for (MFIter mfi = pc.MakeMFIter(0, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
         const Box& tilebox = mfi.tilebox();
 
         Vector<UrbanPopAgent> agents;
-        Vector<int> num_workgroups;
+        Vector<int> group_work_populations;
+        Vector<int> group_home_populations;
         // can't read the agent data from disk on the GPU
         for (int x = lbound(tilebox).x; x <= ubound(tilebox).x; x++) {
             for (int y = lbound(tilebox).y; y <= ubound(tilebox).y; y++) {
@@ -251,7 +254,7 @@ void UrbanPopData::initAgents (AgentContainer &pc, const ExaEpi::TestParams &par
                     work_population += block_group.work_population;
                     if (block_group.home_population > 0) {
                         // now read in the agents for this block group
-                        block_group.read_agents(f, agents, num_workgroups, params.workgroup_size, xy_to_block_groups,
+                        block_group.read_agents(f, agents, group_work_populations, group_home_populations, xy_to_block_groups,
                                                 lnglat_to_grid);
                         num_households += block_group.num_households;
                         num_employed += block_group.num_employed;
@@ -268,7 +271,8 @@ void UrbanPopData::initAgents (AgentContainer &pc, const ExaEpi::TestParams &par
         ptile.resize(agents.size());
         auto aos = &ptile.GetArrayOfStructs()[0];
         auto agents_ptr = agents.data();
-        auto num_workgroups_ptr = num_workgroups.data();
+        auto group_work_populations_ptr = group_work_populations.data();
+        auto group_home_populations_ptr = group_home_populations.data();
 
         auto& soa = ptile.GetStructOfArrays();
         auto age_group_ptr = soa.GetIntData(IntIdx::age_group).data();
@@ -283,6 +287,8 @@ void UrbanPopData::initAgents (AgentContainer &pc, const ExaEpi::TestParams &par
         auto school_ptr = soa.GetIntData(IntIdx::school).data();
         auto workgroup_ptr = soa.GetIntData(IntIdx::workgroup).data();
         auto work_nborhood_ptr = soa.GetIntData(IntIdx::work_nborhood).data();
+        int workgroup_size = params.workgroup_size;
+        int nborhood_size = params.nborhood_size;
         soa.GetIntData(IntIdx::withdrawn).assign(0);
         soa.GetIntData(IntIdx::random_travel).assign(0);
 
@@ -303,18 +309,24 @@ void UrbanPopData::initAgents (AgentContainer &pc, const ExaEpi::TestParams &par
             lnglat_to_grid(agent.home_lng, agent.home_lat, home_i_ptr[i], home_j_ptr[i]);
             AMREX_ALWAYS_ASSERT(tilebox.contains(IntVect(home_i_ptr[i], home_j_ptr[i])));
             lnglat_to_grid(agent.work_lng, agent.work_lat, work_i_ptr[i], work_j_ptr[i]);
-            nborhood_ptr[i] = 0;
+            int max_nborhood = group_home_populations_ptr[i] / nborhood_size + 1;
+            nborhood_ptr[i] = Random_int(max_nborhood, engine) + 1;
             school_ptr[i] = agent.school_id;
             if (agent.role == 1) {
-                workgroup_ptr[i] = Random_int(num_workgroups_ptr[i], engine) + 1;
-                work_nborhood_ptr[i] = 0;
+                AMREX_ALWAYS_ASSERT(group_work_populations_ptr[i] > 0 && group_work_populations_ptr[i] < 100000);
+                int max_workgroup = group_work_populations_ptr[i] / workgroup_size + 1;
+                workgroup_ptr[i] = Random_int(max_workgroup, engine) + 1;
+                AMREX_ALWAYS_ASSERT(workgroup_ptr[i] > 0 && workgroup_ptr[i] < 5000);
+                int max_work_nborhood = group_work_populations_ptr[i] / nborhood_size + 1;
+                work_nborhood_ptr[i] = Random_int(max_work_nborhood, engine) + 1;
+                AMREX_ALWAYS_ASSERT(work_nborhood_ptr[i] > 0 && work_nborhood_ptr[i] < 5000);
             } else {
                 workgroup_ptr[i] = 0;
                 work_nborhood_ptr[i] = 0;
             }
         });
 
-        auto np = soa.numParticles();
+        // now ensure that all members of the same family have the same home nborhood
 
         // convert device to host to avoid using managed memory. But since the outputs are only for debugging, this is overkill
         //Gpu::HostVector<int> age_group_h(np);
@@ -324,19 +336,20 @@ void UrbanPopData::initAgents (AgentContainer &pc, const ExaEpi::TestParams &par
         bool the_arena_is_managed = false;
         pp.query("the_arena_is_managed", the_arena_is_managed);
         if (the_arena_is_managed) {
+            auto np = soa.numParticles();
             // For CUDA code, need a managed arena for this to work
             for (int i = 0; i < np; i++) {
                 agents_of << aos[i].id() << " "
-                        << age_group_ptr[i] << " "
-                        << family_ptr[i] << " "
-                        << home_i_ptr[i] << " "
-                        << home_j_ptr[i] << " "
-                        << work_i_ptr[i] << " "
-                        << work_j_ptr[i] << " "
-                        << nborhood_ptr[i] << " "
-                        << school_ptr[i] << " "
-                        << workgroup_ptr[i] << " "
-                        << work_nborhood_ptr[i] << "\n";
+                          << age_group_ptr[i] << " "
+                          << family_ptr[i] << " "
+                          << home_i_ptr[i] << " "
+                          << home_j_ptr[i] << " "
+                          << work_i_ptr[i] << " "
+                          << work_j_ptr[i] << " "
+                          << nborhood_ptr[i] << " "
+                          << school_ptr[i] << " "
+                          << workgroup_ptr[i] << " "
+                          << work_nborhood_ptr[i] << "\n";
             }
         }
     }
