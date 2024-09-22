@@ -269,6 +269,7 @@ void UrbanPopData::initAgents (AgentContainer &pc, const ExaEpi::TestParams &par
         auto aos = &ptile.GetArrayOfStructs()[0];
         auto agents_ptr = agents.data();
         auto num_workgroups_ptr = num_workgroups.data();
+
         auto& soa = ptile.GetStructOfArrays();
         auto age_group_ptr = soa.GetIntData(IntIdx::age_group).data();
         auto family_ptr = soa.GetIntData(IntIdx::family).data();
@@ -315,25 +316,36 @@ void UrbanPopData::initAgents (AgentContainer &pc, const ExaEpi::TestParams &par
 
         auto np = soa.numParticles();
 
-        for (int i = 0; i < np; i++) {
-            agents_of << aos[i].id() << " "
-                      << age_group_ptr[i] << " "
-                      << family_ptr[i] << " "
-                      << home_i_ptr[i] << " "
-                      << home_j_ptr[i] << " "
-                      << work_i_ptr[i] << " "
-                      << work_j_ptr[i] << " "
-                      << nborhood_ptr[i] << " "
-                      << school_ptr[i] << " "
-                      << workgroup_ptr[i] << " "
-                      << work_nborhood_ptr[i] << "\n";
+        // convert device to host to avoid using managed memory. But since the outputs are only for debugging, this is overkill
+        //Gpu::HostVector<int> age_group_h(np);
+        //Gpu::copy(Gpu::deviceToHost, soa.GetIntData(IntIdx::age_group).begin(), soa.GetIntData(IntIdx::age_group).end(),
+        //          age_group_h.begin());
+        ParmParse pp("amrex");
+        bool the_arena_is_managed = false;
+        pp.query("the_arena_is_managed", the_arena_is_managed);
+        if (the_arena_is_managed) {
+            // For CUDA code, need a managed arena for this to work
+            for (int i = 0; i < np; i++) {
+                agents_of << aos[i].id() << " "
+                        << age_group_ptr[i] << " "
+                        << family_ptr[i] << " "
+                        << home_i_ptr[i] << " "
+                        << home_j_ptr[i] << " "
+                        << work_i_ptr[i] << " "
+                        << work_j_ptr[i] << " "
+                        << nborhood_ptr[i] << " "
+                        << school_ptr[i] << " "
+                        << workgroup_ptr[i] << " "
+                        << work_nborhood_ptr[i] << "\n";
+            }
         }
     }
 
     AMREX_ALWAYS_ASSERT(pc.OK());
     agents_of.close();
 
-    // For some reason this crashes. Ugh
+    // Ugh. This crashes with:
+    //   Assertion `dst.m_num_runtime_real == src.m_num_runtime_real' failed, file AMReX_ParticleTransformation.H", line 35
     // pc.WriteAsciiFile("amrex-agents.csv");
 
 
