@@ -11,6 +11,7 @@
 #include <AMReX_GpuContainers.H>
 
 #include "Utils.H"
+#include "CaseData.H"
 #include "UrbanPopAgentStruct.H"
 
 

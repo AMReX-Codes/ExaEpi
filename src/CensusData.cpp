@@ -20,7 +20,7 @@ using namespace ExaEpi;
  *
  *  A periodic Cartesian grid is defined.
 */
-Geometry get_geometry (const DemographicData&    demo   /*!< demographic data */) {
+Geometry get_geometry (const DemographicData& demo /*!< demographic data */) {
     int is_per[BL_SPACEDIM];
     for (int i = 0; i < BL_SPACEDIM; i++) {
         is_per[i] = true;
@@ -944,7 +944,7 @@ int infect_random_community (AgentContainer& pc, /*!< Agent container (particle 
 
     int random_comm = -1;
     if (ParallelDescriptor::IOProcessor()) {
-        random_comm = amrex::Random_int(ncomms) + comm_offset;
+        random_comm = Random_int(ncomms) + comm_offset;
     }
     ParallelDescriptor::Bcast(&random_comm, 1);
 
@@ -957,7 +957,7 @@ int infect_random_community (AgentContainer& pc, /*!< Agent container (particle 
     int num_infected = 0;
     for (MFIter mfi(censusData.unit_mf, TilingIfNotGPU()); mfi.isValid(); ++mfi)
     {
-        amrex::DenseBins<AgentContainer::ParticleType>& bins = bin_map[std::make_pair(mfi.index(), mfi.LocalTileIndex())];
+        DenseBins<AgentContainer::ParticleType>& bins = bin_map[std::make_pair(mfi.index(), mfi.LocalTileIndex())];
         auto& agents_tile = pc.GetParticles(0)[std::make_pair(mfi.index(), mfi.LocalTileIndex())];
         auto& aos = agents_tile.GetArrayOfStructs();
         auto& soa = agents_tile.GetStructOfArrays();
@@ -994,7 +994,7 @@ int infect_random_community (AgentContainer& pc, /*!< Agent container (particle 
 
         Gpu::DeviceScalar<int> num_infected_d(num_infected);
         int* num_infected_p = num_infected_d.dataPtr();
-        amrex::ParallelForRNG(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k, amrex::RandomEngine const& engine) noexcept
+        ParallelForRNG(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k, amrex::RandomEngine const& engine) noexcept
         {
             int community = comm_arr(i, j, k);
             if (community != random_comm) { return; }
@@ -1025,9 +1025,9 @@ int infect_random_community (AgentContainer& pc, /*!< Agent container (particle 
                 } else {
                     status_ptr[pindex] = Status::infected;
                     counter_ptr[pindex] = 0;
-                    incubation_period_ptr[pindex] = amrex::RandomNormal(lparm->latent_length_mean, lparm->latent_length_std, engine);
-                    infectious_period_ptr[pindex] = amrex::RandomNormal(lparm->infectious_length_mean, lparm->infectious_length_std, engine);
-                    symptomdev_period_ptr[pindex] = amrex::RandomNormal(lparm->incubation_length_mean, lparm->incubation_length_std, engine);
+                    incubation_period_ptr[pindex] = RandomNormal(lparm->latent_length_mean, lparm->latent_length_std, engine);
+                    infectious_period_ptr[pindex] = RandomNormal(lparm->infectious_length_mean, lparm->infectious_length_std, engine);
+                    symptomdev_period_ptr[pindex] = RandomNormal(lparm->incubation_length_mean, lparm->incubation_length_std, engine);
                     ++ni;
                 }
             }
@@ -1075,7 +1075,9 @@ void CensusData::setInitialCasesFromFile (AgentContainer& pc, /*!< Agent contain
                 int FIPS = cases[d].FIPS_hubs[ihub];
                 std::vector<int> units;
                 units.resize(0);
-                for (int i = 0; i < demo.Nunit; ++i) if(demo.FIPS[i]==FIPS)units.push_back(i);
+                for (int i = 0; i < demo.Nunit; ++i) {
+                    if (demo.FIPS[i] == FIPS) units.push_back(i);
+                }
                 //int unit = FIPS_code_to_i[FIPS];
                 if (units.size() > 0) {
                     amrex::Print() << "    Attempting to infect: " << cases[d].Size_hubs[ihub] << " people in FIPS " << FIPS << "... ";
@@ -1084,7 +1086,7 @@ void CensusData::setInitialCasesFromFile (AgentContainer& pc, /*!< Agent contain
                     while (i < cases[d].Size_hubs[ihub]) {
                         int nSuccesses = infect_random_community(pc, *this, bin_map, units[u], d, ntry, fast_bin);
                         ninf += nSuccesses;
-                        i+= nSuccesses;
+                        i += nSuccesses;
                         u=(u+1)%units.size(); //sometimes we infect fewer than ntry, but switch to next unit anyway
                     }
                     amrex::Print() << "infected " << i<< " (total " << ninf << ") after processing. \n";

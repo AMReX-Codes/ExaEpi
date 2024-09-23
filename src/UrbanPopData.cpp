@@ -41,6 +41,7 @@ using ParallelDescriptor::NProcs;
 bool BlockGroup::read_agents(ifstream &f, Vector<UrbanPopAgent> &agents, Vector<int>& group_work_populations,
                              Vector<int>& group_home_populations, const std::map<IntVect, BlockGroup> &xy_to_block_groups,
                              const LngLatToGrid &lnglat_to_grid) {
+    BL_PROFILE("BlockGroup::read_agents");
     string buf;
     num_households = 0;
     num_employed = 0;
@@ -85,6 +86,7 @@ bool BlockGroup::read_agents(ifstream &f, Vector<UrbanPopAgent> &agents, Vector<
 }
 
 bool BlockGroup::read(istringstream &iss) {
+    BL_PROFILE("BlockGroup::read");
     const int NTOKS = 6;
 
     string buf;
@@ -109,6 +111,7 @@ bool BlockGroup::read(istringstream &iss) {
 }
 
 static Vector<BlockGroup> read_block_groups_file(const string &fname) {
+    BL_PROFILE("read_block_groups_file");
     // read in index file and broadcast
     Vector<char> idx_file_ptr;
     ParallelDescriptor::ReadAndBcastFile(fname  + ".idx", idx_file_ptr);
@@ -220,7 +223,7 @@ void UrbanPopData::init (ExaEpi::TestParams &params, Geometry &geom, BoxArray &b
 
 
 void UrbanPopData::initAgents (AgentContainer &pc, const ExaEpi::TestParams &params) {
-    BL_PROFILE("UrbanPopData::init");
+    BL_PROFILE("UrbanPopData::initAgents");
 
     LngLatToGrid lnglat_to_grid(min_lng, min_lat, gspacing_x, gspacing_y);
 
@@ -393,4 +396,5 @@ void UrbanPopData::initAgents (AgentContainer &pc, const ExaEpi::TestParams &par
             << "Households:  " << num_households << "\n"
             << "Communities: " << all_num_communities << " (balance " << load_balance_communities << ")\n";
 }
+
 

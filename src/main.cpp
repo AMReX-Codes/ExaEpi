@@ -196,6 +196,11 @@ void runAgent ()
             }
         } else if (params.ic_type == ICType::UrbanPop) {
             urbanPopData.initAgents(pc, params);
+            if (params.initial_case_type[0] == "file") {
+                Print() << "File initialization not yet implemented for UrbanPop\n";
+            } else {
+                Print() << "Random case initialization not yet implemented for UrbanPop\n";
+            }
             return;
         } else {
             Abort("Unimplemented ic_type");

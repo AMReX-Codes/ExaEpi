@@ -416,6 +416,11 @@ def process_feather_files(fnames, out_fname, geoid_locs_map, df_dt_nt):
             print(geoid, ' '.join(map(str, geoid_locs_map[geoid])), foffset, len(subset_df.index), work_pop, file=f)
     print("Wrote", len(df.index), "records in %.3f s" % (time.time() - t))
 
+    fips_codes = []
+    for i, geoid in enumerate(geoids):
+        fips_codes.append(int(str(geoid)[:5]))
+    print("FIPS codes:", sorted(set(fips_codes)))
+
 
 def process_census_bg_shape_file(dir_names, geoid_locs_map):
     for dname in dir_names:
