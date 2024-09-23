@@ -15,7 +15,7 @@
 #include "IO.H"
 #include "Utils.H"
 #include "UrbanPopData.H"
-
+#include "InitializeInfections.H"
 
 
 using namespace amrex;
@@ -190,9 +190,11 @@ void runAgent ()
             censusData.initAgents(pc, params.nborhood_size);
             censusData.read_workerflow(pc, params.workerflow_filename, params.workgroup_size);
             if (params.initial_case_type[0] == "file") {
-                censusData.setInitialCasesFromFile(pc, cases, params.disease_names, params.fast);
+                setInitialCasesFromFile(pc, cases, params.disease_names, censusData.demo.FIPS, censusData.demo.Ncommunity,
+                                        censusData.demo.Start, censusData.unit_mf, censusData.comm_mf, params.fast);
             } else {
-                censusData.setInitialCasesRandom(pc, params.num_initial_cases, params.disease_names, params.fast);
+                setInitialCasesRandom(pc, params.num_initial_cases, params.disease_names, censusData.demo.Ncommunity,
+                                      censusData.demo.Start, censusData.unit_mf, censusData.comm_mf, params.fast);
             }
         } else if (params.ic_type == ICType::UrbanPop) {
             urbanPopData.initAgents(pc, params);

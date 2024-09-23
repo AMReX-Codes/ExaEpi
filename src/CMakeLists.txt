@@ -22,6 +22,8 @@ set(_sources
          InteractionModSchool.H
          InteractionModWork.H
          InteractionModelLibrary.H
+         InitializeInfections.H
+         InitializeInfections.cpp
          UrbanPopAgentStruct.H
          UrbanPopData.H
          UrbanPopData.cpp
