@@ -146,6 +146,12 @@ void UrbanPopData::init (ExaEpi::TestParams &params, Geometry &geom, BoxArray &b
     std::string fname = params.urbanpop_filename;
     // every rank reads all the block groups from the index file
     auto all_block_groups = read_block_groups_file(fname);
+    // now sort block groups by geoid to make all FIPS units consecutively grouped
+    std::sort(all_block_groups.begin(), all_block_groups.end(),
+              [](const BlockGroup &bg1, const BlockGroup &bg2) {
+                  return bg1.geoid > bg2.geoid;
+              });
+
     min_lat = 1000;
     min_lng = 1000;
     max_lat = -1000;
@@ -157,6 +163,27 @@ void UrbanPopData::init (ExaEpi::TestParams &params, Geometry &geom, BoxArray &b
         max_lat = max(block_group.lat, max_lat);
     }
     Print() << "lng " << min_lng << ", " << max_lng << " lat " << min_lat << ", " << max_lat << "\n";
+
+    // get FIPS codes and community numbers from block group array
+    int current_FIPS = -1;
+    int num_communities = 0;
+    for (int i = 0; i < all_block_groups.size(); i++) {
+        auto &block_group = all_block_groups[i];
+        // FIPS is the first 5 digits of the GEOID, which is 12 digits
+        int64_t fips = (block_group.geoid / 1e7);
+        if (current_FIPS != fips) {
+            FIPS_codes.push_back(fips);
+            FIPS_to_unit[fips] = FIPS_codes.size();
+            unit_community_start.push_back(num_communities);
+            current_FIPS = fips;
+        }
+        num_communities++;
+    }
+
+    Print() << "Found " << FIPS_codes.size() << " demographic units:\n";
+    for (int i = 0; i < FIPS_codes.size(); i++) {
+        Print() << "    FIPS " << FIPS_codes[i] << " " << unit_community_start[i] << "\n";
+    }
 
     // grid spacing is 1/10th minute of arc at the equator, which is about 0.12 regular miles
     Real gspacing = 0.1_prt / 60.0_prt;
@@ -219,6 +246,13 @@ void UrbanPopData::init (ExaEpi::TestParams &params, Geometry &geom, BoxArray &b
     // distribute the boxes in the array across the processors
     dm.define(ba);
     dm.KnapSackProcessorMap(weights, NProcs());
+
+    unit_mf.define(ba, dm, 1, 0);
+    FIPS_mf.define(ba, dm, 2, 0);
+    comm_mf.define(ba, dm, 1, 0);
+    unit_mf.setVal(-1);
+    FIPS_mf.setVal(-1);
+    comm_mf.setVal(-1);
 }
 
 
@@ -226,6 +260,8 @@ void UrbanPopData::initAgents (AgentContainer &pc, const ExaEpi::TestParams &par
     BL_PROFILE("UrbanPopData::initAgents");
 
     LngLatToGrid lnglat_to_grid(min_lng, min_lat, gspacing_x, gspacing_y);
+
+    auto& domain = pc.Geom(0).Domain();
 
     int home_population = 0;
     int work_population = 0;
@@ -241,6 +277,10 @@ void UrbanPopData::initAgents (AgentContainer &pc, const ExaEpi::TestParams &par
 
     for (MFIter mfi = pc.MakeMFIter(0, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
         const Box& tilebox = mfi.tilebox();
+
+        auto unit_arr = unit_mf[mfi].array();
+        auto FIPS_arr = FIPS_mf[mfi].array();
+        auto comm_arr = comm_mf[mfi].array();
 
         Vector<UrbanPopAgent> agents;
         Vector<int> group_work_populations;
@@ -262,6 +302,15 @@ void UrbanPopData::initAgents (AgentContainer &pc, const ExaEpi::TestParams &par
                         num_households += block_group.num_households;
                         num_employed += block_group.num_employed;
                         num_students += block_group.num_students;
+
+                        // FIPS is the first 5 digits of the GEOID, which is 12 digits
+                        int64_t fips = (block_group.geoid / 1e7);
+                        // Census tract is the 6 digits after the FIPS code
+                        int64_t tract = (block_group.geoid - (fips * 1e7)) / 10;
+                        FIPS_arr(x, y, 0, 0) = (int)fips;
+                        FIPS_arr(x, y, 0, 1) = (int)tract;
+                        comm_arr(x, y, 0) = (int)domain.index(IntVect(AMREX_D_DECL(x, y, 0)));
+                        unit_arr(x, y, 0) = FIPS_to_unit[fips];
                     }
                 }
             }
