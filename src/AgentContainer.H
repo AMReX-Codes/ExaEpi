@@ -44,7 +44,8 @@ public:
                     const amrex::DistributionMapping & a_dmap,
                     const amrex::BoxArray            & a_ba,
                     const int                        & a_num_diseases,
-                    const std::vector<std::string>   & a_disease_names);
+                    const std::vector<std::string>   & a_disease_names,
+                    const bool                       fast);
 
     void morningCommute(amrex::MultiFab&);
 
