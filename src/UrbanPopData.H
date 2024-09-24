@@ -62,6 +62,8 @@ struct UrbanPopData {
     amrex::iMultiFab FIPS_mf;        /*!< FIPS code (component 0) and census tract number (component 1) of each community */
     amrex::iMultiFab comm_mf;        /*!< Community number */
 
+    int num_communities;
+
     UrbanPopData () {}
 
     void init(ExaEpi::TestParams &params, amrex::Geometry &geom, amrex::BoxArray &ba, amrex::DistributionMapping &dm);

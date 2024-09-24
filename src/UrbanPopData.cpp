@@ -149,7 +149,7 @@ void UrbanPopData::init (ExaEpi::TestParams &params, Geometry &geom, BoxArray &b
     // now sort block groups by geoid to make all FIPS units consecutively grouped
     std::sort(all_block_groups.begin(), all_block_groups.end(),
               [](const BlockGroup &bg1, const BlockGroup &bg2) {
-                  return bg1.geoid > bg2.geoid;
+                  return bg1.geoid < bg2.geoid;
               });
 
     min_lat = 1000;
@@ -166,19 +166,20 @@ void UrbanPopData::init (ExaEpi::TestParams &params, Geometry &geom, BoxArray &b
 
     // get FIPS codes and community numbers from block group array
     int current_FIPS = -1;
-    int num_communities = 0;
+    num_communities = 0;
     for (int i = 0; i < all_block_groups.size(); i++) {
         auto &block_group = all_block_groups[i];
         // FIPS is the first 5 digits of the GEOID, which is 12 digits
-        int64_t fips = (block_group.geoid / 1e7);
+        int64_t fips = static_cast<int64_t>(block_group.geoid / 1e7);
         if (current_FIPS != fips) {
-            FIPS_codes.push_back(fips);
             FIPS_to_unit[fips] = FIPS_codes.size();
+            FIPS_codes.push_back(fips);
             unit_community_start.push_back(num_communities);
             current_FIPS = fips;
         }
         num_communities++;
     }
+    unit_community_start.push_back(num_communities);
 
     Print() << "Found " << FIPS_codes.size() << " demographic units:\n";
     for (int i = 0; i < FIPS_codes.size(); i++) {
@@ -261,19 +262,16 @@ void UrbanPopData::initAgents (AgentContainer &pc, const ExaEpi::TestParams &par
 
     LngLatToGrid lnglat_to_grid(min_lng, min_lat, gspacing_x, gspacing_y);
 
-    auto& domain = pc.Geom(0).Domain();
+    //auto& domain = pc.Geom(0).Domain();
 
     int home_population = 0;
     int work_population = 0;
     int num_households = 0;
     int num_employed = 0;
     int num_students = 0;
-    int num_communities = 0;
+    num_communities = 0;
     ifstream f(params.urbanpop_filename + ".csv");
     if (!f) Abort("Could not open file " + params.urbanpop_filename + ".csv" + "\n");
-    // for checking results against original urbanpop data
-    std::ofstream agents_of("agents." + std::to_string(MyProc()) + ".csv");
-    agents_of << "id age family homei homej worki workj nborhood school workgroup worknborhood\n";
 
     for (MFIter mfi = pc.MakeMFIter(0, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
         const Box& tilebox = mfi.tilebox();
@@ -281,6 +279,7 @@ void UrbanPopData::initAgents (AgentContainer &pc, const ExaEpi::TestParams &par
         auto unit_arr = unit_mf[mfi].array();
         auto FIPS_arr = FIPS_mf[mfi].array();
         auto comm_arr = comm_mf[mfi].array();
+        int community_i = 0;
 
         Vector<UrbanPopAgent> agents;
         Vector<int> group_work_populations;
@@ -304,12 +303,13 @@ void UrbanPopData::initAgents (AgentContainer &pc, const ExaEpi::TestParams &par
                         num_students += block_group.num_students;
 
                         // FIPS is the first 5 digits of the GEOID, which is 12 digits
-                        int64_t fips = (block_group.geoid / 1e7);
+                        int64_t fips = static_cast<int64_t>(block_group.geoid / 1e7);
                         // Census tract is the 6 digits after the FIPS code
-                        int64_t tract = (block_group.geoid - (fips * 1e7)) / 10;
+                        int64_t tract = static_cast<int64_t>((block_group.geoid - (fips * 1e7)) / 10);
                         FIPS_arr(x, y, 0, 0) = (int)fips;
                         FIPS_arr(x, y, 0, 1) = (int)tract;
-                        comm_arr(x, y, 0) = (int)domain.index(IntVect(AMREX_D_DECL(x, y, 0)));
+                        comm_arr(x, y, 0) = community_i;
+                        community_i++;
                         unit_arr(x, y, 0) = FIPS_to_unit[fips];
                     }
                 }
@@ -318,8 +318,9 @@ void UrbanPopData::initAgents (AgentContainer &pc, const ExaEpi::TestParams &par
 
         if (num_communities == 0) continue;
 
-        auto& ptile = pc.GetParticles(0)[{mfi.index(), mfi.LocalTileIndex()}];
         int myproc = ParallelDescriptor::MyProc();
+        //auto& ptile = pc.GetParticles(0)[{mfi.index(), mfi.LocalTileIndex()}];
+        auto& ptile = pc.DefineAndReturnParticleTile(0, mfi);
         ptile.resize(agents.size());
         auto aos = &ptile.GetArrayOfStructs()[0];
         auto agents_ptr = agents.data();
@@ -342,14 +343,30 @@ void UrbanPopData::initAgents (AgentContainer &pc, const ExaEpi::TestParams &par
         int workgroup_size = params.workgroup_size;
         int nborhood_size = params.nborhood_size;
         soa.GetIntData(IntIdx::withdrawn).assign(0);
-        soa.GetIntData(IntIdx::random_travel).assign(0);
+        soa.GetIntData(IntIdx::random_travel).assign(-1);
+
+        int i_RT = IntIdx::nattribs;
+        int r_RT = RealIdx::nattribs;
+        int n_disease = pc.m_num_diseases;
+        for (int d = 0; d < n_disease; d++) {
+            soa.GetRealData(r_RT + r0(d) + RealIdxDisease::treatment_timer).assign(0.0_rt);
+            soa.GetRealData(r_RT + r0(d) + RealIdxDisease::disease_counter).assign(0.0_rt);
+            soa.GetRealData(r_RT + r0(d) + RealIdxDisease::prob).assign(0.0_rt);
+            soa.GetRealData(r_RT + r0(d) + RealIdxDisease::incubation_period).assign(0.0_rt);
+            soa.GetRealData(r_RT + r0(d) + RealIdxDisease::infectious_period).assign(0.0_rt);
+            soa.GetRealData(r_RT + r0(d) + RealIdxDisease::symptomdev_period).assign(0.0_rt);
+            soa.GetIntData(i_RT + i0(d) + IntIdxDisease::status).assign(0);
+            soa.GetIntData(i_RT + i0(d) + IntIdxDisease::strain).assign(0);
+            soa.GetIntData(i_RT + i0(d) + IntIdxDisease::symptomatic).assign(0);
+        }
         auto np = soa.numParticles();
         AMREX_ALWAYS_ASSERT(np == agents.size());
 
         ParallelForRNG (np, [=] AMREX_GPU_DEVICE (int i, RandomEngine const& engine) noexcept {
             auto &p = aos[i];
             auto &agent = agents_ptr[i];
-            p.id() = agent.id;
+            // agent ID in amrex must be > 0
+            p.id() = agent.id + 1;
             p.cpu() = myproc;
             p.pos(0) = agent.home_lng;
             p.pos(1) = agent.home_lat;
@@ -391,39 +408,9 @@ void UrbanPopData::initAgents (AgentContainer &pc, const ExaEpi::TestParams &par
             }
             nborhood_ptr[i] = nborhood;
         });
-
-        // convert device to host to avoid using managed memory. But since the outputs are only for debugging, this is overkill
-        //Gpu::HostVector<int> age_group_h(np);
-        //Gpu::copy(Gpu::deviceToHost, soa.GetIntData(IntIdx::age_group).begin(), soa.GetIntData(IntIdx::age_group).end(),
-        //          age_group_h.begin());
-        ParmParse pp("amrex");
-        bool the_arena_is_managed = false;
-        pp.query("the_arena_is_managed", the_arena_is_managed);
-        if (the_arena_is_managed) {
-            // For CUDA code, need a managed arena for this to work
-            for (int i = 0; i < np; i++) {
-                agents_of << aos[i].id() << " "
-                          << age_group_ptr[i] << " "
-                          << family_ptr[i] << " "
-                          << home_i_ptr[i] << " "
-                          << home_j_ptr[i] << " "
-                          << work_i_ptr[i] << " "
-                          << work_j_ptr[i] << " "
-                          << nborhood_ptr[i] << " "
-                          << school_ptr[i] << " "
-                          << workgroup_ptr[i] << " "
-                          << work_nborhood_ptr[i] << "\n";
-            }
-        }
     }
 
     AMREX_ALWAYS_ASSERT(pc.OK());
-    agents_of.close();
-
-    // Ugh. This crashes with:
-    //   Assertion `dst.m_num_runtime_real == src.m_num_runtime_real' failed, file AMReX_ParticleTransformation.H", line 35
-    // pc.WriteAsciiFile("amrex-agents.csv");
-
 
     AllPrint() << "Process " << MyProc() << ": population " << home_population << " in " << num_communities << " communities\n";
     auto [all_num_communities, load_balance_communities] = get_all_load_balance(num_communities);
@@ -444,6 +431,8 @@ void UrbanPopData::initAgents (AgentContainer &pc, const ExaEpi::TestParams &par
             << "Students:    " << num_students << "\n"
             << "Households:  " << num_households << "\n"
             << "Communities: " << all_num_communities << " (balance " << load_balance_communities << ")\n";
+
+    num_communities = all_num_communities;
 }
 
 

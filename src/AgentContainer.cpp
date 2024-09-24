@@ -27,7 +27,6 @@ void AgentContainer::add_attributes()
         }
         Print() << "Added " << count << " integer-type run-time SoA attibute(s).\n";
     }
-    return;
 }
 
 /*! Constructor:
@@ -102,6 +101,7 @@ AgentContainer::AgentContainer (const amrex::Geometry            & a_geom,  /*!<
     }
 
     max_attribute_values.fill(0);
+
 }
 
 

@@ -28,7 +28,6 @@ using namespace ExaEpi;
     + Sum up number of infected agents over all processors and return that value.
 */
 static int infect_random_community (AgentContainer& pc, /*!< Agent container (particle container)*/
-                                    int ncomms,   /*!< Number of communities*/
                                     const Vector<int> &unit_community_start, /*!< Start community number for each unit */
                                     iMultiFab &unit_mf,
                                     iMultiFab &comm_mf,
@@ -38,18 +37,12 @@ static int infect_random_community (AgentContainer& pc, /*!< Agent container (pa
                                     const int d_idx, /*!< Disease index */
                                     int ninfect, /*!< Target number of agents to infect */
                                     const bool fast_bin /*!< Use GPU binning - fast but non-deterministic */  ) {
-
     // chose random community
-    int comm_offset = 0;
-    if (unit > 0) {
-        ncomms = unit_community_start[unit + 1] - unit_community_start[unit];
-        comm_offset = unit_community_start[unit];
-    }
+    int ncomms = unit_community_start[unit + 1] - unit_community_start[unit];
+    int comm_offset = unit_community_start[unit];
 
     int random_comm = -1;
-    if (ParallelDescriptor::IOProcessor()) {
-        random_comm = Random_int(ncomms) + comm_offset;
-    }
+    if (ParallelDescriptor::IOProcessor()) random_comm = Random_int(ncomms) + comm_offset;
     ParallelDescriptor::Bcast(&random_comm, 1);
 
     const Geometry& geom = pc.Geom(0);
@@ -59,14 +52,13 @@ static int infect_random_community (AgentContainer& pc, /*!< Agent container (pa
     const auto domain = geom.Domain();
 
     int num_infected = 0;
-    for (MFIter mfi(unit_mf, TilingIfNotGPU()); mfi.isValid(); ++mfi)
-    {
+    for (MFIter mfi(unit_mf, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
         DenseBins<AgentContainer::ParticleType>& bins = bin_map[std::make_pair(mfi.index(), mfi.LocalTileIndex())];
         auto& agents_tile = pc.GetParticles(0)[std::make_pair(mfi.index(), mfi.LocalTileIndex())];
         auto& aos = agents_tile.GetArrayOfStructs();
         auto& soa = agents_tile.GetStructOfArrays();
         const size_t np = aos.numParticles();
-        if (np == 0) { continue; }
+        if (np == 0) continue;
         auto pstruct_ptr = aos().dataPtr();
         const Box& box = mfi.validbox();
 
@@ -101,16 +93,15 @@ static int infect_random_community (AgentContainer& pc, /*!< Agent container (pa
         ParallelForRNG(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k, amrex::RandomEngine const& engine) noexcept
         {
             int community = comm_arr(i, j, k);
-            if (community != random_comm) { return; }
+            if (community != random_comm) return;
 
             Box tbx;
             int i_cell = getTileIndex({AMREX_D_DECL(i, j, k)}, box, true, bin_size, tbx);
             auto cell_start = offsets[i_cell];
             auto cell_stop  = offsets[i_cell+1];
             int num_this_community = cell_stop - cell_start;
-            AMREX_ASSERT(num_this_community > 0);
+            //AMREX_ASSERT(num_this_community > 0);
             //AMREX_ASSERT(cell_stop < np);
-
             if (num_this_community == 0) { return;}
 
             int ntry = 0;
@@ -146,6 +137,9 @@ static int infect_random_community (AgentContainer& pc, /*!< Agent container (pa
     }
 
     ParallelDescriptor::ReduceIntSum(num_infected);
+    Print() << "Infecting unit " << unit << " out of " << unit_community_start.size() - 1 << " units, "
+            << "random community " << random_comm << " out of " << ncomms << " comms, ranging from "
+            << comm_offset << " to " << unit_community_start[unit + 1] << " and infected " << num_infected << "\n";
     return num_infected;
 }
 
@@ -165,13 +159,17 @@ void setInitialCasesFromFile (AgentContainer& pc, /*!< Agent container (particle
                               const std::vector<CaseData>& cases, /*!< Case data */
                               const std::vector<std::string>& d_names, /*!< Disease names */
                               const Vector<int> &FIPS_codes,
-                              int ncomms,   /*!< Number of communities*/
                               const Vector<int> &unit_community_start, /*!< Start community number for each unit */
                               iMultiFab &unit_mf,
                               iMultiFab &comm_mf,
                               const bool fast_bin)
 {
     BL_PROFILE("setInitialCasesFromFile");
+
+    for (int unit_i = 0; unit_i < unit_community_start.size() - 1; unit_i++) {
+        Print() << "FIPS " << FIPS_codes[unit_i] << " unit " << unit_i << ": "
+                << unit_community_start[unit_i] << " " << unit_community_start[unit_i + 1] << "\n";
+    }
 
     std::map<std::pair<int, int>, amrex::DenseBins<AgentContainer::ParticleType> > bin_map;
 
@@ -189,17 +187,17 @@ void setInitialCasesFromFile (AgentContainer& pc, /*!< Agent container (particle
                 }
                 //int unit = FIPS_code_to_i[FIPS];
                 if (units.size() > 0) {
-                    amrex::Print() << "    Attempting to infect: " << cases[d].Size_hubs[ihub] << " people in FIPS " << FIPS << "... ";
-                    int u=0;
-                    int i=0;
+                    Print() << "    Attempting to infect: " << cases[d].Size_hubs[ihub] << " people in FIPS " << FIPS << "... ";
+                    int u = 0;
+                    int i = 0;
                     while (i < cases[d].Size_hubs[ihub]) {
-                        int nSuccesses = infect_random_community(pc, ncomms, unit_community_start, unit_mf, comm_mf, bin_map,
-                                                                 units[u], d, ntry, fast_bin);
+                        int nSuccesses = infect_random_community(pc, unit_community_start, unit_mf, comm_mf, bin_map, units[u],
+                                                                 d, ntry, fast_bin);
                         ninf += nSuccesses;
                         i += nSuccesses;
-                        u=(u+1)%units.size(); //sometimes we infect fewer than ntry, but switch to next unit anyway
+                        u = (u + 1) % units.size(); //sometimes we infect fewer than ntry, but switch to next unit anyway
                     }
-                    amrex::Print() << "infected " << i<< " (total " << ninf << ") after processing. \n";
+                    Print() << "infected " << i<< " (total " << ninf << ") after processing. \n";
                 }
             }
         }
@@ -210,7 +208,6 @@ void setInitialCasesFromFile (AgentContainer& pc, /*!< Agent container (particle
 void setInitialCasesRandom (AgentContainer& pc, /*!< Agent container (particle container) */
                             std::vector<int> num_cases, /*!< Number of initial cases */
                             const std::vector<std::string>& d_names, /*!< Disease names */
-                            int ncomms,   /*!< Number of communities*/
                             const Vector<int> &unit_community_start, /*!< Start community number for each unit */
                             iMultiFab &unit_mf,
                             iMultiFab &comm_mf,
@@ -227,8 +224,10 @@ void setInitialCasesRandom (AgentContainer& pc, /*!< Agent container (particle c
         for (int ihub = 0; ihub < num_cases[d]; ++ihub) {
             int i = 0;
             while (i < 1) {
-                int nSuccesses = infect_random_community(pc, ncomms, unit_community_start, unit_mf, comm_mf, bin_map, -1, d, 1,
-                                                         fast_bin);
+                int unit = 0;
+                if (ParallelDescriptor::IOProcessor()) unit = Random_int(unit_community_start.size() - 1);
+                ParallelDescriptor::Bcast(&unit, 1);
+                int nSuccesses = infect_random_community(pc, unit_community_start, unit_mf, comm_mf, bin_map, unit, d, 1, fast_bin);
                 ninf += nSuccesses;
                 i+= nSuccesses;
             }
