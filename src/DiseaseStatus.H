@@ -198,15 +198,14 @@ void DiseaseStatus<AC,ACT,ACTD,A>::updateAgents(AC& a_agents, /*!< Agent contain
                                 if (timer_ptr[i] > 0) { flag_hosp_ptr[i] = 1; }
                                 if (flag_ICU_i) { flag_ICU_ptr[i] = 1; }
                                 if (flag_vent_i) { flag_vent_ptr[i] = 1; }
-                            } else {
-                                if (!isHospitalized(i,ptd)) {
-                                    if (counter_ptr[i] >= (latent_period_ptr[i] + infectious_period_ptr[i])) {
-                                        status_ptr[i] = Status::immune;
-                                        counter_ptr[i] = amrex::RandomNormal(immune_length_mean, immune_length_std, engine);
-                                        symptomatic_ptr[i] = SymptomStatus::presymptomatic;
-                                        withdrawn_ptr[i] = 0;
-                                    }
-                                }
+                            }
+                        }
+                        if (!isHospitalized(i,ptd)) {
+                            if (counter_ptr[i] >= (latent_period_ptr[i] + infectious_period_ptr[i])) {
+                                status_ptr[i] = Status::immune;
+                                counter_ptr[i] = amrex::RandomNormal(immune_length_mean, immune_length_std, engine);
+                                symptomatic_ptr[i] = SymptomStatus::presymptomatic;
+                                withdrawn_ptr[i] = 0;
                             }
                         }
                     }
