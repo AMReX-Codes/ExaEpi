@@ -39,6 +39,9 @@ void ExaEpi::Utils::get_test_params (   TestParams& params,         /*!< Test pa
     params.random_travel_int = -1;
     pp.query("random_travel_int", params.random_travel_int);
 
+    params.random_travel_prob = 0.0001_prt;
+    pp.query("random_travel_prob", params.random_travel_prob);
+
     params.num_diseases = 1;
     pp.query("number_of_diseases", params.num_diseases);
 
@@ -116,5 +119,7 @@ void ExaEpi::Utils::get_test_params (   TestParams& params,         /*!< Test pa
         ULong cpu_seed = (ULong) seed;
         amrex::ResetRandomSeed(cpu_seed, gpu_seed);
     }
+
+    pp.query("fast", params.fast);
 }
 

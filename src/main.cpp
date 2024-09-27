@@ -2,6 +2,8 @@
     \brief **Main**: Contains main() and runAgent()
 */
 
+#include <chrono>
+
 #include <AMReX.H>
 #include <AMReX_iMultiFab.H>
 #include <AMReX_ParmParse.H>
@@ -12,6 +14,7 @@
 #include "DemographicData.H"
 #include "IO.H"
 #include "Utils.H"
+
 
 using namespace amrex;
 using namespace ExaEpi;
@@ -111,8 +114,12 @@ void runAgent ()
     BoxArray ba;
     DistributionMapping dm;
     CensusData censusData;
+
     if (params.ic_type == ICType::Census) {
         censusData.init(params, geom, ba, dm);
+    } else if (params.ic_type == ICType::UrbanPop) {
+        Abort("UrbanPop not yet implemented");
+        return;
     }
 
     // The default output filename is:
@@ -173,8 +180,7 @@ void runAgent ()
     MultiFab mask_behavior(ba, dm, 1, 0);
     mask_behavior.setVal(1);
 
-    AgentContainer pc(geom, dm, ba, params.num_diseases, params.disease_names);
-    AgentContainer on_travel_pc(geom, dm, ba, params.num_diseases, params.disease_names);
+    AgentContainer pc(geom, dm, ba, params.num_diseases, params.disease_names, params.fast);
 
     {
         BL_PROFILE_REGION("Initialization");
@@ -182,9 +188,9 @@ void runAgent ()
             censusData.initAgents(pc, params.nborhood_size);
             censusData.read_workerflow(pc, params.workerflow_filename, params.workgroup_size);
             if (params.initial_case_type[0] == "file") {
-                censusData.setInitialCasesFromFile(pc, cases, params.disease_names);
+                censusData.setInitialCasesFromFile(pc, cases, params.disease_names, params.fast);
             } else {
-                censusData.setInitialCasesRandom(pc, params.num_initial_cases, params.disease_names);
+                censusData.setInitialCasesRandom(pc, params.num_initial_cases, params.disease_names, params.fast);
             }
         } else if (params.ic_type == ICType::UrbanPop) {
             Abort("UrbanPop not yet implemented");
@@ -206,11 +212,14 @@ void runAgent ()
     }
 
     amrex::Real cur_time = 0;
+
+    Vector<Long> num_infected(params.num_diseases, 0);
+
     {
         BL_PROFILE_REGION("Evolution");
         for (int i = 0; i < params.nsteps; ++i)
         {
-            amrex::Print() << "Simulating day " << i << " " << std::flush;
+            auto start_time = std::chrono::high_resolution_clock::now();
 
             if ((params.plot_int > 0) && (i % params.plot_int == 0)) {
                 ExaEpi::IO::writePlotFile(pc, censusData, params.num_diseases, params.disease_names, cur_time, i);
@@ -230,6 +239,7 @@ void runAgent ()
                     step_of_peak[d] = i;
                 }
                 cumulative_deaths[d] = counts[4];
+                num_infected[d] = counts[1];
 
                 Real mmc[4] = {0, 0, 0, 0};
 #ifdef AMREX_USE_GPU
@@ -276,8 +286,6 @@ void runAgent ()
 
                 if (ParallelDescriptor::IOProcessor())
                 {
-                    amrex::Print() << " " << counts[1] << " infected, " << counts[4] << " deaths\n";
-
                     // total number of deaths computed on agents and on mesh should be the same...
                     if (mmc[3] != counts[4]) {
                         amrex::Print() << mmc[3] << " " << counts[4] << "\n";
@@ -330,12 +338,7 @@ void runAgent ()
             }
 
             if ((params.random_travel_int > 0) && (i % params.random_travel_int == 0)) {
-                pc.moveRandomTravel();
-                using SrcData = AgentContainer::ParticleTileType::ConstParticleTileDataType;
-                on_travel_pc.copyParticles(pc,
-                                           [=] AMREX_GPU_HOST_DEVICE (const SrcData& src, int ip) {
-                                               return (src.m_idata[IntIdx::random_travel][ip] >= 0);
-                                           });
+                pc.moveRandomTravel(params.random_travel_prob);
             }
 
             // Typical day
@@ -346,18 +349,20 @@ void runAgent ()
             pc.interactNight(mask_behavior);
 
             if ((params.random_travel_int > 0) && (i % params.random_travel_int == 0)) {
-                pc.interactRandomTravel(mask_behavior, on_travel_pc);
+                pc.returnRandomTravel();
             }
 
             // Infect agents based on their interactions
             pc.infectAgents();
 
-            if ((params.random_travel_int > 0) && (i % params.random_travel_int == 0)) {
-                on_travel_pc.moveAgentsToHome();
-                on_travel_pc.Redistribute();
-                pc.returnRandomTravel(on_travel_pc);
-                on_travel_pc.clearParticles();
+            std::chrono::duration<double> elapsed_time = std::chrono::high_resolution_clock::now() - start_time;
+
+            Print() << "[Day " << cur_time <<  " " << std::fixed << std::setprecision(1) << elapsed_time.count() << "s] ";
+            for (int d = 0; d < params.num_diseases; d++) {
+                if (d > 0) Print() << "; ";
+                Print() << params.disease_names[d] << ": " << num_infected[d] << " infected, " << cumulative_deaths[d] << " deaths";
             }
+            Print() << "\n";
 
             cur_time += 1.0_rt; // time step is one day
         }

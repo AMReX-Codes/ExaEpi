@@ -44,14 +44,16 @@ struct CensusData
 
     void setInitialCasesFromFile (AgentContainer& pc,
                                   const std::vector<CaseData>& cases,
-                                  const std::vector<std::string>& names);
+                                  const std::vector<std::string>& names,
+                                  const bool fast_bin);
 
     void setInitialCasesRandom (AgentContainer& pc,
                                 std::vector<int> num_cases,
-                                const std::vector<std::string>& names);
+                                const std::vector<std::string>& names,
+                                const bool fast_bin);
 
   private:
-    void assignTeachersAndWorkgroup (AgentContainer& pc);
+    void assignTeachersAndWorkgroup (AgentContainer& pc, const int workgroup_size);
 
 };
 
