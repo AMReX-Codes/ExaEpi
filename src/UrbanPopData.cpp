@@ -156,11 +156,13 @@ void UrbanPopData::init (ExaEpi::TestParams &params, Geometry &geom, BoxArray &b
     min_lng = 1000;
     max_lat = -1000;
     max_lng = -1000;
-    for (auto &block_group : all_block_groups) {
+    for (int i = 0; i < all_block_groups.size(); i++) {
+        auto& block_group = all_block_groups[i];
         min_lng = min(block_group.lng, min_lng);
         max_lng = max(block_group.lng, max_lng);
         min_lat = min(block_group.lat, min_lat);
         max_lat = max(block_group.lat, max_lat);
+        block_group.block_i = i;
     }
     Print() << "lng " << min_lng << ", " << max_lng << " lat " << min_lat << ", " << max_lat << "\n";
 
@@ -172,7 +174,6 @@ void UrbanPopData::init (ExaEpi::TestParams &params, Geometry &geom, BoxArray &b
         // FIPS is the first 5 digits of the GEOID, which is 12 digits
         int64_t fips = static_cast<int64_t>(block_group.geoid / 1e7);
         if (current_FIPS != fips) {
-            FIPS_to_unit[fips] = FIPS_codes.size();
             FIPS_codes.push_back(fips);
             unit_community_start.push_back(num_communities);
             current_FIPS = fips;
@@ -181,9 +182,11 @@ void UrbanPopData::init (ExaEpi::TestParams &params, Geometry &geom, BoxArray &b
     }
     unit_community_start.push_back(num_communities);
 
-    Print() << "Found " << FIPS_codes.size() << " demographic units:\n";
-    for (int i = 0; i < FIPS_codes.size(); i++) {
-        Print() << "    FIPS " << FIPS_codes[i] << " " << unit_community_start[i] << "\n";
+    if (ParallelDescriptor::IOProcessor()) {
+        Print() << "Found " << FIPS_codes.size() << " demographic units:\n";
+        for (int i = 0; i < FIPS_codes.size(); i++) {
+            Print() << "    FIPS " << FIPS_codes[i] << " " << unit_community_start[i] << "\n";
+        }
     }
 
     // grid spacing is 1/10th minute of arc at the equator, which is about 0.12 regular miles
@@ -248,10 +251,8 @@ void UrbanPopData::init (ExaEpi::TestParams &params, Geometry &geom, BoxArray &b
     dm.define(ba);
     dm.KnapSackProcessorMap(weights, NProcs());
 
-    unit_mf.define(ba, dm, 1, 0);
     FIPS_mf.define(ba, dm, 2, 0);
     comm_mf.define(ba, dm, 1, 0);
-    unit_mf.setVal(-1);
     FIPS_mf.setVal(-1);
     comm_mf.setVal(-1);
 }
@@ -276,17 +277,21 @@ void UrbanPopData::initAgents (AgentContainer &pc, const ExaEpi::TestParams &par
     for (MFIter mfi = pc.MakeMFIter(0, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
         const Box& tilebox = mfi.tilebox();
 
-        auto unit_arr = unit_mf[mfi].array();
         auto FIPS_arr = FIPS_mf[mfi].array();
         auto comm_arr = comm_mf[mfi].array();
-        int community_i = 0;
+
+        int min_x = lbound(tilebox).x;
+        int max_x = ubound(tilebox).x + 1;
+        int min_y = lbound(tilebox).y;
+        int max_y = ubound(tilebox).y + 1;
 
         Vector<UrbanPopAgent> agents;
         Vector<int> group_work_populations;
         Vector<int> group_home_populations;
         // can't read the agent data from disk on the GPU
-        for (int x = lbound(tilebox).x; x <= ubound(tilebox).x; x++) {
-            for (int y = lbound(tilebox).y; y <= ubound(tilebox).y; y++) {
+        // FIXME: this approach requires managed memory on the GPU
+        for (int x = min_x; x < max_x; x++) {
+            for (int y = min_y; y < max_y; y++) {
                 auto xy = IntVect(x, y);
                 auto it = xy_to_block_groups.find(xy);
                 if (it != xy_to_block_groups.end()) {
@@ -308,9 +313,7 @@ void UrbanPopData::initAgents (AgentContainer &pc, const ExaEpi::TestParams &par
                         int64_t tract = static_cast<int64_t>((block_group.geoid - (fips * 1e7)) / 10);
                         FIPS_arr(x, y, 0, 0) = (int)fips;
                         FIPS_arr(x, y, 0, 1) = (int)tract;
-                        comm_arr(x, y, 0) = community_i;
-                        community_i++;
-                        unit_arr(x, y, 0) = FIPS_to_unit[fips];
+                        comm_arr(x, y, 0) = block_group.block_i;
                     }
                 }
             }
@@ -319,7 +322,6 @@ void UrbanPopData::initAgents (AgentContainer &pc, const ExaEpi::TestParams &par
         if (num_communities == 0) continue;
 
         int myproc = ParallelDescriptor::MyProc();
-        //auto& ptile = pc.GetParticles(0)[{mfi.index(), mfi.LocalTileIndex()}];
         auto& ptile = pc.DefineAndReturnParticleTile(0, mfi);
         ptile.resize(agents.size());
         auto aos = &ptile.GetArrayOfStructs()[0];

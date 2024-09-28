@@ -432,7 +432,7 @@ def process_feather_files(fnames, out_fname, geoid_locs_map, df_dt_nt):
                 educator_pop = len(df_educators)
             educator_sample = df_educators.sample(n=educator_pop)
             educator_sample['school_id'] = school
-            educator_sample.to_csv("school-sample." + str(school) + ".csv", index=True)
+            #educator_sample.to_csv("school-sample." + str(school) + ".csv", index=True)
             df.loc[df['id'].isin(educator_sample['id']), 'school_id'] = school
     print("Schools with no educators:", no_educator_schools, "missing educators", no_educators)
     print("Schools with too few educators:", shortfall_educator_schools, "missing educators", shortfall_educators)

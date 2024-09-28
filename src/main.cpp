@@ -28,7 +28,7 @@ void override_amrex_defaults ()
 {
     amrex::ParmParse pp("amrex");
 
-    // ExaEpi currently assumes we have mananaged memory in the Arena
+    // ExaEpi should never require mananaged memory in the Arena
     bool the_arena_is_managed = true;
     pp.queryAdd("the_arena_is_managed", the_arena_is_managed);
 }
@@ -191,26 +191,26 @@ void runAgent ()
             censusData.read_workerflow(pc, params.workerflow_filename, params.workgroup_size);
             if (params.initial_case_type[0] == "file") {
                 setInitialCasesFromFile(pc, cases, params.disease_names, censusData.demo.FIPS, censusData.demo.Start,
-                                        censusData.unit_mf, censusData.comm_mf, params.fast);
+                                        censusData.comm_mf, params.fast);
             } else {
                 setInitialCasesRandom(pc, params.num_initial_cases, params.disease_names, censusData.demo.Start,
-                                      censusData.unit_mf, censusData.comm_mf, params.fast);
+                                      censusData.comm_mf, params.fast);
             }
         } else if (params.ic_type == ICType::UrbanPop) {
             urbanPopData.initAgents(pc, params);
             if (params.initial_case_type[0] == "file") {
                 setInitialCasesFromFile(pc, cases, params.disease_names, urbanPopData.FIPS_codes, urbanPopData.unit_community_start,
-                                        urbanPopData.unit_mf, urbanPopData.comm_mf, params.fast);
+                                        urbanPopData.comm_mf, params.fast);
             } else {
                 setInitialCasesRandom(pc, params.num_initial_cases, params.disease_names, urbanPopData.unit_community_start,
-                                      urbanPopData.unit_mf, urbanPopData.comm_mf, params.fast);
+                                      urbanPopData.comm_mf, params.fast);
             }
         } else {
             Abort("Unimplemented ic_type");
         }
     }
-    pc.WriteAsciiFile("amrex-agents.csv");
-    return;
+    pc.WriteAsciiFile(std::string("agents.") + (params.ic_type == ICType::UrbanPop ? "urbanpop" : "census") + ".csv");
+    if (params.ic_type == ICType::UrbanPop) return;
 
     std::vector<int>  step_of_peak(params.num_diseases, 0);
     std::vector<Long> num_infected_peak(params.num_diseases, 0);

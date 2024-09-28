@@ -36,7 +36,7 @@ struct BlockGroup {
     amrex::Real lng;
     amrex::Real lat;
     size_t file_offset;
-    int box_i;
+    int block_i;
     int x;
     int y;
     int home_population;
@@ -58,7 +58,6 @@ struct UrbanPopData {
     amrex::Vector<int> FIPS_codes;   /*!< FIPS codes for each unit */
     amrex::Vector<int> unit_community_start;  /*!< Starting community number (block group) for each unit */
 
-    amrex::iMultiFab unit_mf;        /*!< Unit number of each community */
     amrex::iMultiFab FIPS_mf;        /*!< FIPS code (component 0) and census tract number (component 1) of each community */
     amrex::iMultiFab comm_mf;        /*!< Community number */
 
@@ -73,5 +72,4 @@ struct UrbanPopData {
   private:
 
     std::map<IntVect, BlockGroup> xy_to_block_groups;
-    std::map<int, int> FIPS_to_unit;
 };
