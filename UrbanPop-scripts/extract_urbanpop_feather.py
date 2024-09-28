@@ -32,7 +32,7 @@ include_fields = [
     'role',
     'naics',
     'grade',
-    'school_id'
+    'school_id',
     ]
 
 PUMS_ID_LEN = 14
@@ -232,6 +232,7 @@ def process_nt_dt_feather_files(fnames):
     school_id_map = dict(zip(unique_school_ids, range(len(unique_school_ids))));
     school_id_map[None] = -1
 
+    df["school_name"] = df["school_id"]
     df["school_id"] = df["school_id"].map(school_id_map).apply(lambda x: x).astype("int64")
 
     print("Processed", len(dfs[-1].index), "records in %.3f s" % (time.time() - start_t))
@@ -266,8 +267,6 @@ def process_feather_files(fnames, out_fname, geoid_locs_map, df_dt_nt):
     if not np.array_equal(df.geoid.values, df_dt_nt.orig_geoid.values):
         print("Mismatched geoids for population vs daytime/nightime")
         sys.exit(0)
-
-    df.to_csv("all.csv", sep=' ')
 
     # remove all not found in include list
     cols_to_purge = set(list(df.columns.values)) - set(include_fields)
@@ -366,12 +365,11 @@ def process_feather_files(fnames, out_fname, geoid_locs_map, df_dt_nt):
     num_rows = len(df.index)
     # make sure all the p_ids are globally unique (they are only unique to each urbanpop feather file originally)
     df['p_id'] = np.arange(0, num_rows)
-    # start with a distinct marker so that the file can be read in parallel more easily
-    df.index = ['*'] * num_rows
 
     df.rename(columns={"p_id": "id"}, inplace=True)
     for col in df.columns:
         if col.startswith("pr_"):
+            print("renaming", col, "to", col[3:])
             df.rename(columns={col: col[3:]}, inplace=True)
         elif col.startswith("h_"):
             df.rename(columns={col: "home_" + col[2:]}, inplace=True)
@@ -384,6 +382,69 @@ def process_feather_files(fnames, out_fname, geoid_locs_map, df_dt_nt):
 
     print_header(df)
 
+    df_special = df[['id', 'age', 'role', 'school_id']]
+    df_special = df_special.loc[(df_special['school_id'] != '') & (df_special['school_id'] != -1)]
+    df_special.to_csv("students.csv", sep=' ')
+    print("Student population", len(df_special))
+
+    # allocate educators at a ratio of 15:1 - this is the average for the US
+    student_schools_map = {}
+    schools = df.school_id.unique()
+    for i, school in enumerate(schools):
+        if school == -1:
+            continue
+        subset_df = df.loc[(df['school_id'] == school) & (df['role'] == 2)]
+        geoids = subset_df.work_geoid.unique()
+        if len(geoids) != 1:
+            print("WARNING: more than one unique geoids for the school", n)
+            sys.exit(0)
+        student_schools_map[school] = [len(subset_df.index), geoids[0]]
+
+    no_educators = 0
+    no_educator_schools = 0
+    shortfall_educators = 0
+    shortfall_educator_schools = 0
+    with open("schools.csv", mode='w') as f:
+        for i, school in enumerate(schools):
+            if school == -1:
+                continue
+            if not school in student_schools_map:
+                continue
+            student_pop = student_schools_map[school]
+            print(school, ' '.join(map(str, student_pop)), file=f)
+            educator_pop = int(student_pop[0] / 15)
+            #print(school, "educator_pop", educator_pop)
+            if educator_pop == 0:
+                continue
+            df_educators = df.loc[(df['role'] == 1) &
+                                  (df['naics'] == 0) &
+                                  (df['school_id'] == -1) &
+                                  (df['work_geoid'] == student_pop[1])]
+            if len(df_educators) == 0:
+                no_educator_schools += 1
+                no_educators += educator_pop
+                #print("Short", (educator_pop - len(df_educators)), "(all) educators for school", school)
+                continue
+            if len(df_educators) < educator_pop:
+                shortfall_educators += (educator_pop - len(df_educators))
+                shortfall_educator_schools += 1
+                #print("Short", (educator_pop - len(df_educators)), "educators for school", school)
+                educator_pop = len(df_educators)
+            educator_sample = df_educators.sample(n=educator_pop)
+            educator_sample['school_id'] = school
+            educator_sample.to_csv("school-sample." + str(school) + ".csv", index=True)
+            df.loc[df['id'].isin(educator_sample['id']), 'school_id'] = school
+    print("Schools with no educators:", no_educator_schools, "missing educators", no_educators)
+    print("Schools with too few educators:", shortfall_educator_schools, "missing educators", shortfall_educators)
+
+    df_edu_med_sca = df.loc[(df['role'] == 1) & (df['naics'] == 0)]
+    df_edu_med_sca.to_csv("edu_med_sca.csv", sep=' ')
+    print("edu_med_sca population", len(df_edu_med_sca))
+
+    df_educators = df_edu_med_sca.loc[df_edu_med_sca['school_id'] != -1]
+    df_educators.to_csv("educators.csv", sep=' ')
+    print("educators population", len(df_educators))
+
     work_geoids_map = {}
     work_geoids = df.work_geoid.unique()
     for i, geoid in enumerate(work_geoids):
@@ -391,10 +452,8 @@ def process_feather_files(fnames, out_fname, geoid_locs_map, df_dt_nt):
         work_geoids_map[geoid] = len(subset_df.index)
     print("Found", len(df.home_geoid.unique()), "home locations and", len(work_geoids_map), "work locations")
 
-    df_special = df[['id', 'age', 'role', 'school_id']]
-    df_special = df_special.loc[df_special['school_id'] != '']
-    df_special = df_special.loc[df_special['school_id'] != -1]
-    df_special.to_csv("schools.csv", sep=' ')
+    # start with a distinct marker so that the file can be read in parallel more easily
+    df.index = ['*'] * num_rows
 
     # print each geoid in turn so we can track the file offsets
     with open(out_fname_idx, mode='w') as f:
@@ -403,7 +462,7 @@ def process_feather_files(fnames, out_fname, geoid_locs_map, df_dt_nt):
         work_geoids = df.work_geoid.unique()
         if len(work_geoids) > len(geoids):
             only_work_geoids = list(set(work_geoids) - set(geoids))
-            print("Only work geoids", only_work_geoids)
+            print("Work-only geoids", only_work_geoids)
             for i, geoid in enumerate(only_work_geoids):
                 work_pop = work_geoids_map[geoid] if geoid in work_geoids_map else 0
                 print(geoid, ' '.join(map(str, geoid_locs_map[geoid])), 0, 0, work_pop, file=f)
@@ -451,7 +510,10 @@ if __name__ == "__main__":
     parser.add_argument("--shape_files_dir", "-s", required=True, nargs="+",
                         help="Directories for census block group shape files. Available from\n" + \
                         "https://www.census.gov/cgi-bin/geo/shapefiles/index.php?year=2010&layergroup=Block+Groups")
-    parser.add_argument("--day_night_files", "-d", required=True, nargs="+",
+    parser.add_argument("--day_night_files",
+                        "-d",
+                        required=True,
+                        nargs="+",
                         help="Feather files containing daytime and nighttime locations")
     args = parser.parse_args()
 
