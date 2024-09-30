@@ -18,6 +18,7 @@
 #include "InitializeInfections.H"
 
 
+
 using namespace amrex;
 using namespace ExaEpi;
 
@@ -182,7 +183,7 @@ void runAgent ()
     MultiFab mask_behavior(ba, dm, 1, 0);
     mask_behavior.setVal(1);
 
-    AgentContainer pc(geom, dm, ba, params.num_diseases, params.disease_names);
+    AgentContainer pc(geom, dm, ba, params.num_diseases, params.disease_names, params.fast);
 
     {
         BL_PROFILE_REGION("Initialization");
