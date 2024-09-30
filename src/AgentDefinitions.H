@@ -50,6 +50,7 @@ struct IntIdx
         hosp_j          /*!< hosp location index */,
         nborhood,       /*!< home neighborhood ID */
         school,         /*!< school type (elementary, middle, high, none) */
+        naics,          /*!< industry NAICS code for business employed at */
         workgroup,      /*!< workgroup ID */
         work_nborhood,  /*!< work neighborhood ID */
         withdrawn,      /*!< quarantine status */

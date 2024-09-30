@@ -124,7 +124,9 @@ const size_t NUM_COLS = {len(df.columns)};
     for field_type in df:
         if field_type in categ_types:
             categs_expected = list(categ_types[field_type].categories)
+            num_categs = len(categs_expected)
             hdr += f"""static string {field_type}_descriptions[] = {{"{'", "'.join(categs_expected)}"}};\n"""
+            hdr += f"""const int {field_type.upper()}_COUNT = {num_categs};\n"""
     hdr += "\n"
 
     hdr += """
@@ -213,7 +215,7 @@ static std::vector<string> split_string(const string &s, char delim) {
     print("Wrote", len(df.columns), "fields to", hdr_fname)
 
 
-def process_nt_dt_feather_files(fnames):
+def process_nt_dt_feather_files(fnames, out_fname):
     start_t = time.time()
     dfs = []
     for fname in fnames:
@@ -237,7 +239,7 @@ def process_nt_dt_feather_files(fnames):
 
     print("Processed", len(dfs[-1].index), "records in %.3f s" % (time.time() - start_t))
 
-    df.to_csv("work.csv", sep=' ')
+    df.to_csv(out_fname + ".work.csv", sep=' ')
 
     return df
 
@@ -369,7 +371,6 @@ def process_feather_files(fnames, out_fname, geoid_locs_map, df_dt_nt):
     df.rename(columns={"p_id": "id"}, inplace=True)
     for col in df.columns:
         if col.startswith("pr_"):
-            print("renaming", col, "to", col[3:])
             df.rename(columns={col: col[3:]}, inplace=True)
         elif col.startswith("h_"):
             df.rename(columns={col: "home_" + col[2:]}, inplace=True)
@@ -384,7 +385,7 @@ def process_feather_files(fnames, out_fname, geoid_locs_map, df_dt_nt):
 
     df_special = df[['id', 'age', 'role', 'school_id']]
     df_special = df_special.loc[(df_special['school_id'] != '') & (df_special['school_id'] != -1)]
-    df_special.to_csv("students.csv", sep=' ')
+    df_special.to_csv(out_fname + ".students.csv", sep=' ')
     print("Student population", len(df_special))
 
     # allocate educators at a ratio of 15:1 - this is the average for the US
@@ -404,7 +405,7 @@ def process_feather_files(fnames, out_fname, geoid_locs_map, df_dt_nt):
     no_educator_schools = 0
     shortfall_educators = 0
     shortfall_educator_schools = 0
-    with open("schools.csv", mode='w') as f:
+    with open(out_fname + ".schools.csv", mode='w') as f:
         for i, school in enumerate(schools):
             if school == -1:
                 continue
@@ -438,18 +439,33 @@ def process_feather_files(fnames, out_fname, geoid_locs_map, df_dt_nt):
     print("Schools with too few educators:", shortfall_educator_schools, "missing educators", shortfall_educators)
 
     df_edu_med_sca = df.loc[(df['role'] == 1) & (df['naics'] == 0)]
-    df_edu_med_sca.to_csv("edu_med_sca.csv", sep=' ')
+    #df_edu_med_sca.to_csv("edu_med_sca.csv", sep=' ')
     print("edu_med_sca population", len(df_edu_med_sca))
 
     df_educators = df_edu_med_sca.loc[df_edu_med_sca['school_id'] != -1]
-    df_educators.to_csv("educators.csv", sep=' ')
+    df_educators.to_csv(out_fname + ".educators.csv", sep=' ')
     print("educators population", len(df_educators))
 
+    naics_types = list(categ_types['naics'].categories)
+    num_naics = len(naics_types)
+    print("num naics", num_naics)
     work_geoids_map = {}
     work_geoids = df.work_geoid.unique()
+    num_workers = 0
     for i, geoid in enumerate(work_geoids):
-        subset_df = df.loc[(df['work_geoid'] == geoid) & (df['role'] == 1)]
-        work_geoids_map[geoid] = len(subset_df.index)
+        # don't include wfh
+        subset_df = df.loc[(df['work_geoid'] == geoid) & (df['role'] == 1) & (df['naics'] != 5)]
+        naics_counts = []
+        for naics_i in range(num_naics):
+            naics_counts.append(len(subset_df.loc[subset_df['naics'] == naics_i]))
+        work_pops = [len(subset_df.index)]
+        if work_pops[0] != sum(naics_counts):
+            print("ERROR: NAICS codes don't sum up to work population for geoid", geoid, work_pops[0], sum(naics_counts))
+            sys.exit(0)
+        num_workers += work_pops[0]
+        work_pops.extend(naics_counts)
+        work_geoids_map[geoid] = work_pops
+    print("workers population", num_workers)
     print("Found", len(df.home_geoid.unique()), "home locations and", len(work_geoids_map), "work locations")
 
     # start with a distinct marker so that the file can be read in parallel more easily
@@ -457,22 +473,22 @@ def process_feather_files(fnames, out_fname, geoid_locs_map, df_dt_nt):
 
     # print each geoid in turn so we can track the file offsets
     with open(out_fname_idx, mode='w') as f:
-        print("geoid lat lng foff h_pop w_pop", file=f)
+        print("geoid lat lng foff h_pop w_pop", ' '.join(naics_types), file=f)
         geoids = df.home_geoid.unique()
         work_geoids = df.work_geoid.unique()
         if len(work_geoids) > len(geoids):
             only_work_geoids = list(set(work_geoids) - set(geoids))
             print("Work-only geoids", only_work_geoids)
             for i, geoid in enumerate(only_work_geoids):
-                work_pop = work_geoids_map[geoid] if geoid in work_geoids_map else 0
-                print(geoid, ' '.join(map(str, geoid_locs_map[geoid])), 0, 0, work_pop, file=f)
+                work_pops = work_geoids_map[geoid] if geoid in work_geoids_map else []
+                print(geoid, ' '.join(map(str, geoid_locs_map[geoid])), 0, 0, ' '.join(map(str, work_pops)), file=f)
 
         for i, geoid in enumerate(geoids):
             foffset = os.stat(out_fname_csv).st_size if i > 0 else 0
             subset_df = df.loc[df['home_geoid'] == geoid]
             subset_df.to_csv(out_fname_csv, index=True, header=(i == 0), mode='w' if i == 0 else 'a', float_format="%.6f")
-            work_pop = work_geoids_map[geoid] if geoid in work_geoids_map else 0
-            print(geoid, ' '.join(map(str, geoid_locs_map[geoid])), foffset, len(subset_df.index), work_pop, file=f)
+            work_pops = work_geoids_map[geoid] if geoid in work_geoids_map else []
+            print(geoid, ' '.join(map(str, geoid_locs_map[geoid])), foffset, len(subset_df.index), ' '.join(map(str, work_pops)), file=f)
     print("Wrote", len(df.index), "records in %.3f s" % (time.time() - t))
 
     fips_codes = []
@@ -521,7 +537,7 @@ if __name__ == "__main__":
     process_census_bg_shape_file(args.shape_files_dir, geoid_locs_map)
     print("GEOID to locations map contains", len(geoid_locs_map), "entries")
 
-    df_dt_nt = process_nt_dt_feather_files(args.day_night_files)
+    df_dt_nt = process_nt_dt_feather_files(args.day_night_files, args.output)
 
     process_feather_files(args.files, args.output, geoid_locs_map, df_dt_nt)
 

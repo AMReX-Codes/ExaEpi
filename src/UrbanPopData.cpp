@@ -46,6 +46,7 @@ bool BlockGroup::read_agents(ifstream &f, Vector<UrbanPopAgent> &agents, Vector<
     num_households = 0;
     num_employed = 0;
     num_students = 0;
+    num_educators = 0;
     AMREX_ALWAYS_ASSERT(home_population > 0);
     int start_i = agents.size();
     agents.resize(start_i + home_population);
@@ -66,13 +67,15 @@ bool BlockGroup::read_agents(ifstream &f, Vector<UrbanPopAgent> &agents, Vector<
             Abort("File is corrupted: wrong geoid, read " + to_string(agent.home_geoid) + " expected " + to_string(geoid) + "\n");
         households.insert(agent.household_id);
         AMREX_ALWAYS_ASSERT(agent.work_lat != -1 && agent.work_lng != -1);
-        if (agent.role == 1) {
+        if (agent.role == 1 && agent.naics != 5) {
             num_employed++;
             int work_x, work_y;
             lnglat_to_grid(agent.work_lng, agent.work_lat, work_x, work_y);
             auto it = xy_to_block_groups.find(IntVect(work_x, work_y));
             if (it == xy_to_block_groups.end()) Abort("Cannot find block group for work location");
-            group_work_populations[i] = it->second.work_population;
+            group_work_populations[i] = it->second.work_populations[agent.naics + 1];
+            if (agent.naics != 5) AMREX_ALWAYS_ASSERT(group_work_populations[i] > 0 && group_work_populations[i] < 100000);
+            if (agent.school_id != -1) num_educators++;
         } else {
             group_work_populations[i] = 0;
             if (agent.role == 0) AMREX_ALWAYS_ASSERT(agent.work_lat == agent.home_lat && agent.work_lng == agent.home_lng);
@@ -87,7 +90,7 @@ bool BlockGroup::read_agents(ifstream &f, Vector<UrbanPopAgent> &agents, Vector<
 
 bool BlockGroup::read(istringstream &iss) {
     BL_PROFILE("BlockGroup::read");
-    const int NTOKS = 6;
+    const int NTOKS = 6 + NAICS_COUNT;
 
     string buf;
     if (!getline(iss, buf)) return false;
@@ -100,8 +103,11 @@ bool BlockGroup::read(istringstream &iss) {
         lng = stof(tokens[2]);
         file_offset = stol(tokens[3]);
         home_population = stoi(tokens[4]);
-        work_population = stoi(tokens[5]);
-        AMREX_ALWAYS_ASSERT(home_population > 0 || work_population > 0);
+        for (int i = 0; i < NAICS_COUNT + 1; i++) {
+            work_populations.push_back(stoi(tokens[5 + i]));
+        }
+        AMREX_ALWAYS_ASSERT(home_population > 0 || work_populations[0] > 0);
+        AMREX_ALWAYS_ASSERT(work_populations.size() == NAICS_COUNT + 1);
     } catch (const std::exception &ex) {
         std::ostringstream os;
         os << "Error reading UrbanPop input file: " << ex.what() << ", line read: " << "'" << buf << "'";
@@ -119,11 +125,11 @@ static Vector<BlockGroup> read_block_groups_file(const string &fname) {
     istringstream idx_file_iss(idx_file_ptr_string, istringstream::in);
 
     Vector<BlockGroup> block_groups;
-    BlockGroup block_group;
     string buf;
     // first line should be column labels
     getline(idx_file_iss, buf);
     while (true) {
+        BlockGroup block_group;
         if (!block_group.read(idx_file_iss)) break;
         block_groups.push_back(block_group);
     }
@@ -263,13 +269,12 @@ void UrbanPopData::initAgents (AgentContainer &pc, const ExaEpi::TestParams &par
 
     LngLatToGrid lnglat_to_grid(min_lng, min_lat, gspacing_x, gspacing_y);
 
-    //auto& domain = pc.Geom(0).Domain();
-
     int home_population = 0;
     int work_population = 0;
     int num_households = 0;
     int num_employed = 0;
     int num_students = 0;
+    int num_educators = 0;
     num_communities = 0;
     ifstream f(params.urbanpop_filename + ".csv");
     if (!f) Abort("Could not open file " + params.urbanpop_filename + ".csv" + "\n");
@@ -298,7 +303,7 @@ void UrbanPopData::initAgents (AgentContainer &pc, const ExaEpi::TestParams &par
                     auto &block_group = it->second;
                     num_communities++;
                     home_population += block_group.home_population;
-                    work_population += block_group.work_population;
+                    work_population += block_group.work_populations[0];
                     if (block_group.home_population > 0) {
                         // now read in the agents for this block group
                         block_group.read_agents(f, agents, group_work_populations, group_home_populations, xy_to_block_groups,
@@ -306,6 +311,7 @@ void UrbanPopData::initAgents (AgentContainer &pc, const ExaEpi::TestParams &par
                         num_households += block_group.num_households;
                         num_employed += block_group.num_employed;
                         num_students += block_group.num_students;
+                        num_educators += block_group.num_educators;
 
                         // FIPS is the first 5 digits of the GEOID, which is 12 digits
                         int64_t fips = static_cast<int64_t>(block_group.geoid / 1e7);
@@ -340,6 +346,7 @@ void UrbanPopData::initAgents (AgentContainer &pc, const ExaEpi::TestParams &par
         soa.GetIntData(IntIdx::hosp_j).assign(-1);
         auto nborhood_ptr = soa.GetIntData(IntIdx::nborhood).data();
         auto school_ptr = soa.GetIntData(IntIdx::school).data();
+        auto naics_ptr = soa.GetIntData(IntIdx::naics).data();
         auto workgroup_ptr = soa.GetIntData(IntIdx::workgroup).data();
         auto work_nborhood_ptr = soa.GetIntData(IntIdx::work_nborhood).data();
         int workgroup_size = params.workgroup_size;
@@ -385,11 +392,13 @@ void UrbanPopData::initAgents (AgentContainer &pc, const ExaEpi::TestParams &par
             int max_nborhood = group_home_populations_ptr[i] / nborhood_size + 1;
             nborhood_ptr[i] = Random_int(max_nborhood, engine) + 1;
             school_ptr[i] = agent.school_id;
-            if (agent.role == 1) {
-                AMREX_ALWAYS_ASSERT(group_work_populations_ptr[i] > 0 && group_work_populations_ptr[i] < 100000);
+            naics_ptr[i] = agent.naics;
+            // set up workers, excluding educators and wfh
+            if (agent.role == 1 && agent.school_id == -1 && agent.naics != 5) {
+                // the group work population for this agent is for the NAICS category for the agent
                 int max_workgroup = group_work_populations_ptr[i] / workgroup_size + 1;
                 workgroup_ptr[i] = Random_int(max_workgroup, engine) + 1;
-                AMREX_ALWAYS_ASSERT(workgroup_ptr[i] > 0 && workgroup_ptr[i] < 5000);
+                AMREX_ALWAYS_ASSERT(workgroup_ptr[i] > 0 && workgroup_ptr[i] < max_workgroup * (NAICS_COUNT + 1));
                 int max_work_nborhood = group_work_populations_ptr[i] / nborhood_size + 1;
                 work_nborhood_ptr[i] = Random_int(max_work_nborhood, engine) + 1;
                 AMREX_ALWAYS_ASSERT(work_nborhood_ptr[i] > 0 && work_nborhood_ptr[i] < 5000);
@@ -424,6 +433,7 @@ void UrbanPopData::initAgents (AgentContainer &pc, const ExaEpi::TestParams &par
     ParallelDescriptor::ReduceIntSum(num_households);
     ParallelDescriptor::ReduceIntSum(num_employed);
     ParallelDescriptor::ReduceIntSum(num_students);
+    ParallelDescriptor::ReduceIntSum(num_educators);
 
     AMREX_ALWAYS_ASSERT(num_employed == work_population);
 
@@ -431,6 +441,7 @@ void UrbanPopData::initAgents (AgentContainer &pc, const ExaEpi::TestParams &par
             << "Population:  " << all_num_agents << " (balance " << load_balance_agents << ")\n"
             << "Employed:    " << num_employed << "\n"
             << "Students:    " << num_students << "\n"
+            << "Educators:   " << num_educators << "\n"
             << "Households:  " << num_households << "\n"
             << "Communities: " << all_num_communities << " (balance " << load_balance_communities << ")\n";
 

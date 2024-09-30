@@ -40,10 +40,11 @@ struct BlockGroup {
     int x;
     int y;
     int home_population;
-    int work_population;
+    amrex::Vector<int> work_populations;
     int num_households;
     int num_employed;
     int num_students;
+    int num_educators;
 
     bool read(std::istringstream &iss);
     bool read_agents(std::ifstream &f, amrex::Vector<UrbanPopAgent> &agents, amrex::Vector<int>& group_work_population,

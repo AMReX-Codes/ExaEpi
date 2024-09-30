@@ -209,7 +209,16 @@ void runAgent ()
             Abort("Unimplemented ic_type");
         }
     }
-    pc.WriteAsciiFile(std::string("agents.") + (params.ic_type == ICType::UrbanPop ? "urbanpop" : "census") + ".csv");
+
+    string agents_fname = std::string("agents.") + (params.ic_type == ICType::UrbanPop ? "urbanpop" : "census") + ".csv";
+    pc.WriteAsciiFile(agents_fname);
+    if (ParallelDescriptor::IOProcessor()) {
+        std::ofstream agents_f(agents_fname, std::ios_base::app);
+        agents_f << "posx posy id cpu treat disease prob incb inft symp age family homei homej worki workj hospi hospj nbhood school ";
+        agents_f << "naics wgroup wnbhood wdrawn travel status strain symptomatic\n";
+        agents_f.close();
+    }
+
     if (params.ic_type == ICType::UrbanPop) return;
 
     std::vector<int>  step_of_peak(params.num_diseases, 0);
