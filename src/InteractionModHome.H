@@ -116,7 +116,6 @@ void InteractionModHome<PCType, PTDType, PType>::fastInteractHome (PCType& agent
             int max_nborhood = agents.getMaxGroup(IntIdx::nborhood) + 1;
             int max_family = agents.getMaxGroup(IntIdx::family) + 1;
             int max_nc = max_family / FAMILIES_PER_CLUSTER + 1;
-            AMREX_ALWAYS_ASSERT(max_family <= agents.NumberOfParticlesAtLevel(lev));
 
             for (int d = 0; d < n_disease; d++) {
                 // calculate separately for infected children and infected adults, since they have different transmission rates
