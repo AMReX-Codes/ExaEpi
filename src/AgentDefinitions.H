@@ -43,11 +43,11 @@ struct IntIdx
         age_group = 0,  /*!< Age group (under 5, 5-17, 18-29, 30-64, 65+) */
         family,         /*!< Family ID */
         home_i,         /*!< home location index */
-        home_j          /*!< home location index */,
-        work_i          /*!< work location index */,
-        work_j          /*!< work location index */,
-        hosp_i          /*!< hosp location index */,
-        hosp_j          /*!< hosp location index */,
+        home_j,         /*!< home location index */
+        work_i,         /*!< work location index */
+        work_j,         /*!< work location index */
+        hosp_i,         /*!< hosp location index */
+        hosp_j,         /*!< hosp location index */
         nborhood,       /*!< home neighborhood ID */
         school,         /*!< school type (elementary, middle, high, none) */
         naics,          /*!< industry NAICS code for business employed at */

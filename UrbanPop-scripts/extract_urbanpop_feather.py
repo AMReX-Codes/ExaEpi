@@ -31,7 +31,7 @@ include_fields = [
     'pr_veh_occ',
     'role',
     'naics',
-    'grade',
+    'pr_grade',
     'school_id',
     ]
 
@@ -73,6 +73,12 @@ categ_types = {
         CategoricalDtype(categories=["drove_alone", "carpooled"]),
     'pr_grade':
         CategoricalDtype(categories=[
+            "childcare",
+            "preschl", "kind", "1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th", "9th", "10th", "11th", "12th",
+            "undergrad", "grad"]),
+    'grade':
+        CategoricalDtype(categories=[
+            "childcare",
             "preschl", "kind", "1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th", "9th", "10th", "11th", "12th",
             "undergrad", "grad"]),
     'role':
@@ -80,7 +86,7 @@ categ_types = {
     'naics':
         CategoricalDtype(categories=[
            'edu_med_sca', 'con', 'prf', 'agr_ext', 'mfg', 'wfh', 'ent', 'fin', 'ret', 'srv', 'adm', 'utl_trn', 'whl', 'inf']),
-    'grade':
+    'nt_dt_grade':
         CategoricalDtype(categories=[
             'childcare',
             'k12pub_preschl', 'k12pub_kind', 'k12pub_1st', 'k12pub_2nd', 'k12pub_3rd', 'k12pub_4th', 'k12pub_5th', 'k12pub_6th',
@@ -125,8 +131,8 @@ const size_t NUM_COLS = {len(df.columns)};
         if field_type in categ_types:
             categs_expected = list(categ_types[field_type].categories)
             num_categs = len(categs_expected)
-            hdr += f"""static string {field_type}_descriptions[] = {{"{'", "'.join(categs_expected)}"}};\n"""
             hdr += f"""const int {field_type.upper()}_COUNT = {num_categs};\n"""
+            hdr += f"""static string {field_type}_descriptions[{field_type.upper()}_COUNT] = {{"{'", "'.join(categs_expected)}"}};\n"""
     hdr += "\n"
 
     hdr += """
@@ -239,7 +245,7 @@ def process_nt_dt_feather_files(fnames, out_fname):
 
     print("Processed", len(dfs[-1].index), "records in %.3f s" % (time.time() - start_t))
 
-    df.to_csv(out_fname + ".work.csv", sep=' ')
+    df.to_csv(out_fname + ".work.csv", sep=' ', index=False)
 
     return df
 
@@ -308,19 +314,18 @@ def process_feather_files(fnames, out_fname, geoid_locs_map, df_dt_nt):
     df.work_lng = df.work_lng.astype("float32")
 
     df["work_geoid"] = df_dt_nt["dest_geoid"].values
-    for col in ["role", "naics", "grade", "school_id"]:
+    for col in ["role", "naics", "school_id"]:
         df[col] = df_dt_nt[col].values
         if not np.array_equal(df[col].values, df_dt_nt[col].values):
             print("Mismatched", col, "for population vs daytime/nightime")
             sys.exit(0)
+    df['school_id'] += 1
 
     if not np.array_equal(df.work_geoid.values, df_dt_nt.dest_geoid.values):
         print("Mismatched work geoids for population vs daytime/nightime")
         sys.exit(0)
 
     for field_type in df:
-        if field_type not in include_fields:
-            continue
         if field_type in categ_types:
             # compare the list with the unique to make sure we haven't fonud anything not in our predefined list
             categs_found = list(df[field_type].unique())
@@ -383,16 +388,18 @@ def process_feather_files(fnames, out_fname, geoid_locs_map, df_dt_nt):
 
     print_header(df)
 
-    df_special = df[['id', 'age', 'role', 'school_id']]
-    df_special = df_special.loc[(df_special['school_id'] != '') & (df_special['school_id'] != -1)]
-    df_special.to_csv(out_fname + ".students.csv", sep=' ')
+    df['grade'] += 1
+
+    df_special = df[['id', 'age', 'role', 'grade', 'school_id']]
+    df_special = df_special.loc[(df_special['school_id'] != '') & (df_special['school_id'] != 0)]
+    df_special.to_csv(out_fname + ".students.csv", sep=' ', index=False)
     print("Student population", len(df_special))
 
     # allocate educators at a ratio of 15:1 - this is the average for the US
     student_schools_map = {}
     schools = df.school_id.unique()
     for i, school in enumerate(schools):
-        if school == -1:
+        if school == 0:
             continue
         subset_df = df.loc[(df['school_id'] == school) & (df['role'] == 2)]
         geoids = subset_df.work_geoid.unique()
@@ -406,6 +413,7 @@ def process_feather_files(fnames, out_fname, geoid_locs_map, df_dt_nt):
     shortfall_educators = 0
     shortfall_educator_schools = 0
     with open(out_fname + ".schools.csv", mode='w') as f:
+        print("school students geoid", file=f)
         for i, school in enumerate(schools):
             if school == -1:
                 continue
@@ -419,7 +427,7 @@ def process_feather_files(fnames, out_fname, geoid_locs_map, df_dt_nt):
                 continue
             df_educators = df.loc[(df['role'] == 1) &
                                   (df['naics'] == 0) &
-                                  (df['school_id'] == -1) &
+                                  (df['school_id'] == 0) &
                                   (df['work_geoid'] == student_pop[1])]
             if len(df_educators) == 0:
                 no_educator_schools += 1
@@ -442,13 +450,12 @@ def process_feather_files(fnames, out_fname, geoid_locs_map, df_dt_nt):
     #df_edu_med_sca.to_csv("edu_med_sca.csv", sep=' ')
     print("edu_med_sca population", len(df_edu_med_sca))
 
-    df_educators = df_edu_med_sca.loc[df_edu_med_sca['school_id'] != -1]
-    df_educators.to_csv(out_fname + ".educators.csv", sep=' ')
+    df_educators = df_edu_med_sca.loc[df_edu_med_sca['school_id'] != 0]
+    df_educators.to_csv(out_fname + ".educators.csv", sep=' ', index=False)
     print("educators population", len(df_educators))
 
     naics_types = list(categ_types['naics'].categories)
     num_naics = len(naics_types)
-    print("num naics", num_naics)
     work_geoids_map = {}
     work_geoids = df.work_geoid.unique()
     num_workers = 0
