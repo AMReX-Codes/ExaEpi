@@ -111,16 +111,17 @@ void InteractionModWork<PCType, PTDType, PType>::fastInteractWork (PCType& agent
             const auto np = ptile.GetArrayOfStructs().numParticles();
             auto& soa = ptile.GetStructOfArrays();
             auto workgroup_ptr = soa.GetIntData(IntIdx::workgroup).data();
+            auto naics_ptr = soa.GetIntData(IntIdx::naics).data();
 
             GetCommunityIndex<PTDType> getCommunityIndex(agents.Geom(lev), mfi.validbox());
 
             int max_communities = getCommunityIndex.max();
             int max_workgroup = agents.getMaxGroup(IntIdx::workgroup) + 1;
             AMREX_ALWAYS_ASSERT(max_workgroup <= np);
-
+            int max_naics = agents.getMaxGroup(IntIdx::naics) + 1;
 
             for (int d = 0; d < n_disease; d++) {
-                Gpu::DeviceVector<int> infected_workgroup_d(max_communities * max_workgroup, 0);
+                Gpu::DeviceVector<int> infected_workgroup_d(max_communities * max_workgroup * max_naics, 0);
                 auto infected_workgroup_d_ptr = infected_workgroup_d.data();
 
                 auto prob_ptr = soa.GetRealData(RealIdx::nattribs + r0(d) + RealIdxDisease::prob).data();
@@ -132,7 +133,8 @@ void InteractionModWork<PCType, PTDType, PType>::fastInteractWork (PCType& agent
                 ParallelFor(np, [=] AMREX_GPU_DEVICE (int i) noexcept {
                     if (isInfectious(i, ptd, d) && isCandidate(i, ptd)) {
                         auto community = getCommunityIndex(ptd, i);
-                        Gpu::Atomic::Add(&infected_workgroup_d_ptr[community * max_workgroup + workgroup_ptr[i]], 1);
+                        int wgroup_i = (community * max_workgroup + workgroup_ptr[i]) * max_naics + naics_ptr[i];
+                        Gpu::Atomic::Add(&infected_workgroup_d_ptr[wgroup_i], 1);
                     }
                 });
                 Gpu::synchronize();
@@ -140,7 +142,8 @@ void InteractionModWork<PCType, PTDType, PType>::fastInteractWork (PCType& agent
                 ParallelFor(np, [=] AMREX_GPU_DEVICE (int i) noexcept {
                     if (isSusceptible(i, ptd, d) && isCandidate(i, ptd)) {
                         auto community = getCommunityIndex(ptd, i);
-                        int num_infected_workgroup = infected_workgroup_d_ptr[community * max_workgroup + workgroup_ptr[i]];
+                        int wgroup_i = (community * max_workgroup + workgroup_ptr[i]) * max_naics + naics_ptr[i];
+                        int num_infected_workgroup = infected_workgroup_d_ptr[wgroup_i];
                         ParticleReal workgroup_prob = 1.0_prt - infect * lparm->xmit_work * scale;
                         prob_ptr[i] *= static_cast<ParticleReal>(std::pow(workgroup_prob, num_infected_workgroup));
                     }
