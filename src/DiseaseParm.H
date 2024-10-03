@@ -63,14 +63,25 @@ struct DiseaseParm
                                                     amrex::Real(.08*pHC) };
     /*! Work transmission probabilities for each age group (<5, 5-17, 18-29, 30-64, 65+) */
     amrex::Real xmit_work = amrex::Real(0.115*pWO);
+
     /*! School transmission probabilities for each school type (High, Middle, Elem3/4 , Daycare/Playgroups */
-    amrex::Real xmit_school[7] = {  amrex::Real(0.),
-                                    amrex::Real(.105*pHSC),
-                                    amrex::Real(.125*pMSC),
-                                    amrex::Real(.145*pESC),
-                                    amrex::Real(.145*pESC),
-                                    amrex::Real(.15),
-                                    amrex::Real(.35) };
+    amrex::Real xmit_high_school = amrex::Real(.105*pHSC);
+    amrex::Real xmit_middle_school = amrex::Real(.125*pMSC);
+    amrex::Real xmit_elem_school = amrex::Real(.145*pESC);
+    amrex::Real xmit_daycare = amrex::Real(.15);
+    amrex::Real xmit_playgroup = amrex::Real(.35);
+    /*!< Transmission probability in school - child to adult */
+    amrex::Real xmit_high_school_c2a = amrex::Real(.105*pHSC);
+    amrex::Real xmit_middle_school_c2a = amrex::Real(.125*pMSC);
+    amrex::Real xmit_elem_school_c2a = amrex::Real(.145*pESC);
+    amrex::Real xmit_daycare_c2a = amrex::Real(.15);
+    amrex::Real xmit_playgroup_c2a = amrex::Real(.35);
+    /*!< Transmission probability in school - adult to child */
+    amrex::Real xmit_high_school_a2c = amrex::Real(.105*pHSC);
+    amrex::Real xmit_middle_school_a2c = amrex::Real(.125*pMSC);
+    amrex::Real xmit_elem_school_a2c = amrex::Real(.145*pESC);
+    amrex::Real xmit_daycare_a2c = amrex::Real(.15);
+    amrex::Real xmit_playgroup_a2c = amrex::Real(.35);
 
     /* Within family, from child or adult, for 5 age groups (here Thai paper, US:0.6->0.8)*/
     /*! Transmission probability within family for each age-group of adult */
@@ -92,22 +103,6 @@ struct DiseaseParm
                 xmit_nc_adult_SC[AgeGroups::total];  /*!< Transmission probability for neighborhood cluster (adult) - school closed ?? */
     amrex::Real xmit_comm_SC[AgeGroups::total],      /*!< Transmission probability in community - school closed */
                 xmit_hood_SC[AgeGroups::total];      /*!< Transmission probability in neighborhood - school closed ?? */
-     /*!< Transmission probability in school - child to adult */
-    amrex::Real xmit_sch_c2a[7] = { amrex::Real(0.),
-                                    amrex::Real(.105*pHSC),
-                                    amrex::Real(.125*pMSC),
-                                    amrex::Real(.145*pESC),
-                                    amrex::Real(.145*pESC),
-                                    amrex::Real(.15),
-                                    amrex::Real(.35) };
-    /*!< Transmission probability in school - adult to child */
-    amrex::Real xmit_sch_a2c[7] = { amrex::Real(0.),
-                                    amrex::Real(.105*pHSC),
-                                    amrex::Real(.125*pMSC),
-                                    amrex::Real(.145*pESC),
-                                    amrex::Real(.145*pESC),
-                                    amrex::Real(.15),
-                                    amrex::Real(.35) };
 
     amrex::Real infect = amrex::Real(1.0); /*!< Overall multiplier for agent's infectiousness */
 

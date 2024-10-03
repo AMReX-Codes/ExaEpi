@@ -165,7 +165,22 @@ void DiseaseParm::Initialize ()
         xmit_child[i] *= p_trans[0];
     }
 
-    for (int i = 1; i < 7; i++) xmit_school[i] *= p_trans[0];
+    xmit_high_school *= p_trans[0];
+    xmit_middle_school *= p_trans[0];
+    xmit_elem_school *= p_trans[0];
+    xmit_daycare *= p_trans[0];
+    xmit_playgroup *= p_trans[0];
+    xmit_high_school_c2a *= p_trans[0];
+    xmit_middle_school_c2a *= p_trans[0];
+    xmit_elem_school_c2a *= p_trans[0];
+    xmit_daycare_c2a *= p_trans[0];
+    xmit_playgroup_c2a *= p_trans[0];
+    xmit_high_school_a2c *= p_trans[0];
+    xmit_middle_school_a2c *= p_trans[0];
+    xmit_elem_school_a2c *= p_trans[0];
+    xmit_daycare_a2c *= p_trans[0];
+    xmit_playgroup_a2c *= p_trans[0];
+
     for (int i = 1; i < 5; i++) {
         xmit_child_SC[i] *= p_trans[0];
         xmit_adult_SC[i] *= p_trans[0];
@@ -173,8 +188,6 @@ void DiseaseParm::Initialize ()
         xmit_nc_adult_SC[i] *= p_trans[0];
         xmit_comm_SC[i] *= p_trans[0];
         xmit_hood_SC[i] *= p_trans[0];
-        xmit_sch_c2a[i] *= p_trans[0];
-        xmit_sch_a2c[i] *= p_trans[0];
     }
 
     infect = 1.0_rt;

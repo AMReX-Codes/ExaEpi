@@ -124,6 +124,7 @@ void InteractionModSchool<PCType, PTDType, PType>::fastInteractSchool (PCType& a
             const auto& ptd = ptile.getParticleTileData();
             const auto np = ptile.GetArrayOfStructs().numParticles();
             auto& soa = ptile.GetStructOfArrays();
+            auto school_grade_ptr = soa.GetIntData(IntIdx::school_grade).data();
             auto school_id_ptr = soa.GetIntData(IntIdx::school_id).data();
             auto nborhood_ptr = soa.GetIntData(IntIdx::nborhood).data();
             auto age_group_ptr = soa.GetIntData(IntIdx::age_group).data();
@@ -131,14 +132,13 @@ void InteractionModSchool<PCType, PTDType, PType>::fastInteractSchool (PCType& a
             GetCommunityIndex<PTDType> getCommunityIndex(agents.Geom(lev), mfi.validbox());
 
             int max_communities = getCommunityIndex.max();
-            int max_school = agents.getMaxGroup(IntIdx::school_id) + 1;
+            int max_school_grade = agents.getMaxGroup(IntIdx::school_grade) + 1;
+            int max_school_id = agents.getMaxGroup(IntIdx::school_id) + 1;
             int max_nborhood = agents.getMaxGroup(IntIdx::nborhood) + 1;
-            AMREX_ALWAYS_ASSERT(max_school <= 6);
-
 
             for (int d = 0; d < n_disease; d++) {
                 for (auto adults : {true, false}) {
-                    Gpu::DeviceVector<int> infected_school_d(max_communities * max_school, 0);
+                    Gpu::DeviceVector<int> infected_school_d(max_communities * max_school_grade, 0);
                     auto infected_school_d_ptr = infected_school_d.data();
                     Gpu::DeviceVector<int> infected_daycare_d(max_communities * max_nborhood, 0);
                     auto infected_daycare_d_ptr = infected_daycare_d.data();
@@ -152,10 +152,10 @@ void InteractionModSchool<PCType, PTDType, PType>::fastInteractSchool (PCType& a
                     ParallelFor(np, [=] AMREX_GPU_DEVICE (int i) noexcept {
                         if (isInfectious(i, ptd, d) && isCandidate(i, ptd) && isAnAdult(i, ptd) == adults) {
                             auto community = getCommunityIndex(ptd, i);
-                            if (school_id_ptr[i] < 5) {
-                                Gpu::Atomic::Add(&infected_school_d_ptr[community * max_school + school_id_ptr[i]], 1);
-                            } else if (school_id_ptr[i] == 5) {
+                            if (school_grade_ptr[i] <= 1) {
                                 Gpu::Atomic::Add(&infected_daycare_d_ptr[community * max_nborhood + nborhood_ptr[i]], 1);
+                            } else {
+                                Gpu::Atomic::Add(&infected_school_d_ptr[community * max_school_id + school_id_ptr[i]], 1);
                             }
                         }
                     });
@@ -164,27 +164,39 @@ void InteractionModSchool<PCType, PTDType, PType>::fastInteractSchool (PCType& a
                     ParallelFor(np, [=] AMREX_GPU_DEVICE (int i) noexcept {
                         if (isSusceptible(i, ptd, d) && isCandidate(i, ptd)) {
                             auto community = getCommunityIndex(ptd, i);
-                            if (school_id_ptr[i] < 5) {
-                                int num_infected_school = infected_school_d_ptr[community * max_school + school_id_ptr[i]];
+                            if (school_grade_ptr[i] <= 1) {
+                                int num_infected_daycare = infected_daycare_d_ptr[community * max_nborhood + nborhood_ptr[i]];
+                                ParticleReal daycare_prob = 1.0_prt - infect * lparm->xmit_daycare * scale;
+                                prob_ptr[i] *= static_cast<ParticleReal>(std::pow(daycare_prob, num_infected_daycare));
+                            } else {
+                                int num_infected_school = infected_school_d_ptr[community * max_school_id + school_id_ptr[i]];
                                 ParticleReal school_prob = 0;
                                 if (adults) {   // transmitters are adults
                                     if (age_group_ptr[i] <= 1) {  // Adult teacher/staff -> child student
-                                        school_prob = 1.0_prt - infect * lparm->xmit_sch_a2c[school_id_ptr[i]] * scale; // * 0.25;
-                                    } else {  // adult to adult
-                                        school_prob = 1.0_prt - infect * lparm->xmit_school[school_id_ptr[i]] * scale;
+                                        Real xmit = lparm->xmit_elem_school_a2c;
+                                        if (school_id_ptr[i] == 1) xmit = lparm->xmit_high_school_a2c;
+                                        if (school_id_ptr[i] == 2) xmit = lparm->xmit_middle_school_a2c;
+                                        school_prob = 1.0_prt - infect * xmit * scale; // * 0.25;
+                                    } else {  // adult to adult - use high school transmission value
+                                        Real xmit = lparm->xmit_elem_school;
+                                        if (school_id_ptr[i] == 1) xmit = lparm->xmit_high_school;
+                                        if (school_id_ptr[i] == 2) xmit = lparm->xmit_middle_school;
+                                        school_prob = 1.0_prt - infect * xmit * scale;
                                     }
                                 } else { // Transmitters are children
                                     if (age_group_ptr[i] <= 1) {  // Receiver j is a child
-                                        school_prob = 1.0_prt - infect * lparm->xmit_school[school_id_ptr[i]] * scale;
+                                        Real xmit = lparm->xmit_elem_school;
+                                        if (school_id_ptr[i] == 1) xmit = lparm->xmit_high_school;
+                                        if (school_id_ptr[i] == 2) xmit = lparm->xmit_middle_school;
+                                        school_prob = 1.0_prt - infect * xmit * scale;
                                     } else {  // Child student -> adult teacher/staff transmission
-                                        school_prob = 1.0_prt - infect * lparm->xmit_sch_c2a[school_id_ptr[i]] * scale; // * 0.5;
+                                        Real xmit = lparm->xmit_elem_school_c2a;
+                                        if (school_id_ptr[i] == 1) xmit = lparm->xmit_high_school_c2a;
+                                        if (school_id_ptr[i] == 2) xmit = lparm->xmit_middle_school_c2a;
+                                        school_prob = 1.0_prt - infect * xmit * scale; // * 0.5;
                                     }
                                 }
                                 prob_ptr[i] *= static_cast<ParticleReal>(std::pow(school_prob, num_infected_school));
-                            } else if (school_id_ptr[i] == 5) {
-                                int num_infected_daycare = infected_daycare_d_ptr[community * max_nborhood + nborhood_ptr[i]];
-                                ParticleReal daycare_prob = 1.0_prt - infect * lparm->xmit_school[school_id_ptr[i]] * scale;
-                                prob_ptr[i] *= static_cast<ParticleReal>(std::pow(daycare_prob, num_infected_daycare));
                             }
                         }
                     });
