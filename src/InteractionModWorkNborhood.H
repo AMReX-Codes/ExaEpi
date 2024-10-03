@@ -10,6 +10,7 @@
 
 using namespace amrex;
 
+#ifndef FAST_INTERACTIONS
 /*! \brief One-on-one interaction between an infectious agent and a susceptible agent.
  *
  * This function defines the one-on-one interaction between an infectious agent and a
@@ -47,6 +48,7 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE
         }
     }
 };
+#endif
 
 template <typename PTDType>
 struct WorkNborhoodCandidate {

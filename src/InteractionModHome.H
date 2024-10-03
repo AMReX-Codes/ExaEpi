@@ -13,6 +13,7 @@ using namespace amrex;
 
 #define FAMILIES_PER_CLUSTER 4
 
+#ifndef FAST_INTERACTIONS
 /*! \brief One-on-one interaction between an infectious agent and a susceptible agent.
  *
  * This function defines the one-on-one interaction between an infectious agent and a
@@ -54,6 +55,7 @@ struct BinaryInteractionHome {
         return 0.0_prt;
     }
 };
+#endif
 
 template <typename PTDType>
 struct HomeCandidate {

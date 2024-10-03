@@ -49,7 +49,9 @@ struct IntIdx
         hosp_i,         /*!< hosp location index */
         hosp_j,         /*!< hosp location index */
         nborhood,       /*!< home neighborhood ID */
-        school,         /*!< school type (elementary, middle, high, none) */
+        school_grade,   /*!< school grade, including universities */
+        school_id,      /*!< ID for a given school */
+        school_closed,  /*!< 0 for open, 1 for closed */
         naics,          /*!< industry NAICS code for business employed at */
         workgroup,      /*!< workgroup ID */
         work_nborhood,  /*!< work neighborhood ID */

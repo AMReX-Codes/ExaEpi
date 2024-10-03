@@ -77,25 +77,30 @@ void CensusData::init (ExaEpi::TestParams &params, Geometry &geom, BoxArray &ba,
 /*! \brief Assigns school by taking a random number between 0 and 100, and using
  *  default distribution to choose elementary/middle/high school. */
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-int assign_school (const int nborhood, const amrex::RandomEngine& engine) {
-    int il4 = amrex::Random_int(100, engine);
-    int school = 0;
-
-    if (il4 < 36) {
-        school = 3 + (nborhood / 2);  // elementary school, in neighborhoods 1 and 2
-        AMREX_ALWAYS_ASSERT(school < 5);
+void assign_school (int* school_grade, int* school_id, const int age_group, const int nborhood, const RandomEngine& engine) {
+    if (age_group == 0) {
+        *school_grade = 0;
+        *school_id = 5; // note - need to handle playgroups
+    } else if (age_group == 1) {
+        int il4 = Random_int(100, engine);
+        if (il4 < 36) {
+            *school_id = 3 + (nborhood / 2);  // elementary school, in neighborhoods 1 and 2
+            *school_grade = 5;
+            AMREX_ALWAYS_ASSERT(*school_id < 5);
+        } else if (il4 < 68) {
+            *school_id = 2;  // middle school, one for all neighborhoods
+            *school_grade = 9;
+        } else if (il4 < 93) {
+            *school_id = 1;  // high school, one for all neighborhoods
+            *school_grade = 12;
+        } else {
+            *school_id = 0;  // not in school, presumably 18-year-olds or some home-schooled, etc
+            *school_grade = -1;
+        }
+    } else {
+        *school_grade = -1;
+        *school_id = 0; // only use negative values to indicate school closed
     }
-    else if (il4 < 68) {
-        school = 2;  // middle school, one for all neighborhoods
-    }
-
-    else if (il4 < 93) {
-        school = 1;  // high school, one for all neighborhoods
-    }
-    else {
-        school = 0;  // not in school, presumably 18-year-olds or some home-schooled, etc
-    }
-    return school;
 }
 
 
@@ -314,7 +319,9 @@ void CensusData::initAgents (AgentContainer& pc,       /*!< Agents */
         auto hosp_i_ptr = soa.GetIntData(IntIdx::hosp_i).data();
         auto hosp_j_ptr = soa.GetIntData(IntIdx::hosp_j).data();
         auto nborhood_ptr = soa.GetIntData(IntIdx::nborhood).data();
-        auto school_ptr = soa.GetIntData(IntIdx::school).data();
+        auto school_grade_ptr = soa.GetIntData(IntIdx::school_grade).data();
+        auto school_id_ptr = soa.GetIntData(IntIdx::school_id).data();
+        auto school_closed_ptr = soa.GetIntData(IntIdx::school_closed).data();
         auto naics_ptr = soa.GetIntData(IntIdx::naics).data();
         auto workgroup_ptr = soa.GetIntData(IntIdx::workgroup).data();
         auto work_nborhood_ptr = soa.GetIntData(IntIdx::work_nborhood).data();
@@ -459,28 +466,24 @@ void CensusData::initAgents (AgentContainer& pc,       /*!< Agents */
                 naics_ptr[ip] = 0;
                 random_travel_ptr[ip] = -1;
 
-                if (age_group == 0) {
-                    school_ptr[ip] = 5; // note - need to handle playgroups
-                } else if (age_group == 1) {
-                    school_ptr[ip] = assign_school(nborhood, engine);
-                } else {
-                    school_ptr[ip] = 0; // only use negative values to indicate school closed
-                }
+                assign_school(&school_grade_ptr[ip], &school_id_ptr[ip], age_group, nborhood, engine);
+
+                school_closed_ptr[ip] = 0;
 
                 // Increment the appropriate student counter based on the school assignment
-                if (school_ptr[ip] == SchoolType::elem_3) {
+                if (school_id_ptr[ip] == SchoolType::elem_3) {
                     amrex::Gpu::Atomic::AddNoRet(&student_counts_arr(i, j, k, SchoolType::elem_3), 1);
-                } else if (school_ptr[ip] == SchoolType::elem_4) {
+                } else if (school_id_ptr[ip] == SchoolType::elem_4) {
                     amrex::Gpu::Atomic::AddNoRet(&student_counts_arr(i, j, k, SchoolType::elem_4), 1);
-                } else if (school_ptr[ip] == SchoolType::middle) {
+                } else if (school_id_ptr[ip] == SchoolType::middle) {
                     amrex::Gpu::Atomic::AddNoRet(&student_counts_arr(i, j, k, SchoolType::middle), 1);
-                } else if (school_ptr[ip] == SchoolType::high) {
+                } else if (school_id_ptr[ip] == SchoolType::high) {
                     amrex::Gpu::Atomic::AddNoRet(&student_counts_arr(i, j, k, SchoolType::high), 1);
-                } else if (school_ptr[ip] == SchoolType::day_care) {
+                } else if (school_id_ptr[ip] == SchoolType::day_care) {
                     amrex::Gpu::Atomic::AddNoRet(&student_counts_arr(i, j, k, SchoolType::day_care), 1);
                 }
 
-                if (school_ptr[ip]>0) {amrex::Gpu::Atomic::AddNoRet(&student_counts_arr(i, j, k, SchoolType::total), 1); }
+                if (school_id_ptr[ip] > 0) {amrex::Gpu::Atomic::AddNoRet(&student_counts_arr(i, j, k, SchoolType::total), 1); }
 
             }
         });
@@ -790,7 +793,8 @@ void CensusData::assignTeachersAndWorkgroup (AgentContainer& pc       /*!< Agent
         amrex::Gpu::PinnedVector<int> workgroup_h(np);
         amrex::Gpu::PinnedVector<int> work_i_h(np);
         amrex::Gpu::PinnedVector<int> work_j_h(np);
-        amrex::Gpu::PinnedVector<int> school_h(np);
+        amrex::Gpu::PinnedVector<int> school_grade_h(np);
+        amrex::Gpu::PinnedVector<int> school_id_h(np);
         amrex::Gpu::PinnedVector<int> work_nborhood_h(np);
 
         amrex::Gpu::copy(Gpu::deviceToHost, soa.GetIntData(IntIdx::age_group).begin(),
@@ -801,8 +805,10 @@ void CensusData::assignTeachersAndWorkgroup (AgentContainer& pc       /*!< Agent
                          soa.GetIntData(IntIdx::work_i).end(), work_i_h.begin());
         amrex::Gpu::copy(Gpu::deviceToHost, soa.GetIntData(IntIdx::work_j).begin(),
                          soa.GetIntData(IntIdx::work_j).end(), work_j_h.begin());
-        amrex::Gpu::copy(Gpu::deviceToHost, soa.GetIntData(IntIdx::school).begin(),
-                         soa.GetIntData(IntIdx::school).end(), school_h.begin());
+        amrex::Gpu::copy(Gpu::deviceToHost, soa.GetIntData(IntIdx::school_grade).begin(),
+                         soa.GetIntData(IntIdx::school_grade).end(), school_grade_h.begin());
+        amrex::Gpu::copy(Gpu::deviceToHost, soa.GetIntData(IntIdx::school_id).begin(),
+                         soa.GetIntData(IntIdx::school_id).end(), school_id_h.begin());
         amrex::Gpu::copy(Gpu::deviceToHost, soa.GetIntData(IntIdx::work_nborhood).begin(),
                          soa.GetIntData(IntIdx::work_nborhood).end(), work_nborhood_h.begin());
 
@@ -810,7 +816,8 @@ void CensusData::assignTeachersAndWorkgroup (AgentContainer& pc       /*!< Agent
         auto workgroup_ptr = workgroup_h.data();
         auto work_i_ptr = work_i_h.data();
         auto work_j_ptr = work_j_h.data();
-        auto school_ptr = school_h.data();
+        auto school_grade_ptr = school_grade_h.data();
+        auto school_id_ptr = school_id_h.data();
         auto work_nborhood_ptr = work_nborhood_h.data();
 
         for (int ip = 0; ip < np; ++ip) {
@@ -845,27 +852,32 @@ void CensusData::assignTeachersAndWorkgroup (AgentContainer& pc       /*!< Agent
                     if (total_available > 0) {
                         int choice = amrex::Random_int(total_available);
                         if (choice < available_slots[0]) {
-                            school_ptr[ip] = 3;  // elementary school for kids in Neighbordhood 1 & 2
+                            school_grade_ptr[ip] = 5;  // 3rd grade - generic for elementary
+                            school_id_ptr[ip] = 3;  // elementary school for kids in Neighbordhood 1 & 2
                             workgroup_ptr[ip] = 3 ;
                             work_nborhood_ptr[ip] = 1; // assuming the first elementary school is located in Neighbordhood 1
                             elem3_teacher_counts_ptr[comm_to]++;
                         } else if (choice < available_slots[0] + available_slots[1]) {
-                            school_ptr[ip] = 4;  // elementary school for kids in Neighbordhood 3 & 4
+                            school_grade_ptr[ip] = 5;  // 3rd grade - generic for elementary
+                            school_id_ptr[ip] = 4;  // elementary school for kids in Neighbordhood 3 & 4
                             workgroup_ptr[ip] = 4 ;
                             work_nborhood_ptr[ip] = 3; // assuming the first elementary school is located in Neighbordhood 3
                             elem4_teacher_counts_ptr[comm_to]++;
                         } else if (choice < available_slots[0] + available_slots[1] + available_slots[2]) {
-                            school_ptr[ip] = 2;  // middle school for kids in all Neighbordhoods (1 through 4)
+                            school_grade_ptr[ip] = 9;  // 7th grade - generic for middle
+                            school_id_ptr[ip] = 2;  // middle school for kids in all Neighbordhoods (1 through 4)
                             workgroup_ptr[ip] = 2 ;
                             work_nborhood_ptr[ip] = 3; // assuming the middle school is located in Neighbordhood 2
                             middle_teacher_counts_ptr[comm_to]++;
                         } else if (choice < available_slots[0] + available_slots[1] + available_slots[2] + available_slots[3]) {
-                            school_ptr[ip] = 1;  // high school for kids in all Neighbordhoods (1 through 4)
+                            school_grade_ptr[ip] = 12;  // 10th grade - generic for high school
+                            school_id_ptr[ip] = 1;  // high school for kids in all Neighbordhoods (1 through 4)
                             workgroup_ptr[ip] = 1 ;
                             work_nborhood_ptr[ip] = 4; // assuming the high school is located in Neighbordhood 4
                             high_teacher_counts_ptr[comm_to]++;
                         } else if (choice < total_available) {
-                            school_ptr[ip] = 5;  // day care
+                            school_grade_ptr[ip] = 0; // generic for daycare
+                            school_id_ptr[ip] = 5;  // daycare
                             workgroup_ptr[ip] = 5 ;
                             work_nborhood_ptr[ip] = 1; // deal with daycare/playgroups later
                             daycr_teacher_counts_ptr[comm_to]++;
@@ -884,8 +896,10 @@ void CensusData::assignTeachersAndWorkgroup (AgentContainer& pc       /*!< Agent
             }
         }
 
-        amrex::Gpu::copy(Gpu::hostToDevice, school_h.begin(), school_h.end(),
-                         soa.GetIntData(IntIdx::school).begin());
+        amrex::Gpu::copy(Gpu::hostToDevice, school_grade_h.begin(), school_grade_h.end(),
+                         soa.GetIntData(IntIdx::school_grade).begin());
+        amrex::Gpu::copy(Gpu::hostToDevice, school_id_h.begin(), school_id_h.end(),
+                         soa.GetIntData(IntIdx::school_id).begin());
         amrex::Gpu::copy(Gpu::hostToDevice, workgroup_h.begin(), workgroup_h.end(),
                          soa.GetIntData(IntIdx::workgroup).begin());
         amrex::Gpu::copy(Gpu::hostToDevice, work_nborhood_h.begin(), work_nborhood_h.end(),

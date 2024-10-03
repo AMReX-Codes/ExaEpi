@@ -66,6 +66,7 @@ class InteractionModel
         std::map<std::pair<int, int>, amrex::DenseBins<PTDType> > m_bins;
 };
 
+#ifndef FAST_INTERACTIONS
 template <typename PTDType>
 struct Binner
 {
@@ -230,13 +231,13 @@ template <typename PTDType>
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
 Real infectProb(const PTDType &ptd, int infectious_i, int susceptible_i, const Real* xmit_SC, const Real* xmit) {
     // school < 0 means a child normally attends school, but not today
-    if (ptd.m_idata[IntIdx::school][infectious_i] < 0) { // not attending school, use _SC contacts
+    if (ptd.m_idata[IntIdx::school_closed][infectious_i] == 1) { // school closed, use _SC contacts
         return xmit_SC[ptd.m_idata[IntIdx::age_group][susceptible_i]];
     } else {
         return xmit[ptd.m_idata[IntIdx::age_group][susceptible_i]];
     }
 }
-
+#endif
 
 template <typename PTDType>
 struct GetCommunityIndex

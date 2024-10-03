@@ -11,6 +11,7 @@
 using namespace amrex;
 
 
+#ifndef FAST_INTERACTIONS
 template <typename ParticleType>
 struct GetWorkerBin
 {
@@ -52,6 +53,7 @@ struct BinaryInteractionWork {
         return a_lparm->xmit_work * a_work_scale;
     }
 };
+#endif
 
 template <typename PTDType>
 struct WorkCandidate {

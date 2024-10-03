@@ -345,7 +345,9 @@ void UrbanPopData::initAgents (AgentContainer &pc, const ExaEpi::TestParams &par
         soa.GetIntData(IntIdx::hosp_i).assign(-1);
         soa.GetIntData(IntIdx::hosp_j).assign(-1);
         auto nborhood_ptr = soa.GetIntData(IntIdx::nborhood).data();
-        auto school_ptr = soa.GetIntData(IntIdx::school).data();
+        auto school_grade_ptr = soa.GetIntData(IntIdx::school_grade).data();
+        auto school_id_ptr = soa.GetIntData(IntIdx::school_id).data();
+        auto school_closed_ptr = soa.GetIntData(IntIdx::school_closed).data();
         auto naics_ptr = soa.GetIntData(IntIdx::naics).data();
         auto workgroup_ptr = soa.GetIntData(IntIdx::workgroup).data();
         auto work_nborhood_ptr = soa.GetIntData(IntIdx::work_nborhood).data();
@@ -391,7 +393,9 @@ void UrbanPopData::initAgents (AgentContainer &pc, const ExaEpi::TestParams &par
             lnglat_to_grid(agent.work_lng, agent.work_lat, work_i_ptr[i], work_j_ptr[i]);
             int max_nborhood = group_home_populations_ptr[i] / nborhood_size + 1;
             nborhood_ptr[i] = Random_int(max_nborhood, engine) + 1;
-            school_ptr[i] = agent.school_id;
+            school_grade_ptr[i] = agent.grade;
+            school_id_ptr[i] = agent.school_id;
+            school_closed_ptr[i] = 0;
             naics_ptr[i] = agent.naics;
             // set up workers, excluding educators and wfh
             if (agent.role == 1 && agent.school_id == 0 && agent.naics != 5) {
