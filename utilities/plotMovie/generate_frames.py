@@ -17,7 +17,7 @@ infected, never_infected, susceptible, immune,
 or deaths to plot number of deaths.
 
 Depending on choice, adjusting color scale may be advisable, which can be
-done by changing vmin and vmax values on line 198 in the call to generate_plot() 
+done by changing vmin and vmax values on line 198 in the call to generate_plot()
 
 Since US census tracts include territories around the globe, if
 we use this data, some sort of cropping is necessary (i.e. 48-state mainland)
@@ -97,9 +97,8 @@ def get_raw_data_hdf5(name: str, plot_option: str = "infected"):
     for i in range(f.attrs['num_components'][0]):
         comm_indices[f.attrs['component_' + str(i)]] = str(i)
 
-    
     fips = f['level_0']['data:datatype=' + comm_indices[b'FIPS']][()]
-    
+
     if plot_option == "deaths":
         plts = (f['level_0']['data:datatype=' + comm_indices[b'total']][()]
                 - f['level_0']['data:datatype=' + comm_indices[b'infected']][()]
