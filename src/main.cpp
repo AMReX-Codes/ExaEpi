@@ -148,14 +148,14 @@ void runAgent ()
             }
 
             File << std::setw(5) << "Day"
-                 << std::setw(10) << "Never"
-                 << std::setw(10) << "Infected"
-                 << std::setw(10) << "Immune"
-                 << std::setw(10) << "Deaths"
+                 << std::setw(12) << "Susceptible"
+                 << std::setw(12) << "Infected"
+                 << std::setw(12) << "Recovered"
+                 << std::setw(12) << "Deaths"
                  << std::setw(15) << "Hospitalized"
                  << std::setw(15) << "Ventilated"
-                 << std::setw(10) << "ICU"
-                 << std::setw(10) << "Exposed"
+                 << std::setw(12) << "ICU"
+                 << std::setw(12) << "Exposed"
                  << std::setw(15) << "Asymptomatic"
                  << std::setw(15) << "Presymptomatic"
                  << std::setw(15) << "Symptomatic\n";
@@ -307,14 +307,14 @@ void runAgent ()
                     }
 
                     File << std::setw(5) << i
-                         << std::setw(10) << counts[0]
-                         << std::setw(10) << counts[1]
-                         << std::setw(10) << counts[2]
-                         << std::setw(10) << counts[4]
+                         << std::setw(12) << counts[0]
+                         << std::setw(12) << counts[1]
+                         << std::setw(12) << counts[2]
+                         << std::setw(12) << counts[4]
                          << std::setw(15) << mmc[0]
                          << std::setw(15) << mmc[1]
-                         << std::setw(10) << mmc[2]
-                         << std::setw(10) << counts[5]
+                         << std::setw(12) << mmc[2]
+                         << std::setw(12) << counts[5]
                          << std::setw(15) << counts[6]
                          << std::setw(15) << counts[7]
                          << std::setw(15) << counts[8] << "\n";

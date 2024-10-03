@@ -89,7 +89,6 @@ class InteractionModHome : public InteractionModel<PCType, PTDType, PType>
         void fastInteractHome (PCType &agents);
 };
 
-
 template <typename PCType, typename PTDType, typename PType>
 void InteractionModHome<PCType, PTDType, PType>::fastInteractHome (PCType& agents) {
     BL_PROFILE(__func__);

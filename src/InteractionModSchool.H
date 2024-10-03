@@ -104,7 +104,6 @@ class InteractionModSchool : public InteractionModel<PCType, PTDType, PType>
         void fastInteractSchool (PCType &agents);
 };
 
-
 template <typename PCType, typename PTDType, typename PType>
 void InteractionModSchool<PCType, PTDType, PType>::fastInteractSchool (PCType& agents) {
     BL_PROFILE(__func__);

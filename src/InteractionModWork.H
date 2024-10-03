@@ -93,7 +93,6 @@ class InteractionModWork : public InteractionModel<PCType, PTDType, PType>
 
 };
 
-
 template <typename PCType, typename PTDType, typename PType>
 void InteractionModWork<PCType, PTDType, PType>::fastInteractWork (PCType& agents) {
     BL_PROFILE(__func__);
