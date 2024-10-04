@@ -72,6 +72,7 @@ struct SchoolCandidate {
         return !isHospitalized(idx, ptd) &&
                 ptd.m_idata[IntIdx::school][idx] > 0 &&
                 !ptd.m_idata[IntIdx::withdrawn][idx] &&
+                ptd.m_idata[IntIdx::air_travel][idx] < 0 &&
                 ptd.m_idata[IntIdx::random_travel][idx] < 0;
     }
 };

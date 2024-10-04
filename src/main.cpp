@@ -11,6 +11,7 @@
 
 #include "AgentContainer.H"
 #include "CaseData.H"
+#include "AirTravelFlow.H"
 #include "DemographicData.H"
 #include "IO.H"
 #include "Utils.H"
@@ -106,7 +107,7 @@ void runAgent ()
     cases.resize(params.num_diseases);
     for (int d = 0; d < params.num_diseases; d++) {
         if (params.initial_case_type[d] == "file") {
-            cases[d].InitFromFile(params.disease_names[d], params.case_filename[d]);
+            cases[d].InitFromFile(params.disease_names[d],params.case_filename[d]);
         }
     }
 
@@ -120,6 +121,13 @@ void runAgent ()
     } else if (params.ic_type == ICType::UrbanPop) {
         Abort("UrbanPop not yet implemented");
         return;
+    }
+
+    AirTravelFlow air;
+    if (params.air_travel_int > 0){
+        air.ReadAirports(params.airports_filename, censusData.demo);
+        air.ReadAirTravelFlow(params.air_traffic_filename);
+        air.ComputeTravelProbs(censusData.demo);
     }
 
     // The default output filename is:
@@ -181,6 +189,7 @@ void runAgent ()
     mask_behavior.setVal(1);
 
     AgentContainer pc(geom, dm, ba, params.num_diseases, params.disease_names, params.fast);
+    if (params.air_travel_int > 0) pc.setAirTravel(censusData.unit_mf, air, censusData.demo);
 
     {
         BL_PROFILE_REGION("Initialization");
@@ -341,6 +350,10 @@ void runAgent ()
                 pc.moveRandomTravel(params.random_travel_prob);
             }
 
+            if ((params.air_travel_int > 0) && (i % params.air_travel_int == 0)) {
+                pc.moveAirTravel(censusData.unit_mf, air, censusData.demo);
+            }
+
             // Typical day
             pc.morningCommute(mask_behavior);
             pc.interactDay(mask_behavior);
@@ -350,6 +363,10 @@ void runAgent ()
 
             if ((params.random_travel_int > 0) && (i % params.random_travel_int == 0)) {
                 pc.returnRandomTravel();
+            }
+
+            if ((params.air_travel_int > 0) && (i % params.air_travel_int == 0)){
+                pc.returnAirTravel();
             }
 
             // Infect agents based on their interactions

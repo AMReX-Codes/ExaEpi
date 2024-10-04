@@ -311,6 +311,8 @@ void CensusData::initAgents (AgentContainer& pc,       /*!< Agents */
         auto home_j_ptr = soa.GetIntData(IntIdx::home_j).data();
         auto work_i_ptr = soa.GetIntData(IntIdx::work_i).data();
         auto work_j_ptr = soa.GetIntData(IntIdx::work_j).data();
+        auto trav_i_ptr = soa.GetIntData(IntIdx::trav_i).data();
+        auto trav_j_ptr = soa.GetIntData(IntIdx::trav_j).data();
         auto hosp_i_ptr = soa.GetIntData(IntIdx::hosp_i).data();
         auto hosp_j_ptr = soa.GetIntData(IntIdx::hosp_j).data();
         auto nborhood_ptr = soa.GetIntData(IntIdx::nborhood).data();
@@ -318,6 +320,7 @@ void CensusData::initAgents (AgentContainer& pc,       /*!< Agents */
         auto workgroup_ptr = soa.GetIntData(IntIdx::workgroup).data();
         auto work_nborhood_ptr = soa.GetIntData(IntIdx::work_nborhood).data();
         auto random_travel_ptr = soa.GetIntData(IntIdx::random_travel).data();
+        auto air_travel_ptr = soa.GetIntData(IntIdx::air_travel).data();
 
         int i_RT = IntIdx::nattribs;
         int r_RT = RealIdx::nattribs;
@@ -450,12 +453,15 @@ void CensusData::initAgents (AgentContainer& pc,       /*!< Agents */
                 home_j_ptr[ip] = j;
                 work_i_ptr[ip] = i;
                 work_j_ptr[ip] = j;
+                trav_i_ptr[ip] = i;
+                trav_j_ptr[ip] = j;
                 hosp_i_ptr[ip] = -1;
                 hosp_j_ptr[ip] = -1;
                 nborhood_ptr[ip] = nborhood;
                 work_nborhood_ptr[ip] = nborhood;
                 workgroup_ptr[ip] = 0;
                 random_travel_ptr[ip] = -1;
+                air_travel_ptr[ip] = -1;
 
                 if (age_group == 0) {
                     school_ptr[ip] = 5; // note - need to handle playgroups

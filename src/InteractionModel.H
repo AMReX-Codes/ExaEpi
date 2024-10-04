@@ -36,6 +36,7 @@ namespace ExaEpi
         const std::string work_nborhood = "work_neighborhood";
         const std::string transit = "transit";
         const std::string random = "random";
+        const std::string airTravel = "airTravel";
     }
 }
 

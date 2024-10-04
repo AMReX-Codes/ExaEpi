@@ -22,6 +22,7 @@
 #include "DiseaseStatus.H"
 #include "HospitalModel.H"
 #include "InteractionModelLibrary.H"
+#include "AirTravelFlow.H"
 
 
 /*! \brief Derived class from ParticleContainer that defines agents and their functions */
@@ -57,11 +58,17 @@ public:
 
     void interactNight(amrex::MultiFab&);
 
+    void moveAirTravel (const amrex::iMultiFab& unit_mf, AirTravelFlow& air, DemographicData& demo);
+
+    void setAirTravel (const iMultiFab& unit_mf, AirTravelFlow& air, DemographicData& demo);
+
     void moveAgentsRandomWalk ();
 
     void moveRandomTravel (const amrex::Real random_travel_prob);
 
     void returnRandomTravel ();
+
+    void returnAirTravel ();
 
     void updateStatus (MFPtrVec&);
 
@@ -148,7 +155,6 @@ public:
     std::vector<std::string> m_disease_names; /*!< names of the diseases */
 
 protected:
-
     int m_symptomatic_withdraw = 1; /*!< whether symptomatic agents withdraw or not */
 
     amrex::Real m_shelter_compliance = 0.95_rt; /*!< Shelter-in-place compliance rate */

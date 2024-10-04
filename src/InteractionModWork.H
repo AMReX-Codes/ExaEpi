@@ -61,6 +61,7 @@ struct WorkCandidate {
                 ptd.m_idata[IntIdx::work_i][idx] >= 0 &&
                 ptd.m_idata[IntIdx::workgroup][idx] > 0 &&
                 !ptd.m_idata[IntIdx::withdrawn][idx] &&
+                ptd.m_idata[IntIdx::air_travel][idx] < 0 &&
                 ptd.m_idata[IntIdx::random_travel][idx] < 0;
     }
 };
