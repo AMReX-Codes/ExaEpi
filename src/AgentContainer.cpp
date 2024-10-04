@@ -295,10 +295,10 @@ void AgentContainer::moveAirTravel (const iMultiFab& unit_mf, AirTravelFlow& air
     BL_PROFILE("AgentContainer::moveAirTravel");
     for (int lev = 0; lev <= finestLevel(); ++lev)
     {
+        auto& plev  = GetParticles(lev);
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
 #endif
-        auto& plev  = GetParticles(lev);
         for(MFIter mfi = MakeMFIter(lev, TilingIfNotGPU()); mfi.isValid(); ++mfi)
         {
             const auto unit_arr = unit_mf[mfi].array();
