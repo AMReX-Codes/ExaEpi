@@ -28,6 +28,7 @@ struct TestParams
     int plot_int;                       /*!< plot interval (see ExaEpi::IO::writePlotFile) */
     int random_travel_int;              /*!< steps between random travel events
                                              (see AgentContainer::moveRandomTravel) */
+    amrex::Real random_travel_prob;     /*!< probability of an agent going on random travel */
     int air_travel_int;
     short ic_type;                      /*!< initialization type (see ExaEpi::ICType) */
 
@@ -82,6 +83,9 @@ struct TestParams
 
     int nborhood_size = 500;
     int workgroup_size = 20;
+
+    bool fast = true;       /*!< Use the fast implementations for various operations, e.g. binning, at the cost of
+                                 exact reproducibility for a given random seed. */
 };
 
 /**
