@@ -99,7 +99,7 @@ void assign_school (int* school_grade, int* school_id, const int age_group, cons
         }
     } else {
         *school_grade = -1;
-        *school_id = 0; // only use negative values to indicate school closed
+        *school_id = 0; // no school
     }
 }
 

@@ -165,6 +165,7 @@ void DiseaseParm::Initialize ()
         xmit_child[i] *= p_trans[0];
     }
 
+    xmit_college *= p_trans[0];
     xmit_high_school *= p_trans[0];
     xmit_middle_school *= p_trans[0];
     xmit_elem_school *= p_trans[0];

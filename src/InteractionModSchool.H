@@ -79,7 +79,29 @@ struct SchoolCandidate {
     }
 };
 
+// grade definitions
+// {0 "childcare", 1 "preschl", 2 "kind", 3 "1st", 4 "2nd", 5 "3rd", 6 "4th", 7 "5th", 8 "6th", 9 "7th", 10 "8th", 11 "9th",
+//  12 "10th", 13 "11th", 14 "12th", 15 "undergrad", 16 "grad"}
 
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+static bool inElemSchool(const int grade) {
+    return (grade >= 2 && grade <= 7);
+}
+
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+static bool inMiddleSchool(const int grade) {
+    return (grade >= 8 && grade <= 10);
+}
+
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+static bool inHighSchool(const int grade) {
+    return (grade >= 11 && grade <= 14);
+}
+
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+static bool inCollege(const int grade) {
+    return (grade >= 15 && grade <= 16);
+}
 
 /*! \brief Class describing agent interactions at school */
 template <typename PCType, typename PTDType, typename PType>
@@ -170,32 +192,30 @@ void InteractionModSchool<PCType, PTDType, PType>::fastInteractSchool (PCType& a
                                 prob_ptr[i] *= static_cast<ParticleReal>(std::pow(daycare_prob, num_infected_daycare));
                             } else {
                                 int num_infected_school = infected_school_d_ptr[community * max_school_id + school_id_ptr[i]];
-                                ParticleReal school_prob = 0;
+                                ParticleReal xmit = 0;
                                 if (adults) {   // transmitters are adults
                                     if (age_group_ptr[i] <= 1) {  // Adult teacher/staff -> child student
-                                        Real xmit = lparm->xmit_elem_school_a2c;
-                                        if (school_id_ptr[i] == 1) xmit = lparm->xmit_high_school_a2c;
-                                        if (school_id_ptr[i] == 2) xmit = lparm->xmit_middle_school_a2c;
-                                        school_prob = 1.0_prt - infect * xmit * scale; // * 0.25;
-                                    } else {  // adult to adult - use high school transmission value
-                                        Real xmit = lparm->xmit_elem_school;
-                                        if (school_id_ptr[i] == 1) xmit = lparm->xmit_high_school;
-                                        if (school_id_ptr[i] == 2) xmit = lparm->xmit_middle_school;
-                                        school_prob = 1.0_prt - infect * xmit * scale;
+                                        if (inHighSchool(school_grade_ptr[i])) xmit = lparm->xmit_high_school_a2c;
+                                        else if (inMiddleSchool(school_id_ptr[i])) xmit = lparm->xmit_middle_school_a2c;
+                                        else if (inElemSchool(school_grade_ptr[i])) xmit = lparm->xmit_elem_school_a2c;
+                                    } else {  // adult to adult - teachers also have grades (the grade they teach)
+                                        if (inHighSchool(school_grade_ptr[i])) xmit = lparm->xmit_high_school;
+                                        else if (inMiddleSchool(school_id_ptr[i])) xmit = lparm->xmit_middle_school;
+                                        else if (inElemSchool(school_grade_ptr[i])) xmit = lparm->xmit_elem_school;
+                                        else if (inCollege(school_grade_ptr[i])) xmit = lparm->xmit_college;
                                     }
                                 } else { // Transmitters are children
                                     if (age_group_ptr[i] <= 1) {  // Receiver j is a child
-                                        Real xmit = lparm->xmit_elem_school;
-                                        if (school_id_ptr[i] == 1) xmit = lparm->xmit_high_school;
-                                        if (school_id_ptr[i] == 2) xmit = lparm->xmit_middle_school;
-                                        school_prob = 1.0_prt - infect * xmit * scale;
+                                        if (inHighSchool(school_grade_ptr[i])) xmit = lparm->xmit_high_school;
+                                        else if (inMiddleSchool(school_id_ptr[i])) xmit = lparm->xmit_middle_school;
+                                        else if (inElemSchool(school_id_ptr[i])) xmit = lparm->xmit_elem_school;
                                     } else {  // Child student -> adult teacher/staff transmission
-                                        Real xmit = lparm->xmit_elem_school_c2a;
-                                        if (school_id_ptr[i] == 1) xmit = lparm->xmit_high_school_c2a;
-                                        if (school_id_ptr[i] == 2) xmit = lparm->xmit_middle_school_c2a;
-                                        school_prob = 1.0_prt - infect * xmit * scale; // * 0.5;
+                                        if (inHighSchool(school_grade_ptr[i])) xmit = lparm->xmit_high_school_c2a;
+                                        else if (inMiddleSchool(school_id_ptr[i])) xmit = lparm->xmit_middle_school_c2a;
+                                        else if (inElemSchool(school_id_ptr[i])) xmit = lparm->xmit_elem_school_c2a;
                                     }
                                 }
+                                ParticleReal school_prob = 1.0_prt - infect * xmit * scale;
                                 prob_ptr[i] *= static_cast<ParticleReal>(std::pow(school_prob, num_infected_school));
                             }
                         }

@@ -65,6 +65,7 @@ struct DiseaseParm
     amrex::Real xmit_work = amrex::Real(0.115*pWO);
 
     /*! School transmission probabilities for each school type (High, Middle, Elem3/4 , Daycare/Playgroups */
+    amrex::Real xmit_college = amrex::Real(.105*pHSC);
     amrex::Real xmit_high_school = amrex::Real(.105*pHSC);
     amrex::Real xmit_middle_school = amrex::Real(.125*pMSC);
     amrex::Real xmit_elem_school = amrex::Real(.145*pESC);
