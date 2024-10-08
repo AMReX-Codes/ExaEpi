@@ -82,7 +82,7 @@ void assign_school (int* school_grade, int* school_id, const int age_group, cons
         // under 5
         *school_grade = 0;
         //*school_id = 5; // note - need to handle playgroups
-        *school_id = nborhood;
+        *school_id = nborhood + 1; // cannot be zero - that means no school
     } else if (age_group == 1) {
         // 5 to 17
         int il4 = Random_int(100, engine);
@@ -482,7 +482,7 @@ void CensusData::initAgents (AgentContainer& pc,       /*!< Agents */
                     amrex::Gpu::Atomic::AddNoRet(&student_counts_arr(i, j, k, SchoolType::middle), 1);
                 } else if (school_id_ptr[ip] == SchoolType::high) {
                     amrex::Gpu::Atomic::AddNoRet(&student_counts_arr(i, j, k, SchoolType::high), 1);
-                } else if (school_id_ptr[ip] == SchoolType::day_care) {
+                } else if (school_grade_ptr[ip] == 0) {
                     amrex::Gpu::Atomic::AddNoRet(&student_counts_arr(i, j, k, SchoolType::day_care), 1);
                 }
 
