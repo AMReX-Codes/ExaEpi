@@ -263,12 +263,102 @@ def process_nt_dt_feather_files(fnames, out_fname):
 
     print("Processed", len(df.index), "records in %.3f s" % (time.time() - start_t))
 
+    t = time.time()
     df.to_csv(out_fname + ".work.csv", sep=' ', index=False)
+    print("Wrote", out_fname + ".work.csv in %.3f s" % (time.time() - t))
 
     return df
 
 
-def process_feather_files(fnames, out_fname, geoid_locs_map, df_dt_nt):
+def assign_educators_to_school(required_educators, df, school, school_geoid, min_grade, max_grade, edu_naics_only):
+    #print(school, "educator_pop", educator_pop)
+    if edu_naics_only:
+        df_educators = df.loc[(df['role'] == 1) & (df['naics'] == 0) & (df['school_id'] == 0) & (df['work_geoid'] == school_geoid)]
+    else:
+        # note that this also uses WFH, which is ignored for the purposes of workgroups and commuting
+        df_educators = df.loc[(df['role'] == 1) & (df['school_id'] == 0) & (df['work_geoid'] == school_geoid)]
+    if len(df_educators) == 0:
+        return required_educators
+    else:
+        if len(df_educators) <= required_educators:
+            educator_sample = df_educators
+        else:
+            educator_sample = df_educators.sample(n=required_educators)
+        df.loc[df['id'].isin(educator_sample['id']), 'school_id'] = school
+        # randomly choosing the grade is ok if the students are spread out equally across the grades, which we'd generally
+        # expect, except for colleges, where there are far more undergrads than grads. So that will need a special case
+        # FIXME: special case for colleges
+        df.loc[df['id'].isin(educator_sample['id']), 'grade'] = \
+            np.random.randint(min_grade, max_grade + 1, size=len(educator_sample)).astype('int8')
+        return required_educators - len(educator_sample)
+
+
+def allocate_educators(df, out_fname):
+    df_special = df[['id', 'age', 'role', 'grade', 'school_id']]
+    df_special = df_special.loc[(df_special['school_id'] != '') & (df_special['school_id'] != 0)]
+    t = time.time()
+    df_special.to_csv(out_fname + ".students.csv", sep=' ', index=False)
+    print("Wrote", out_fname + ".students.csv in %.3f s" % (time.time() - t))
+    print("Student population", len(df_special))
+
+    t = time.time()
+    # allocate educators at a ratio of 15:1 - this is the average for the US
+    student_schools_map = {}
+    schools = df.school_id.unique()
+    for i, school in enumerate(schools):
+        if school == 0:
+            continue
+        subset_df = df.loc[(df['school_id'] == school) & (df['role'] == 2)]
+        max_grade = subset_df.grade.max()
+        min_grade = subset_df.grade.min()
+        if min_grade < 0:
+            print("ERROR: min grade is", min_grade, max_grade, "for school", school, subset_df.grade)
+            sys.exit(0)
+        geoids = subset_df.work_geoid.unique()
+        if len(geoids) != 1:
+            print("WARNING: more than one unique geoids for the school")
+            sys.exit(0)
+        student_schools_map[school] = [len(subset_df.index), geoids[0], min_grade, max_grade]
+    print("Found", len(schools), "schools in %.3f s" % (time.time() - t))
+
+    df_edu_med_sca = df.loc[(df['role'] == 1) & (df['naics'] == 0)]
+    print("edu_med_sca population", len(df_edu_med_sca))
+
+    t = time.time()
+    shortfall_educators = 0
+    shortfall_educator_schools = 0
+    with open(out_fname + ".schools.csv", mode='w') as f:
+        print("school students geoid min_grade max_grade", file=f)
+        for _, school in enumerate(schools):
+            if school == -1:
+                continue
+            if not school in student_schools_map:
+                continue
+            student_pop, school_geoid, min_grade, max_grade = student_schools_map[school]
+            print(school, student_pop, school_geoid, min_grade, max_grade, file=f)
+            required_educators = int(student_pop / 15)
+            if required_educators == 0:
+                continue
+            required_educators = assign_educators_to_school(required_educators, df, school, school_geoid, min_grade, max_grade, True)
+            if required_educators > 0:
+                required_educators = assign_educators_to_school(required_educators, df, school, school_geoid, min_grade, max_grade, False)
+                if required_educators > 0:
+                    shortfall_educators += required_educators
+                    shortfall_educator_schools += 1
+                    #print("School", school, "still has too few educators:", required_educators)
+
+    df_educators = df.loc[(df['school_id'] != 0) & (df['role'] == 1)]
+
+    print("Allocated", len(df_educators), "educators in %.3f s" % (time.time() - t))
+    print("Schools with too few educators:", shortfall_educator_schools, "missing educators", shortfall_educators)
+
+    t = time.time()
+    df_educators.to_csv(out_fname + ".educators.csv", sep=' ', index=False)
+    print("Wrote", out_fname + ".educators.csv in %.3f s" % (time.time() - t))
+
+
+
+def process_feather_files(fnames, out_fname, geoid_locs_map, df_dt_nt, long_ids):
     global PUMS_ID_LEN
     global NAICS_LEN
 
@@ -393,8 +483,9 @@ def process_feather_files(fnames, out_fname, geoid_locs_map, df_dt_nt):
     print("Writing CSV text data to", out_fname_csv, "and block group indexes to", out_fname_idx)
     t = time.time()
     num_rows = len(df.index)
-    # make sure all the p_ids are globally unique (they are only unique to each urbanpop feather file originally)
-    #df['p_id'] = np.arange(0, num_rows)
+    # make sure all the p_ids are globally unique and just integers
+    if not long_ids:
+        df['p_id'] = np.arange(0, num_rows)
 
     df.rename(columns={"p_id": "id"}, inplace=True)
     for col in df.columns:
@@ -411,79 +502,7 @@ def process_feather_files(fnames, out_fname, geoid_locs_map, df_dt_nt):
 
     print_header(df)
 
-    df_special = df[['id', 'age', 'role', 'grade', 'school_id']]
-    df_special = df_special.loc[(df_special['school_id'] != '') & (df_special['school_id'] != 0)]
-    df_special.to_csv(out_fname + ".students.csv", sep=' ', index=False)
-    print("Student population", len(df_special))
-
-    t = time.time()
-    # allocate educators at a ratio of 15:1 - this is the average for the US
-    student_schools_map = {}
-    schools = df.school_id.unique()
-    for i, school in enumerate(schools):
-        if school == 0:
-            continue
-        subset_df = df.loc[(df['school_id'] == school) & (df['role'] == 2)]
-        max_grade = subset_df.grade.max()
-        min_grade = subset_df.grade.min()
-        if min_grade < 0:
-            print("ERROR: min grade is", min_grade, max_grade, "for school", school, subset_df.grade)
-            sys.exit(0)
-        geoids = subset_df.work_geoid.unique()
-        if len(geoids) != 1:
-            print("WARNING: more than one unique geoids for the school")
-            sys.exit(0)
-        student_schools_map[school] = [len(subset_df.index), geoids[0], min_grade, max_grade]
-    print("Found", len(schools), "schools in %.3f s" % (time.time() - t))
-
-    t = time.time()
-    no_educators = 0
-    no_educator_schools = 0
-    shortfall_educators = 0
-    shortfall_educator_schools = 0
-    with open(out_fname + ".schools.csv", mode='w') as f:
-        print("school students geoid min_grade max_grade", file=f)
-        for i, school in enumerate(schools):
-            if school == -1:
-                continue
-            if not school in student_schools_map:
-                continue
-            student_pop, school_geoid, min_grade, max_grade = student_schools_map[school]
-            print(school, student_pop, school_geoid, min_grade, max_grade, file=f)
-            educator_pop = int(student_pop / 15)
-            #print(school, "educator_pop", educator_pop)
-            if educator_pop == 0:
-                continue
-            df_educators = df.loc[(df['role'] == 1) & (df['naics'] == 0) & (df['school_id'] == 0) &
-                                  (df['work_geoid'] == school_geoid)]
-            if len(df_educators) == 0:
-                no_educator_schools += 1
-                no_educators += educator_pop
-                #print("Short", (educator_pop - len(df_educators)), "(all) educators for school", school)
-                #print("No educators for school", school, "pop", student_pop, "geoid", school_geoid)
-                continue
-            if len(df_educators) < educator_pop:
-                shortfall_educators += (educator_pop - len(df_educators))
-                shortfall_educator_schools += 1
-                #print("Short", (educator_pop - len(df_educators)), "educators for school", school)
-                educator_pop = len(df_educators)
-            educator_sample = df_educators.sample(n=educator_pop)
-            #educator_sample['school_id'] = school
-            #educator_sample['grade'] = np.random.randint(min_grade, max_grade + 1, educator_sample.shape[0])
-            #educator_sample.to_csv("school-sample." + str(school) + ".csv", index=True)
-            df.loc[df['id'].isin(educator_sample['id']), 'school_id'] = school
-            df.loc[df['id'].isin(educator_sample['id']), 'grade'] = np.random.randint(min_grade, max_grade + 1, size=len(educator_sample)).astype('int8')
-
-    df_edu_med_sca = df.loc[(df['role'] == 1) & (df['naics'] == 0)]
-    df_educators = df_edu_med_sca.loc[df_edu_med_sca['school_id'] != 0]
-    print("Allocated", len(df_educators), "educators in %.3f s" % (time.time() - t))
-
-    print("Schools with no educators:", no_educator_schools, "missing educators", no_educators)
-    print("Schools with too few educators:", shortfall_educator_schools, "missing educators", shortfall_educators)
-
-    #df_edu_med_sca.to_csv("edu_med_sca.csv", sep=' ')
-    print("edu_med_sca population", len(df_edu_med_sca))
-    df_educators.to_csv(out_fname + ".educators.csv", sep=' ', index=False)
+    allocate_educators(df, out_fname)
 
     t = time.time()
     naics_types = list(categ_types['naics'].categories)
@@ -576,6 +595,7 @@ if __name__ == "__main__":
                         required=True,
                         nargs="+",
                         help="Feather files containing daytime and nighttime locations")
+    parser.add_argument("--long_ids", "-l", action="store_true", help="Use original long UrbanPop ids for agents")
     args = parser.parse_args()
 
     geoid_locs_map = {}
@@ -584,6 +604,6 @@ if __name__ == "__main__":
 
     df_dt_nt = process_nt_dt_feather_files(args.day_night_files, args.output)
 
-    process_feather_files(args.files, args.output, geoid_locs_map, df_dt_nt)
+    process_feather_files(args.files, args.output, geoid_locs_map, df_dt_nt, args.long_ids)
 
     print("Processed", len(args.files), "files in %.2f s" % (time.time() - t))
