@@ -80,27 +80,40 @@ struct SchoolCandidate {
 };
 
 // grade definitions
-// {0 "childcare", 1 "preschl", 2 "kind", 3 "1st", 4 "2nd", 5 "3rd", 6 "4th", 7 "5th", 8 "6th", 9 "7th", 10 "8th", 11 "9th",
-//  12 "10th", 13 "11th", 14 "12th", 15 "undergrad", 16 "grad"}
+// 0: "childcare",
+// 1: "k12pub_preschl", 2: "k12pub_kind", 3: "k12pub_1st", 4: "k12pub_2nd", 5: "k12pub_3rd", 6: "k12pub_4th", 7: "k12pub_5th",
+// 8: "k12pub_6th", 9: "k12pub_7th", 10: "k12pub_8th",
+// 11: "k12pub_9th", 12: "k12pub_10th", 13: "k12pub_11th", 14: "k12pub_12th",
+// 15: "k12pv_preschl", 16: "k12pv_kind", 17: "k12pv_1st", 18: "k12pv_2nd", 19: "k12pv_3rd", 20: "k12pv_4th", 21: "k12pv_5th",
+// 22: "k12pv_6th", 23: "k12pv_7th", 24: "k12pv_8th",
+// 25: "k12pv_9th", 26: "k12pv_10th", 27: "k12pv_11th", 28: "k12pv_12th",
+// 29: "undergrad", 30: "grad"
+
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+static bool inChildcare(const int grade) {
+    return (grade == 0);
+}
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
 static bool inElemSchool(const int grade) {
-    return (grade >= 2 && grade <= 7);
+    // public or private school
+    // includes preschool
+    return (grade >= 1 && grade <= 7) || (grade >= 15 && grade <= 21);
 }
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
 static bool inMiddleSchool(const int grade) {
-    return (grade >= 8 && grade <= 10);
+    return (grade >= 8 && grade <= 10) || (grade >= 22 && grade <= 24);
 }
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
 static bool inHighSchool(const int grade) {
-    return (grade >= 11 && grade <= 14);
+    return (grade >= 11 && grade <= 14) || (grade >= 25 && grade <= 28);
 }
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
 static bool inCollege(const int grade) {
-    return (grade >= 15 && grade <= 16);
+    return (grade >= 29);
 }
 
 /*! \brief Class describing agent interactions at school */
@@ -160,9 +173,9 @@ void InteractionModSchool<PCType, PTDType, PType>::fastInteractSchool (PCType& a
 
             for (int d = 0; d < n_disease; d++) {
                 for (auto adults : {true, false}) {
-                    Gpu::DeviceVector<int> infected_school_d(max_communities * max_school_grade, 0);
+                    Gpu::DeviceVector<int> infected_school_d(max_communities * max_school_id * max_school_grade, 0);
                     auto infected_school_d_ptr = infected_school_d.data();
-                    Gpu::DeviceVector<int> infected_daycare_d(max_communities * max_nborhood, 0);
+                    Gpu::DeviceVector<int> infected_daycare_d(max_communities * max_school_id * max_school_grade, 0);
                     auto infected_daycare_d_ptr = infected_daycare_d.data();
 
                     auto prob_ptr = soa.GetRealData(RealIdx::nattribs + r0(d) + RealIdxDisease::prob).data();
@@ -174,11 +187,9 @@ void InteractionModSchool<PCType, PTDType, PType>::fastInteractSchool (PCType& a
                     ParallelFor(np, [=] AMREX_GPU_DEVICE (int i) noexcept {
                         if (isInfectious(i, ptd, d) && isCandidate(i, ptd) && isAnAdult(i, ptd) == adults) {
                             auto community = getCommunityIndex(ptd, i);
-                            if (school_grade_ptr[i] <= 1) {
-                                Gpu::Atomic::Add(&infected_daycare_d_ptr[community * max_nborhood + nborhood_ptr[i]], 1);
-                            } else {
-                                Gpu::Atomic::Add(&infected_school_d_ptr[community * max_school_id + school_id_ptr[i]], 1);
-                            }
+                            int pos = (community * max_school_id + school_id_ptr[i]) * max_school_grade + school_grade_ptr[i];
+                            if (inChildcare(school_grade_ptr[i])) Gpu::Atomic::Add(&infected_daycare_d_ptr[pos], 1);
+                            else Gpu::Atomic::Add(&infected_school_d_ptr[pos], 1);
                         }
                     });
                     Gpu::synchronize();
@@ -186,12 +197,14 @@ void InteractionModSchool<PCType, PTDType, PType>::fastInteractSchool (PCType& a
                     ParallelFor(np, [=] AMREX_GPU_DEVICE (int i) noexcept {
                         if (isSusceptible(i, ptd, d) && isCandidate(i, ptd)) {
                             auto community = getCommunityIndex(ptd, i);
-                            if (school_grade_ptr[i] <= 1) {
-                                int num_infected_daycare = infected_daycare_d_ptr[community * max_nborhood + nborhood_ptr[i]];
+                            int pos = (community * max_school_id + school_id_ptr[i]) * max_school_grade + school_grade_ptr[i];
+                            if (inChildcare(school_grade_ptr[i])) {
+                                //int num_infected_daycare = infected_daycare_d_ptr[community * max_nborhood + nborhood_ptr[i]];
+                                int num_infected_daycare = infected_daycare_d_ptr[pos];
                                 ParticleReal daycare_prob = 1.0_prt - infect * lparm->xmit_daycare * scale;
                                 prob_ptr[i] *= static_cast<ParticleReal>(std::pow(daycare_prob, num_infected_daycare));
                             } else {
-                                int num_infected_school = infected_school_d_ptr[community * max_school_id + school_id_ptr[i]];
+                                int num_infected_school = infected_school_d_ptr[pos];
                                 ParticleReal xmit = 0;
                                 if (adults) {   // transmitters are adults
                                     if (age_group_ptr[i] <= 1) {  // Adult teacher/staff -> child student
@@ -204,7 +217,7 @@ void InteractionModSchool<PCType, PTDType, PType>::fastInteractSchool (PCType& a
                                         else if (inElemSchool(school_grade_ptr[i])) xmit = lparm->xmit_elem_school;
                                         else if (inCollege(school_grade_ptr[i])) xmit = lparm->xmit_college;
                                     }
-                                } else { // Transmitters are children
+                                } else { // transmitters are children
                                     if (age_group_ptr[i] <= 1) {  // Receiver j is a child
                                         if (inHighSchool(school_grade_ptr[i])) xmit = lparm->xmit_high_school;
                                         else if (inMiddleSchool(school_id_ptr[i])) xmit = lparm->xmit_middle_school;

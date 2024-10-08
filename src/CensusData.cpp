@@ -79,9 +79,12 @@ void CensusData::init (ExaEpi::TestParams &params, Geometry &geom, BoxArray &ba,
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
 void assign_school (int* school_grade, int* school_id, const int age_group, const int nborhood, const RandomEngine& engine) {
     if (age_group == 0) {
+        // under 5
         *school_grade = 0;
-        *school_id = 5; // note - need to handle playgroups
+        //*school_id = 5; // note - need to handle playgroups
+        *school_id = nborhood;
     } else if (age_group == 1) {
+        // 5 to 17
         int il4 = Random_int(100, engine);
         if (il4 < 36) {
             *school_id = 3 + (nborhood / 2);  // elementary school, in neighborhoods 1 and 2
@@ -819,6 +822,7 @@ void CensusData::assignTeachersAndWorkgroup (AgentContainer& pc       /*!< Agent
         auto school_grade_ptr = school_grade_h.data();
         auto school_id_ptr = school_id_h.data();
         auto work_nborhood_ptr = work_nborhood_h.data();
+        //auto nborhood_ptr = nborhood_h.data();
 
         for (int ip = 0; ip < np; ++ip) {
 
@@ -851,6 +855,7 @@ void CensusData::assignTeachersAndWorkgroup (AgentContainer& pc       /*!< Agent
                                           available_slots[4];
                     if (total_available > 0) {
                         int choice = amrex::Random_int(total_available);
+                        // teachers are assigned the grade they teach
                         if (choice < available_slots[0]) {
                             school_grade_ptr[ip] = 5;  // 3rd grade - generic for elementary
                             school_id_ptr[ip] = 3;  // elementary school for kids in Neighbordhood 1 & 2
@@ -877,9 +882,10 @@ void CensusData::assignTeachersAndWorkgroup (AgentContainer& pc       /*!< Agent
                             high_teacher_counts_ptr[comm_to]++;
                         } else if (choice < total_available) {
                             school_grade_ptr[ip] = 0; // generic for daycare
-                            school_id_ptr[ip] = 5;  // daycare
+                            //school_id_ptr[ip] = nborhood_ptr[ip];  // daycare
+                            school_id_ptr[ip] = amrex::Random_int(4); // randomly select a nborhood
                             workgroup_ptr[ip] = 5 ;
-                            work_nborhood_ptr[ip] = 1; // deal with daycare/playgroups later
+                            work_nborhood_ptr[ip] = school_id_ptr[ip]; // deal with daycare/playgroups later
                             daycr_teacher_counts_ptr[comm_to]++;
                         }
                     }
