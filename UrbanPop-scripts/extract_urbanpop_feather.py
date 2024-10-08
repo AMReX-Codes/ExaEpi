@@ -275,8 +275,8 @@ def assign_educators_to_school(required_educators, df, school, school_geoid, min
     if edu_naics_only:
         df_educators = df.loc[(df['role'] == 1) & (df['naics'] == 0) & (df['school_id'] == 0) & (df['work_geoid'] == school_geoid)]
     else:
-        # note that this also uses WFH, which is ignored for the purposes of workgroups and commuting
-        df_educators = df.loc[(df['role'] == 1) & (df['school_id'] == 0) & (df['work_geoid'] == school_geoid)]
+        # skip wfh
+        df_educators = df.loc[(df['role'] == 1) & (df['naics'] != 5) & (df['school_id'] == 0) & (df['work_geoid'] == school_geoid)]
     if len(df_educators) == 0:
         return required_educators
     else:

@@ -397,15 +397,21 @@ void UrbanPopData::initAgents (AgentContainer &pc, const ExaEpi::TestParams &par
             school_id_ptr[i] = agent.school_id;
             school_closed_ptr[i] = 0;
             naics_ptr[i] = agent.naics;
-            // set up workers, excluding educators and wfh
-            if (agent.role == 1 && agent.school_id == 0 && agent.naics != 5) {
-                // the group work population for this agent is for the NAICS category for the agent
-                int max_workgroup = group_work_populations_ptr[i] / workgroup_size + 1;
-                workgroup_ptr[i] = Random_int(max_workgroup, engine) + 1;
-                AMREX_ALWAYS_ASSERT(workgroup_ptr[i] > 0 && workgroup_ptr[i] < max_workgroup * (NAICS_COUNT + 1));
-                int max_work_nborhood = group_work_populations_ptr[i] / nborhood_size + 1;
-                work_nborhood_ptr[i] = Random_int(max_work_nborhood, engine) + 1;
-                AMREX_ALWAYS_ASSERT(work_nborhood_ptr[i] > 0 && work_nborhood_ptr[i] < 5000);
+            // set up workers, excluding wfh
+            if (agent.role == 1 && agent.naics != 5) {
+                if (agent.school_id == 0) {
+                    // the group work population for this agent is for the NAICS category for the agent
+                    int max_workgroup = group_work_populations_ptr[i] / workgroup_size + 1;
+                    workgroup_ptr[i] = Random_int(max_workgroup, engine) + 1;
+                    AMREX_ALWAYS_ASSERT(workgroup_ptr[i] > 0 && workgroup_ptr[i] < max_workgroup * (NAICS_COUNT + 1));
+                    int max_work_nborhood = group_work_populations_ptr[i] / nborhood_size + 1;
+                    work_nborhood_ptr[i] = Random_int(max_work_nborhood, engine) + 1;
+                    AMREX_ALWAYS_ASSERT(work_nborhood_ptr[i] > 0 && work_nborhood_ptr[i] < 5000);
+                } else {
+                    // educator, workgroup is school, as is nborhood
+                    workgroup_ptr[i] = school_id_ptr[i];
+                    work_nborhood_ptr[i] = school_id_ptr[i];
+                }
             } else {
                 workgroup_ptr[i] = 0;
                 work_nborhood_ptr[i] = 0;
