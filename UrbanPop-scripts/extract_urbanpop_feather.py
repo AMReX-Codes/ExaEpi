@@ -76,7 +76,7 @@ categ_types = {
             "undergrad", "grad"]),
     'role':
         CategoricalDtype(categories=['nope', 'worker', 'student']),
-    'naics':
+    'naics_2010':
         CategoricalDtype(categories=[
            'edu_med_sca', # 0 Educational services, and health care and social assistance
            'con',         # 1 Construction
@@ -93,6 +93,30 @@ categ_types = {
            'whl',         # 12 Wholesale trade
            'inf'          # 13 Information
            ]),
+    'naics':   # 2017 - latest
+        CategoricalDtype(categories=[
+           'agr_ffh',     # 0 Agriculture, forestry, fishing and hunting
+           'ext',         # 1 Mining, quarrying, and oil and gas extraction
+           'utl',         # 2 Utilities
+           'con',         # 3 Construction
+           'mfg',         # 4 Manufacturing
+           'whl',         # 5 Wholesale trade
+           'ret',         # 6 Retail trade
+           'trn_whs',     # 7 Transportation and warehousing
+           'inf',         # 8 Information
+           'fin_ins',     # 9 Finance and insurance
+           'rrl',         # 10 Real estate rental and leasing
+           'prf',         # 11 Professional, scientific and technical services
+           'mgt',         # 12 Management of companies and enterprises
+           'adm_wmr',     # 13 Administrative and support and waste management and remediating services
+           'edu',         # 14 Educational services
+           'med_sca',     # 15 Health care and social services
+           'ent',         # 16 Arts, entertainment and recreation
+           'afs',         # 17 Accomodation and food services
+           'srv',         # 18 Other services (except public administration)
+           'pad',         # 19 Public administration
+           'wfh',         # 20 Work from home
+           ]),
     'grade':
         CategoricalDtype(categories=[
             'childcare',
@@ -106,6 +130,8 @@ categ_types = {
     # college 29-30 (original data has 29-32, undergrade_female, undergrad_male, grad_female, grad_male
 }
 
+NAICS_EDU = 14
+NAICS_WFH = 20
 
 
 def print_header(df):
@@ -234,15 +260,17 @@ static std::vector<string> split_string(const string &s, char delim) {
 def process_nt_dt_feather_files(fnames, out_fname):
     start_t = time.time()
     dfs = []
-    for fname in fnames:
+    for i, fname in enumerate(fnames):
         print("Reading data from", fname, end=': ')
         t = time.time()
-        dfs.append(pandas.read_feather(fname))
+        df_metro = pandas.read_feather(fname)
+        # we assume each file is a separate metro area
+        df_metro.insert(df_metro.columns.get_loc("p_id") + 1, "metro", int(i))
+        dfs.append(df_metro)
         print(len(dfs[-1].index), "records in %.3f s" % (time.time() - t))
 
     df = pandas.concat(dfs)
     df.sort_values(by=['p_id'], inplace=True)
-
     df.orig_geoid = df.orig_geoid.astype("int64")
     df.dest_geoid = df.dest_geoid.astype("int64")
 
@@ -270,13 +298,29 @@ def process_nt_dt_feather_files(fnames, out_fname):
     return df
 
 
-def assign_educators_to_school(required_educators, df, school, school_geoid, min_grade, max_grade, edu_naics_only):
-    #print(school, "educator_pop", educator_pop)
-    if edu_naics_only:
-        df_educators = df.loc[(df['role'] == 1) & (df['naics'] == 0) & (df['school_id'] == 0) & (df['work_geoid'] == school_geoid)]
+def assign_educators_to_school(required_educators, df, school, school_geoid, min_grade, max_grade, local_geoid_only):
+    df_prior_educators = df.loc[(df['role'] == 1) & (df['school_id'] == school) & (df['work_geoid'] == school_geoid)]
+    required_educators -= len(df_prior_educators)
+    if required_educators < 0:
+        print("ERROR: negative required educators", required_educators)
+        sys.exit(0)
+    if required_educators == 0:
+        return 0
+    if local_geoid_only:
+        # select from the same work geoid
+        df_educators = df.loc[(df['role'] == 1) & (df['naics'] == NAICS_EDU) & (df['school_id'] == 0) &
+                              (df['work_geoid'] == school_geoid)]
     else:
-        # skip wfh
-        df_educators = df.loc[(df['role'] == 1) & (df['naics'] != 5) & (df['school_id'] == 0) & (df['work_geoid'] == school_geoid)]
+        # select from the same metro area
+        # df_in_metro = df.loc[(df['school_id'] == school) & (df['work_geoid'] == school_geoid)]
+        # metro = df_in_metro['metro'].iloc[0]
+        #df_educators = df.loc[(df['role'] == 1) & (df['naics'] == NAICS_EDU) & (df['school_id'] == 0) & (df['metro'] == metro)]
+        # select the same county (first 5 of GEOID)
+        factor = 10**7
+        county_code = school_geoid / factor - school_geoid % factor / factor
+        df_educators = df.loc[(df['role'] == 1) & (df['naics'] == NAICS_EDU) & (df['school_id'] == 0) &
+                              (df['work_geoid'] / factor - df['work_geoid'] % factor / factor == county_code)]
+
     if len(df_educators) == 0:
         return required_educators
     else:
@@ -285,6 +329,7 @@ def assign_educators_to_school(required_educators, df, school, school_geoid, min
         else:
             educator_sample = df_educators.sample(n=required_educators)
         df.loc[df['id'].isin(educator_sample['id']), 'school_id'] = school
+        df.loc[df['id'].isin(educator_sample['id']), 'work_geoid'] = school_geoid
         # randomly choosing the grade is ok if the students are spread out equally across the grades, which we'd generally
         # expect, except for colleges, where there are far more undergrads than grads. So that will need a special case
         # FIXME: special case for colleges
@@ -305,7 +350,7 @@ def allocate_educators(df, out_fname):
     # allocate educators at a ratio of 15:1 - this is the average for the US
     student_schools_map = {}
     schools = df.school_id.unique()
-    for i, school in enumerate(schools):
+    for _, school in enumerate(schools):
         if school == 0:
             continue
         subset_df = df.loc[(df['school_id'] == school) & (df['role'] == 2)]
@@ -321,12 +366,10 @@ def allocate_educators(df, out_fname):
         student_schools_map[school] = [len(subset_df.index), geoids[0], min_grade, max_grade]
     print("Found", len(schools), "schools in %.3f s" % (time.time() - t))
 
-    df_edu_med_sca = df.loc[(df['role'] == 1) & (df['naics'] == 0)]
-    print("edu_med_sca population", len(df_edu_med_sca))
+    df_edu = df.loc[(df['role'] == 1) & (df['naics'] == NAICS_EDU)]
+    print("NAICS edu population", len(df_edu))
 
     t = time.time()
-    shortfall_educators = 0
-    shortfall_educator_schools = 0
     with open(out_fname + ".schools.csv", mode='w') as f:
         print("school students geoid min_grade max_grade", file=f)
         for _, school in enumerate(schools):
@@ -336,21 +379,48 @@ def allocate_educators(df, out_fname):
                 continue
             student_pop, school_geoid, min_grade, max_grade = student_schools_map[school]
             print(school, student_pop, school_geoid, min_grade, max_grade, file=f)
-            required_educators = int(student_pop / 15)
-            if required_educators == 0:
-                continue
-            required_educators = assign_educators_to_school(required_educators, df, school, school_geoid, min_grade, max_grade, True)
-            if required_educators > 0:
-                required_educators = assign_educators_to_school(required_educators, df, school, school_geoid, min_grade, max_grade, False)
-                if required_educators > 0:
-                    shortfall_educators += required_educators
-                    shortfall_educator_schools += 1
-                    #print("School", school, "still has too few educators:", required_educators)
+
+    print("Wrote", len(schools), "schools to", out_fname + ".schools.csv", "in %.3f s" % (time.time() - t))
+
+    t = time.time()
+    shortfall_educators = 0
+    shortfall_educator_schools = 0
+    # first allocate educators from local geoids
+    for _, school in enumerate(schools):
+        if school == -1:
+            continue
+        if not school in student_schools_map:
+            continue
+        student_pop, school_geoid, min_grade, max_grade = student_schools_map[school]
+        required_educators = int(student_pop / 15)
+        if required_educators == 0:
+            continue
+        required_educators = assign_educators_to_school(required_educators, df, school, school_geoid, min_grade, max_grade, True)
+        if required_educators > 0:
+            shortfall_educators += required_educators
+            shortfall_educator_schools += 1
+    print("Local educator shortfall:", shortfall_educator_schools, "schools;", shortfall_educators, "educators")
+
+    shortfall_educators = 0
+    shortfall_educator_schools = 0
+    # now allocate educators from metro area
+    for _, school in enumerate(schools):
+        if school == -1:
+            continue
+        if not school in student_schools_map:
+            continue
+        student_pop, school_geoid, min_grade, max_grade = student_schools_map[school]
+        required_educators = int(student_pop / 15)
+        if required_educators == 0:
+            continue
+        required_educators = assign_educators_to_school(required_educators, df, school, school_geoid, min_grade, max_grade, False)
+        if required_educators > 0:
+            shortfall_educators += required_educators
+            shortfall_educator_schools += 1
+    print("Final educator shortfall:", shortfall_educator_schools, "schools;", shortfall_educators, "educators")
 
     df_educators = df.loc[(df['school_id'] != 0) & (df['role'] == 1)]
-
     print("Allocated", len(df_educators), "educators in %.3f s" % (time.time() - t))
-    print("Schools with too few educators:", shortfall_educator_schools, "missing educators", shortfall_educators)
 
     t = time.time()
     df_educators.to_csv(out_fname + ".educators.csv", sep=' ', index=False)
@@ -428,7 +498,7 @@ def process_feather_files(fnames, out_fname, geoid_locs_map, df_dt_nt, long_ids)
 
     # get values from worker data
     df["work_geoid"] = df_dt_nt["dest_geoid"].values
-    for col in ["role", "naics", "grade", "school_id"]:
+    for col in ["role", "naics", "grade", "school_id", "metro"]:
         df[col] = df_dt_nt[col].values
         if not np.array_equal(df[col].values, df_dt_nt[col].values):
             print("Mismatched", col, "for population vs daytime/nightime")
@@ -503,6 +573,9 @@ def process_feather_files(fnames, out_fname, geoid_locs_map, df_dt_nt, long_ids)
     print_header(df)
 
     allocate_educators(df, out_fname)
+    # need to reset the work lat/lng after potentially changing the work geoids for educators
+    df["work_lat"] = df["work_geoid"].map(geoid_locs_map).apply(lambda x: x[0]).astype("float32")
+    df["work_lng"] = df["work_geoid"].map(geoid_locs_map).apply(lambda x: x[1]).astype("float32")
 
     t = time.time()
     naics_types = list(categ_types['naics'].categories)
@@ -512,7 +585,7 @@ def process_feather_files(fnames, out_fname, geoid_locs_map, df_dt_nt, long_ids)
     num_workers = 0
     for i, geoid in enumerate(work_geoids):
         # don't include wfh
-        subset_df = df.loc[(df['work_geoid'] == geoid) & (df['role'] == 1) & (df['naics'] != 5)]
+        subset_df = df.loc[(df['work_geoid'] == geoid) & (df['role'] == 1) & (df['naics'] != NAICS_WFH)]
         naics_counts = []
         for naics_i in range(num_naics):
             naics_counts.append(len(subset_df.loc[subset_df['naics'] == naics_i]))
