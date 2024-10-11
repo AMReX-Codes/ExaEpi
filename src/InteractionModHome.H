@@ -117,21 +117,17 @@ void InteractionModHome<PCType, PTDType, PType>::fastInteractHome (PCType& agent
 
             // calculate the max group values for indexing
             int max_communities = getCommunityIndex.max();
-            int max_nborhood = 0;
-            int max_family = 0;
-            for (int i = 0; i < np; i++) {
-                max_family = max(max_family, family_ptr[i]);
-                max_nborhood = max(max_nborhood, nborhood_ptr[i]);
-            }
-            max_family++;
-            max_nborhood++;
+            int max_family = agents.getMaxGroup(IntIdx::family) + 1;
+            int max_nborhood = agents.getMaxGroup(IntIdx::nborhood) + 1;
             int num_ncs = max_family / FAMILIES_PER_CLUSTER + 1;
-
+            if (max_communities * num_ncs * max_nborhood > 10000000)
+                Print() << "WARNING: large allocations for interactions could result in poor performance. Reduce max grid size.\n";
+            /*
             Print() << mfi.tilebox() << " np " << np << " max communities " << max_communities
                     << " family vector size " << max_communities * max_family
                     << " nc vector size " << max_communities * num_ncs * max_nborhood
                     << "\n";
-
+            */
             for (int d = 0; d < n_disease; d++) {
                 // calculate separately for infected children and infected adults, since they have different transmission rates
                 for (auto adults : {true, false}) {
@@ -155,10 +151,10 @@ void InteractionModHome<PCType, PTDType, PType>::fastInteractHome (PCType& agent
                             AMREX_ALWAYS_ASSERT(community <= max_communities);
                             int family_i = community * max_family + family_ptr[i];
                             Gpu::Atomic::Add(&infected_family_d_ptr[family_i], 1);
-                            Gpu::Atomic::Add(&infected_family_d_ptr[family_i], 1);
                             if (!ptd.m_idata[IntIdx::withdrawn][i]) {
                                 Gpu::Atomic::Add(&infected_family_not_withdrawn_d_ptr[family_i], 1);
-                                int nc = (community * max_nborhood + nborhood_ptr[i]) * num_ncs + family_ptr[i] / FAMILIES_PER_CLUSTER;
+                                int cluster = family_ptr[i] / FAMILIES_PER_CLUSTER;
+                                int nc = (community * max_nborhood + nborhood_ptr[i]) * num_ncs + cluster;
                                 Gpu::Atomic::Add(&infected_nc_d_ptr[nc], 1);
                             }
                         }
@@ -188,11 +184,12 @@ void InteractionModHome<PCType, PTDType, PType>::fastInteractHome (PCType& agent
                             if (!ptd.m_idata[IntIdx::withdrawn][i]) {
                                 int num_infected_family_not_withdrawn = infected_family_not_withdrawn_d_ptr[family_i];
                                 AMREX_ALWAYS_ASSERT(num_infected_family >= num_infected_family_not_withdrawn);
-                                int nc = (community * max_nborhood + nborhood_ptr[i]) * num_ncs + family_ptr[i] / FAMILIES_PER_CLUSTER;
-                                int num_infected_nc = infected_nc_d_ptr[nc];
-                                AMREX_ALWAYS_ASSERT(num_infected_nc >= num_infected_family_not_withdrawn);
+                                int cluster = family_ptr[i] / FAMILIES_PER_CLUSTER;
+                                int nc = (community * max_nborhood + nborhood_ptr[i]) * num_ncs + cluster;
+                                int num_infected_nc = infected_nc_d_ptr[nc] - num_infected_family_not_withdrawn;
+                                AMREX_ALWAYS_ASSERT(num_infected_nc >= 0);
                                 ParticleReal nc_prob = 1.0_prt - infect * xmit_nc_prob * scale;
-                                prob_ptr[i] *= static_cast<ParticleReal>(std::pow(nc_prob, num_infected_nc - num_infected_family_not_withdrawn));
+                                prob_ptr[i] *= static_cast<ParticleReal>(std::pow(nc_prob, num_infected_nc));
                             }
                         }
                     });

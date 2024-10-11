@@ -221,14 +221,15 @@ void UrbanPopData::init (ExaEpi::TestParams &params, Geometry &geom, BoxArray &b
     Print() << "Base domain: " << geom.Domain() << "\n";
     Print() << "Geometry: " << geom << "\n";
     Print() << "Actual grid spacing: " << gspacing_x << ", "  << gspacing_y << "\n";
+    Print() << "Max grid size is: " << params.max_grid_size << "\n";
 
     LngLatToGrid lnglat_to_grid(min_lng, min_lat, gspacing_x, gspacing_y);
 
     // create a box array with a single box representing the domain. Every process does this.
     ba.define(geom.Domain());
     // split the box array by forcing the box size to be limited to a given number of grid points
-    ba.maxSize((int)((0.25 * grid_x) / NProcs()));
-    //ba.maxSize(0.25 * grid_x / 8);
+    ba.maxSize(params.max_grid_size);
+    //ba.maxSize(0.25 * grid_x / NProcs());
     Print() << "Number of boxes: " << ba.size() << "\n";
 
     // weights set according to population in each box so that they can be uniformly distributed
