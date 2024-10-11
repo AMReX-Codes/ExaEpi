@@ -243,7 +243,7 @@ void runAgent ()
         agents_f.close();
     }
 
-    if (params.ic_type == ICType::UrbanPop) return;
+    //if (params.ic_type == ICType::UrbanPop) return;
 
     std::vector<int>  step_of_peak(params.num_diseases, 0);
     std::vector<Long> num_infected_peak(params.num_diseases, 0);
@@ -388,9 +388,9 @@ void runAgent ()
             }
 
             // Typical day
-            pc.morningCommute(mask_behavior);
-            pc.interactDay(mask_behavior);
-            pc.eveningCommute(mask_behavior);
+            //pc.morningCommute(mask_behavior);
+            //pc.interactDay(mask_behavior);
+            //pc.eveningCommute(mask_behavior);
             pc.interactEvening(mask_behavior);
             pc.interactNight(mask_behavior);
 

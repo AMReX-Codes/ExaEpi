@@ -24,6 +24,7 @@
 
 
 using namespace amrex;
+using namespace UrbanPop;
 
 using std::string;
 using std::to_string;
@@ -67,19 +68,19 @@ bool BlockGroup::read_agents(ifstream &f, Vector<UrbanPopAgent> &agents, Vector<
             Abort("File is corrupted: wrong geoid, read " + to_string(agent.home_geoid) + " expected " + to_string(geoid) + "\n");
         households.insert(agent.household_id);
         AMREX_ALWAYS_ASSERT(agent.work_lat != -1 && agent.work_lng != -1);
-        if (agent.role == 1 && agent.naics != 5) {
+        if (agent.role == ROLE::worker && agent.naics != NAICS::wfh) {
             num_employed++;
             int work_x, work_y;
             lnglat_to_grid(agent.work_lng, agent.work_lat, work_x, work_y);
             auto it = xy_to_block_groups.find(IntVect(work_x, work_y));
             if (it == xy_to_block_groups.end()) Abort("Cannot find block group for work location");
             group_work_populations[i] = it->second.work_populations[agent.naics + 1];
-            if (agent.naics != 5) AMREX_ALWAYS_ASSERT(group_work_populations[i] > 0 && group_work_populations[i] < 100000);
+            if (agent.naics != NAICS::wfh) AMREX_ALWAYS_ASSERT(group_work_populations[i] > 0 && group_work_populations[i] < 100000);
             if (agent.school_id != 0) num_educators++;
         } else {
             group_work_populations[i] = 0;
-            if (agent.role == 0) AMREX_ALWAYS_ASSERT(agent.work_lat == agent.home_lat && agent.work_lng == agent.home_lng);
-            if (agent.role == 2) num_students++;
+            if (agent.role == ROLE::nope) AMREX_ALWAYS_ASSERT(agent.work_lat == agent.home_lat && agent.work_lng == agent.home_lng);
+            if (agent.role == ROLE::student) num_students++;
         }
         group_home_populations[i] = home_population;
     }
@@ -398,7 +399,7 @@ void UrbanPopData::initAgents (AgentContainer &pc, const ExaEpi::TestParams &par
             school_closed_ptr[i] = 0;
             naics_ptr[i] = agent.naics;
             // set up workers, excluding wfh
-            if (agent.role == 1 && agent.naics != 5) {
+            if (agent.role == ROLE::worker && agent.naics != NAICS::wfh) {
                 if (agent.school_id == 0) {
                     // the group work population for this agent is for the NAICS category for the agent
                     int max_workgroup = group_work_populations_ptr[i] / workgroup_size + 1;

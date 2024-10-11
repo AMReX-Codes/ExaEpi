@@ -152,6 +152,8 @@ void interactAgentsImpl(IModel &interaction_model, AgentContainer& agents, int b
             auto& ptile = agents.ParticlesAt(lev, mfi);
             const auto& ptd = ptile.getParticleTileData();
             const auto np = ptile.GetArrayOfStructs().numParticles();
+            if (np == 0) continue;
+
             auto& soa = ptile.GetStructOfArrays();
             auto num_tiles = numTilesInBox(mfi.validbox(), true, bin_size);
 

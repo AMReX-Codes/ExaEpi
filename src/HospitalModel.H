@@ -73,6 +73,7 @@ void HospitalModel<PCType, PTDType, PType>::treatAgents(PCType& a_agents, /*!< A
             auto& aos   = ptile.GetArrayOfStructs();
             PType* pstruct = &(aos[0]);
             const auto np = ptile.numParticles();
+            if (np == 0) continue;
 
             auto age_group_ptr = soa.GetIntData(IntIdx::age_group).data();
             auto withdrawn_ptr = soa.GetIntData(IntIdx::withdrawn).data();

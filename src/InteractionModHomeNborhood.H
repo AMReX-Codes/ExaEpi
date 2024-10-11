@@ -98,10 +98,12 @@ void InteractionModHomeNborhood<PCType, PTDType, PType>::fastInteractHomeNborhoo
             auto& ptile = agents.ParticlesAt(lev, mfi);
             const auto& ptd = ptile.getParticleTileData();
             const auto np = ptile.GetArrayOfStructs().numParticles();
+            if (np == 0) continue;
+
             auto& soa = ptile.GetStructOfArrays();
             auto nborhood_ptr = soa.GetIntData(IntIdx::nborhood).data();
 
-            GetCommunityIndex<PTDType> getCommunityIndex(agents.Geom(lev), mfi.validbox());
+            GetCommunityIndex<PTDType> getCommunityIndex(agents.Geom(lev), mfi.tilebox());
 
             int max_communities = getCommunityIndex.max();
             int max_nborhood = agents.getMaxGroup(IntIdx::nborhood) + 1;

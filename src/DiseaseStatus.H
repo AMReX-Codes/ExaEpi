@@ -100,6 +100,7 @@ void DiseaseStatus<AC,ACT,ACTD,A>::updateAgents(AC& a_agents, /*!< Agent contain
             const auto& ptd = ptile.getParticleTileData();
             auto& soa   = ptile.GetStructOfArrays();
             const auto np = ptile.numParticles();
+            if (np == 0) continue;
 
             auto age_group_ptr = soa.GetIntData(IntIdx::age_group).data();
             auto home_i_ptr = soa.GetIntData(IntIdx::home_i).data();

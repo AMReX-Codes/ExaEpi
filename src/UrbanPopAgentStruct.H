@@ -14,14 +14,19 @@
 using std::string;
 using float32_t = float;
 
+namespace UrbanPop {
+
 const size_t NUM_COLS = 17;
 
 const int ROLE_COUNT = 3;
 static string role_descriptions[ROLE_COUNT] = {"nope", "worker", "student"};
-const int NAICS_COUNT = 14;
-static string naics_descriptions[NAICS_COUNT] = {"edu_med_sca", "con", "prf", "agr_ext", "mfg", "wfh", "ent", "fin", "ret", "srv", "adm", "utl_trn", "whl", "inf"};
+struct ROLE { enum {nope, worker, student}; };
+const int NAICS_COUNT = 21;
+static string naics_descriptions[NAICS_COUNT] = {"agr_ffh", "ext", "utl", "con", "mfg", "whl", "ret", "trn_whs", "inf", "fin_ins", "rrl", "prf", "mgt", "adm_wmr", "edu", "med_sca", "ent", "afs", "srv", "pad", "wfh"};
+struct NAICS { enum {agr_ffh, ext, utl, con, mfg, whl, ret, trn_whs, inf, fin_ins, rrl, prf, mgt, adm_wmr, edu, med_sca, ent, afs, srv, pad, wfh}; };
 const int GRADE_COUNT = 31;
 static string grade_descriptions[GRADE_COUNT] = {"childcare", "k12pub_preschl", "k12pub_kind", "k12pub_1st", "k12pub_2nd", "k12pub_3rd", "k12pub_4th", "k12pub_5th", "k12pub_6th", "k12pub_7th", "k12pub_8th", "k12pub_9th", "k12pub_10th", "k12pub_11th", "k12pub_12th", "k12pv_preschl", "k12pv_kind", "k12pv_1st", "k12pv_2nd", "k12pv_3rd", "k12pv_4th", "k12pv_5th", "k12pv_6th", "k12pv_7th", "k12pv_8th", "k12pv_9th", "k12pv_10th", "k12pv_11th", "k12pv_12th", "undergrad", "grad"};
+struct GRADE { enum {childcare, k12pub_preschl, k12pub_kind, k12pub_1st, k12pub_2nd, k12pub_3rd, k12pub_4th, k12pub_5th, k12pub_6th, k12pub_7th, k12pub_8th, k12pub_9th, k12pub_10th, k12pub_11th, k12pub_12th, k12pv_preschl, k12pv_kind, k12pv_1st, k12pv_2nd, k12pv_3rd, k12pv_4th, k12pv_5th, k12pv_6th, k12pv_7th, k12pv_8th, k12pv_9th, k12pv_10th, k12pv_11th, k12pv_12th, undergrad, grad}; };
 
 
 static std::vector<string> split_string(const string &s, char delim) {
@@ -111,4 +116,5 @@ struct UrbanPopAgent {
         return os;
     }
 };
+} // namespace UrbanPop
 

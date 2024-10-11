@@ -392,6 +392,8 @@ void AgentContainer::shelterStart ()
             auto& ptile = plev[std::make_pair(gid, tid)];
             auto& soa   = ptile.GetStructOfArrays();
             const auto np = ptile.numParticles();
+            if (np == 0) continue;
+
             auto withdrawn_ptr = soa.GetIntData(IntIdx::withdrawn).data();
 
             auto shelter_compliance = m_shelter_compliance;
@@ -427,6 +429,8 @@ void AgentContainer::shelterStop ()
             auto& ptile = plev[std::make_pair(gid, tid)];
             auto& soa   = ptile.GetStructOfArrays();
             const auto np = ptile.numParticles();
+            if (np == 0) continue;
+
             auto withdrawn_ptr = soa.GetIntData(IntIdx::withdrawn).data();
 
             amrex::ParallelFor( np, [=] AMREX_GPU_DEVICE (int i) noexcept
@@ -458,6 +462,7 @@ void AgentContainer::infectAgents ()
             auto& ptile = plev[std::make_pair(gid, tid)];
             auto& soa   = ptile.GetStructOfArrays();
             const auto np = ptile.numParticles();
+            if (np == 0) continue;
 
             int i_RT = IntIdx::nattribs;
             int r_RT = RealIdx::nattribs;

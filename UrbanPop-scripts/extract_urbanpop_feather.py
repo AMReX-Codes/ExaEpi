@@ -155,6 +155,8 @@ def print_header(df):
 using std::string;
 using float32_t = float;
 
+namespace UrbanPop {{
+
 const size_t NUM_COLS = {len(df.columns)};
 
 """
@@ -169,6 +171,7 @@ const size_t NUM_COLS = {len(df.columns)};
             num_categs = len(categs_expected)
             hdr += f"""const int {field_type.upper()}_COUNT = {num_categs};\n"""
             hdr += f"""static string {field_type}_descriptions[{field_type.upper()}_COUNT] = {{"{'", "'.join(categs_expected)}"}};\n"""
+            hdr += f"""struct {field_type.upper()} {{ enum {{{', '.join(categs_expected)}}}; }};\n"""
     hdr += "\n"
 
     hdr += """
@@ -249,6 +252,7 @@ static std::vector<string> split_string(const string &s, char delim) {
         return os;
     }
 };
+} // namespace UrbanPop
 """
 
     f_hdr = open(hdr_fname, "w")
@@ -264,8 +268,6 @@ def process_nt_dt_feather_files(fnames, out_fname):
         print("Reading data from", fname, end=': ')
         t = time.time()
         df_metro = pandas.read_feather(fname)
-        # we assume each file is a separate metro area
-        df_metro.insert(df_metro.columns.get_loc("p_id") + 1, "metro", int(i))
         dfs.append(df_metro)
         print(len(dfs[-1].index), "records in %.3f s" % (time.time() - t))
 
@@ -299,8 +301,7 @@ def process_nt_dt_feather_files(fnames, out_fname):
 
 
 def assign_educators_to_school(required_educators, df, school, school_geoid, min_grade, max_grade, local_geoid_only):
-    df_prior_educators = df.loc[(df['role'] == 1) & (df['school_id'] == school) & (df['work_geoid'] == school_geoid)]
-    required_educators -= len(df_prior_educators)
+    required_educators -= len(df.loc[(df['role'] == 1) & (df['school_id'] == school) & (df['work_geoid'] == school_geoid)])
     if required_educators < 0:
         print("ERROR: negative required educators", required_educators)
         sys.exit(0)
@@ -311,10 +312,6 @@ def assign_educators_to_school(required_educators, df, school, school_geoid, min
         df_educators = df.loc[(df['role'] == 1) & (df['naics'] == NAICS_EDU) & (df['school_id'] == 0) &
                               (df['work_geoid'] == school_geoid)]
     else:
-        # select from the same metro area
-        # df_in_metro = df.loc[(df['school_id'] == school) & (df['work_geoid'] == school_geoid)]
-        # metro = df_in_metro['metro'].iloc[0]
-        #df_educators = df.loc[(df['role'] == 1) & (df['naics'] == NAICS_EDU) & (df['school_id'] == 0) & (df['metro'] == metro)]
         # select the same county (first 5 of GEOID)
         factor = 10**7
         county_code = school_geoid / factor - school_geoid % factor / factor
@@ -323,19 +320,19 @@ def assign_educators_to_school(required_educators, df, school, school_geoid, min
 
     if len(df_educators) == 0:
         return required_educators
+
+    if len(df_educators) <= required_educators:
+        educator_sample = df_educators
     else:
-        if len(df_educators) <= required_educators:
-            educator_sample = df_educators
-        else:
-            educator_sample = df_educators.sample(n=required_educators)
-        df.loc[df['id'].isin(educator_sample['id']), 'school_id'] = school
-        df.loc[df['id'].isin(educator_sample['id']), 'work_geoid'] = school_geoid
-        # randomly choosing the grade is ok if the students are spread out equally across the grades, which we'd generally
-        # expect, except for colleges, where there are far more undergrads than grads. So that will need a special case
-        # FIXME: special case for colleges
-        df.loc[df['id'].isin(educator_sample['id']), 'grade'] = \
-            np.random.randint(min_grade, max_grade + 1, size=len(educator_sample)).astype('int8')
-        return required_educators - len(educator_sample)
+        educator_sample = df_educators.sample(n=required_educators)
+
+    df.loc[df['id'].isin(educator_sample['id']), ['school_id', 'work_geoid']] = [school, school_geoid]
+    # randomly choosing the grade is ok if the students are spread out equally across the grades, which we'd generally
+    # expect, except for colleges, where there are far more undergrads than grads. So that will need a special case
+    # FIXME: special case for colleges
+    df.loc[df['id'].isin(educator_sample['id']), 'grade'] = \
+        np.random.randint(min_grade, max_grade + 1, size=len(educator_sample)).astype('int8')
+    return required_educators - len(educator_sample)
 
 
 def allocate_educators(df, out_fname):
@@ -353,18 +350,18 @@ def allocate_educators(df, out_fname):
     for _, school in enumerate(schools):
         if school == 0:
             continue
-        subset_df = df.loc[(df['school_id'] == school) & (df['role'] == 2)]
-        max_grade = subset_df.grade.max()
-        min_grade = subset_df.grade.min()
+        students_df = df.loc[(df['school_id'] == school) & (df['role'] == 2)]
+        max_grade = students_df.grade.max()
+        min_grade = students_df.grade.min()
         if min_grade < 0:
-            print("ERROR: min grade is", min_grade, max_grade, "for school", school, subset_df.grade)
+            print("ERROR: min grade is", min_grade, max_grade, "for school", school, students_df.grade)
             sys.exit(0)
-        geoids = subset_df.work_geoid.unique()
+        geoids = students_df.work_geoid.unique()
         if len(geoids) != 1:
             print("WARNING: more than one unique geoids for the school")
             sys.exit(0)
-        student_schools_map[school] = [len(subset_df.index), geoids[0], min_grade, max_grade]
-    print("Found", len(schools), "schools in %.3f s" % (time.time() - t))
+        student_schools_map[school] = [len(students_df.index), geoids[0], min_grade, max_grade]
+    print("Counted students for", len(schools), "schools in %.3f s" % (time.time() - t))
 
     df_edu = df.loc[(df['role'] == 1) & (df['naics'] == NAICS_EDU)]
     print("NAICS edu population", len(df_edu))
@@ -403,7 +400,7 @@ def allocate_educators(df, out_fname):
 
     shortfall_educators = 0
     shortfall_educator_schools = 0
-    # now allocate educators from metro area
+    # now allocate educators from the county
     for _, school in enumerate(schools):
         if school == -1:
             continue
@@ -498,7 +495,7 @@ def process_feather_files(fnames, out_fname, geoid_locs_map, df_dt_nt, long_ids)
 
     # get values from worker data
     df["work_geoid"] = df_dt_nt["dest_geoid"].values
-    for col in ["role", "naics", "grade", "school_id", "metro"]:
+    for col in ["role", "naics", "grade", "school_id"]:
         df[col] = df_dt_nt[col].values
         if not np.array_equal(df[col].values, df_dt_nt[col].values):
             print("Mismatched", col, "for population vs daytime/nightime")
@@ -603,6 +600,16 @@ def process_feather_files(fnames, out_fname, geoid_locs_map, df_dt_nt, long_ids)
     # start with a distinct marker so that the file can be read in parallel more easily
     df.index = ['*'] * num_rows
 
+    # set school ids to be unique only to work geoid
+    work_geoids = df.work_geoid.unique()
+    for geoid in work_geoids:
+        subset_df = df.loc[(df['work_geoid'] == geoid) & (df['school_id'] != 0)]
+        if len(subset_df) == 0:
+            continue
+        # set school id to be unique only to work geoid
+        min_school_id = subset_df['school_id'].min() - 1
+        df.loc[(df['work_geoid'] == geoid) & (df['school_id'] != 0), 'school_id'] -= min_school_id
+
     # print each geoid in turn so we can track the file offsets
     with open(out_fname_idx, mode='w') as f:
         print("geoid lat lng foff h_pop w_pop", ' '.join(naics_types), file=f)
@@ -618,6 +625,9 @@ def process_feather_files(fnames, out_fname, geoid_locs_map, df_dt_nt, long_ids)
         for i, geoid in enumerate(geoids):
             foffset = os.stat(out_fname_csv).st_size if i > 0 else 0
             subset_df = df.loc[df['home_geoid'] == geoid]
+            min_hh_id = subset_df['household_id'].min()
+            # set household id to be unique only to home geoid
+            subset_df.loc[:, 'household_id'] -= min_hh_id
             subset_df.to_csv(out_fname_csv, index=True, header=(i == 0), mode='w' if i == 0 else 'a', float_format="%.6f")
             work_pops = work_geoids_map[geoid] if geoid in work_geoids_map else []
             print(geoid,
@@ -657,6 +667,7 @@ def process_census_bg_shape_file(dir_names, geoid_locs_map):
 
 if __name__ == "__main__":
     t = time.time()
+    np.random.seed(29)
     parser = argparse.ArgumentParser(description="Convert UrbanPop feather files to C++ struct binary file")
     parser.add_argument("--output", "-o", required=True, help="Output file")
     parser.add_argument("--files", "-f", required=True, nargs="+", help="Feather files")

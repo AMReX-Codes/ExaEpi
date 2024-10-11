@@ -112,11 +112,13 @@ void InteractionModWork<PCType, PTDType, PType>::fastInteractWork (PCType& agent
             auto& ptile = agents.ParticlesAt(lev, mfi);
             const auto& ptd = ptile.getParticleTileData();
             const auto np = ptile.GetArrayOfStructs().numParticles();
+            if (np == 0) continue;
+
             auto& soa = ptile.GetStructOfArrays();
             auto workgroup_ptr = soa.GetIntData(IntIdx::workgroup).data();
             auto naics_ptr = soa.GetIntData(IntIdx::naics).data();
 
-            GetCommunityIndex<PTDType> getCommunityIndex(agents.Geom(lev), mfi.validbox());
+            GetCommunityIndex<PTDType> getCommunityIndex(agents.Geom(lev), mfi.tilebox());
 
             int max_communities = getCommunityIndex.max();
             int max_workgroup = agents.getMaxGroup(IntIdx::workgroup) + 1;

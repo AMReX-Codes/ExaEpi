@@ -158,18 +158,18 @@ void InteractionModSchool<PCType, PTDType, PType>::fastInteractSchool (PCType& a
             auto& ptile = agents.ParticlesAt(lev, mfi);
             const auto& ptd = ptile.getParticleTileData();
             const auto np = ptile.GetArrayOfStructs().numParticles();
+            if (np == 0) continue;
+
             auto& soa = ptile.GetStructOfArrays();
             auto school_grade_ptr = soa.GetIntData(IntIdx::school_grade).data();
             auto school_id_ptr = soa.GetIntData(IntIdx::school_id).data();
-            auto nborhood_ptr = soa.GetIntData(IntIdx::nborhood).data();
             auto age_group_ptr = soa.GetIntData(IntIdx::age_group).data();
 
-            GetCommunityIndex<PTDType> getCommunityIndex(agents.Geom(lev), mfi.validbox());
+            GetCommunityIndex<PTDType> getCommunityIndex(agents.Geom(lev), mfi.tilebox());
 
             int max_communities = getCommunityIndex.max();
             int max_school_grade = agents.getMaxGroup(IntIdx::school_grade) + 1;
             int max_school_id = agents.getMaxGroup(IntIdx::school_id) + 1;
-            int max_nborhood = agents.getMaxGroup(IntIdx::nborhood) + 1;
 
             for (int d = 0; d < n_disease; d++) {
                 for (auto adults : {true, false}) {
@@ -199,7 +199,6 @@ void InteractionModSchool<PCType, PTDType, PType>::fastInteractSchool (PCType& a
                             auto community = getCommunityIndex(ptd, i);
                             int pos = (community * max_school_id + school_id_ptr[i]) * max_school_grade + school_grade_ptr[i];
                             if (inChildcare(school_grade_ptr[i])) {
-                                //int num_infected_daycare = infected_daycare_d_ptr[community * max_nborhood + nborhood_ptr[i]];
                                 int num_infected_daycare = infected_daycare_d_ptr[pos];
                                 ParticleReal daycare_prob = 1.0_prt - infect * lparm->xmit_daycare * scale;
                                 prob_ptr[i] *= static_cast<ParticleReal>(std::pow(daycare_prob, num_infected_daycare));

@@ -102,18 +102,15 @@ void InteractionModWorkNborhood<PCType, PTDType, PType>::fastInteractWorkNborhoo
             auto& ptile = agents.ParticlesAt(lev, mfi);
             const auto& ptd = ptile.getParticleTileData();
             const auto np = ptile.GetArrayOfStructs().numParticles();
+            if (np == 0) continue;
+
             auto& soa = ptile.GetStructOfArrays();
             auto work_nborhood_ptr = soa.GetIntData(IntIdx::work_nborhood).data();
-            //auto home_nborhood_ptr = soa.GetIntData(IntIdx::nborhood).data();
-            auto age_group_ptr = soa.GetIntData(IntIdx::age_group).data();
 
-            GetCommunityIndex<PTDType> getCommunityIndex(agents.Geom(lev), mfi.validbox());
+            GetCommunityIndex<PTDType> getCommunityIndex(agents.Geom(lev), mfi.tilebox());
 
             int max_communities = getCommunityIndex.max();
-            //int max_work_nborhood = agents.getMaxGroup(IntIdx::work_nborhood) + 1;
             int max_nborhood = agents.getMaxGroup(IntIdx::work_nborhood) + 1;
-            //int max_home_nborhood = agents.getMaxGroup(IntIdx::nborhood) + 1;
-            //int max_nborhood = max(max_work_nborhood, max_home_nborhood);
             AMREX_ALWAYS_ASSERT(max_nborhood <= np);
 
             for (int d = 0; d < n_disease; d++) {
@@ -131,7 +128,6 @@ void InteractionModWorkNborhood<PCType, PTDType, PType>::fastInteractWorkNborhoo
                 ParallelFor(np, [=] AMREX_GPU_DEVICE (int i) noexcept {
                     if (isInfectious(i, ptd, d) && isCandidate(i, ptd)) {
                         auto community = getCommunityIndex(ptd, i);
-                        //int nborhood = age_group_ptr[i] > 1 ? work_nborhood_ptr[i] : home_nborhood_ptr[i];
                         // always use work nborhood, because even age group 0 could be in another nborhood during the day for
                         // daycare
                         int nborhood = work_nborhood_ptr[i];
@@ -144,7 +140,6 @@ void InteractionModWorkNborhood<PCType, PTDType, PType>::fastInteractWorkNborhoo
                 ParallelFor(np, [=] AMREX_GPU_DEVICE (int i) noexcept {
                     if (isSusceptible(i, ptd, d) && isCandidate(i, ptd)) {
                         auto community = getCommunityIndex(ptd, i);
-                        //int nborhood = age_group_ptr[i] > 1 ? work_nborhood_ptr[i] : home_nborhood_ptr[i];
                         int nborhood = work_nborhood_ptr[i];
                         int num_infected_nborhood = infected_nborhood_d_ptr[community * max_nborhood + nborhood];
                         int num_infected_community = infected_community_d_ptr[community];
