@@ -149,6 +149,10 @@ void AgentContainer::moveAgentsToWork ()
 {
     BL_PROFILE("AgentContainer::moveAgentsToWork");
 
+    GridToLngLat grid_to_lnglat(min_lng, min_lat, gspacing_x, gspacing_y);
+
+    bool is_census = (gspacing_x == 0);
+
     for (int lev = 0; lev <= finestLevel(); ++lev)
     {
         const auto dx = Geom(lev).CellSizeArray();
@@ -176,8 +180,15 @@ void AgentContainer::moveAgentsToWork ()
             {
                 if (!isHospitalized(ip, ptd)) {
                     ParticleType& p = pstruct[ip];
-                    p.pos(0) = (work_i_ptr[ip] + 0.5_prt)*dx[0];
-                    p.pos(1) = (work_j_ptr[ip] + 0.5_prt)*dx[1];
+                    if (is_census) { // using census data
+                        p.pos(0) = (work_i_ptr[ip] + 0.5_prt)*dx[0];
+                        p.pos(1) = (work_j_ptr[ip] + 0.5_prt)*dx[1];
+                    } else {
+                        Real lng, lat;
+                        grid_to_lnglat(work_i_ptr[ip], work_j_ptr[ip], lng, lat);
+                        p.pos(0) = lng;
+                        p.pos(1) = lat;
+                    }
                 }
             });
         }
@@ -196,6 +207,10 @@ void AgentContainer::moveAgentsToWork ()
 void AgentContainer::moveAgentsToHome ()
 {
     BL_PROFILE("AgentContainer::moveAgentsToHome");
+
+    GridToLngLat grid_to_lnglat(min_lng, min_lat, gspacing_x, gspacing_y);
+
+    bool is_census = (gspacing_x == 0);
 
     for (int lev = 0; lev <= finestLevel(); ++lev)
     {
@@ -224,8 +239,15 @@ void AgentContainer::moveAgentsToHome ()
             {
                 if (!isHospitalized(ip, ptd)) {
                     ParticleType& p = pstruct[ip];
-                    p.pos(0) = (home_i_ptr[ip] + 0.5_prt) * dx[0];
-                    p.pos(1) = (home_j_ptr[ip] + 0.5_prt) * dx[1];
+                    if (is_census) { // using census data
+                        p.pos(0) = (home_i_ptr[ip] + 0.5_prt) * dx[0];
+                        p.pos(1) = (home_j_ptr[ip] + 0.5_prt) * dx[1];
+                    } else {
+                        Real lng, lat;
+                        grid_to_lnglat(home_i_ptr[ip], home_j_ptr[ip], lng, lat);
+                        p.pos(0) = lng;
+                        p.pos(1) = lat;
+                    }
                 }
             });
         }
@@ -293,6 +315,10 @@ void AgentContainer::returnRandomTravel ()
 {
     BL_PROFILE("AgentContainer::returnRandomTravel");
 
+    GridToLngLat grid_to_lnglat(min_lng, min_lat, gspacing_x, gspacing_y);
+
+    bool is_census = (gspacing_x == 0);
+
     for (int lev = 0; lev <= finestLevel(); ++lev)
     {
         auto& plev  = GetParticles(lev);
@@ -317,8 +343,15 @@ void AgentContainer::returnRandomTravel ()
                 if (random_travel_ptr[i] >= 0) {
                     ParticleType& p = pstruct[i];
                     random_travel_ptr[i] = -1;
-                    p.pos(0) = (home_i_ptr[i] + 0.5_prt) * dx[0];
-                    p.pos(1) = (home_j_ptr[i] + 0.5_prt) * dx[1];
+                    if (is_census) { // using census data
+                        p.pos(0) = (home_i_ptr[i] + 0.5_prt) * dx[0];
+                        p.pos(1) = (home_j_ptr[i] + 0.5_prt) * dx[1];
+                    } else {
+                        Real lng, lat;
+                        grid_to_lnglat(home_i_ptr[i], home_j_ptr[i], lng, lat);
+                        p.pos(0) = lng;
+                        p.pos(1) = lat;
+                    }
                 }
             });
         }
@@ -331,6 +364,10 @@ void AgentContainer::returnRandomTravel ()
 void AgentContainer::updateStatus ( MFPtrVec& a_disease_stats /*!< Community-wise disease stats tracker */)
 {
     BL_PROFILE("AgentContainer::updateStatus");
+
+    GridToLngLat grid_to_lnglat(min_lng, min_lat, gspacing_x, gspacing_y);
+
+    bool is_census = (gspacing_x == 0);
 
     m_disease_status.updateAgents(*this, a_disease_stats);
     m_hospital->treatAgents(*this, a_disease_stats);
@@ -363,8 +400,15 @@ void AgentContainer::updateStatus ( MFPtrVec& a_disease_stats /*!< Community-wis
             {
                 if (isHospitalized(ip, ptd)) {
                     ParticleType& p = pstruct[ip];
-                    p.pos(0) = (hosp_i_ptr[ip] + 0.5_prt)*dx[0];
-                    p.pos(1) = (hosp_j_ptr[ip] + 0.5_prt)*dx[1];
+                    if (is_census) { // using census data
+                        p.pos(0) = (hosp_i_ptr[ip] + 0.5_prt) * dx[0];
+                        p.pos(1) = (hosp_j_ptr[ip] + 0.5_prt) * dx[1];
+                    } else {
+                        Real lng, lat;
+                        grid_to_lnglat(hosp_i_ptr[ip], hosp_j_ptr[ip], lng, lat);
+                        p.pos(0) = lng;
+                        p.pos(1) = lat;
+                    }
                 }
             });
         }

@@ -147,6 +147,11 @@ public:
     int m_num_diseases; /*!< Number of diseases */
     std::vector<std::string> m_disease_names; /*!< names of the diseases */
 
+    // these parameters are used by UrbanPop data for converting grid coordinates to underlying geographic coordinates
+    // set to zero for census type
+    amrex::Real min_lng = 0, min_lat = 0;
+    amrex::Real gspacing_x = 0, gspacing_y = 0;
+
 protected:
 
     int m_symptomatic_withdraw = 1; /*!< whether symptomatic agents withdraw or not */
@@ -178,5 +183,40 @@ protected:
 };
 
 using AgentIterator = typename AgentContainer::ParIterType;
+
+struct LngLatToGrid {
+    Real min_lng, min_lat;
+    Real gspacing_x, gspacing_y;
+
+    LngLatToGrid(Real _min_lng, Real _min_lat, Real _gspacing_x, Real _gspacing_y) :
+        min_lng(_min_lng), min_lat(_min_lat),
+        gspacing_x(_gspacing_x), gspacing_y(_gspacing_y) {}
+
+    AMREX_GPU_HOST_DEVICE
+    void operator() (Real lng, Real lat, int &x, int &y) const {
+        Real rx = (lng - min_lng) / gspacing_x;
+        Real ry = (lat - min_lat) / gspacing_y;
+        x = static_cast<int>(rx + 0.001);
+        y = static_cast<int>(ry + 0.001);
+    }
+};
+
+/*! Convert grid coordinates to latitude and longitude for UrbanPop data */
+struct GridToLngLat {
+    Real min_lng, min_lat;
+    Real gspacing_x, gspacing_y;
+
+    GridToLngLat(Real _min_lng, Real _min_lat, Real _gspacing_x, Real _gspacing_y) :
+        min_lng(_min_lng), min_lat(_min_lat),
+        gspacing_x(_gspacing_x), gspacing_y(_gspacing_y) {}
+
+    AMREX_GPU_HOST_DEVICE
+    void operator() (int x, int y, Real &lng, Real &lat) const {
+        lng = (Real)x * gspacing_x + min_lng + 0.001;
+        lat = (Real)y * gspacing_y + min_lat + 0.001;
+    }
+};
+
+
 
 #endif

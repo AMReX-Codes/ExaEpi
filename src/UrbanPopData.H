@@ -15,22 +15,6 @@
 #include "UrbanPopAgentStruct.H"
 
 
-struct LngLatToGrid {
-    Real min_lng, min_lat;
-    Real gspacing_x, gspacing_y;
-
-    LngLatToGrid(Real _min_lng, Real _min_lat, Real _gspacing_x, Real _gspacing_y) :
-        min_lng(_min_lng), min_lat(_min_lat),
-        gspacing_x(_gspacing_x), gspacing_y(_gspacing_y) {}
-
-    AMREX_GPU_HOST_DEVICE
-    void operator() (Real lng, Real lat, int &x, int &y) const {
-        x = (int)((lng - min_lng) / gspacing_x);
-        y = (int)((lat - min_lat) / gspacing_y);
-    }
-};
-
-
 struct BlockGroup {
     int64_t geoid;
     amrex::Real lng;
@@ -49,7 +33,7 @@ struct BlockGroup {
     bool read(std::istringstream &iss);
     bool read_agents(std::ifstream &f, amrex::Vector<UrbanPop::UrbanPopAgent> &agents, amrex::Vector<int>& group_work_population,
                      amrex::Vector<int>& group_home_population, const std::map<IntVect, BlockGroup> &xy_to_block_groups,
-                     const LngLatToGrid &lnglat_to_grid);
+                     const LngLatToGrid &lnglat_to_grid, const GridToLngLat &grid_to_lnglat);
 };
 
 struct UrbanPopData {

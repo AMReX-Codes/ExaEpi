@@ -28,7 +28,7 @@ void ExaEpi::Utils::get_test_params (   TestParams& params,         /*!< Test pa
     params.size = {1, 1};
     pp.query("size", params.size);
 
-    params.max_grid_size = 16;
+    params.max_grid_size = 10;
     pp.query("max_grid_size", params.max_grid_size);
 
     pp.get("nsteps", params.nsteps);

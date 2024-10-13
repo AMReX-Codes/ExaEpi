@@ -12,7 +12,7 @@
 #include <sstream>
 
 using std::string;
-using float32_t = float;
+using float32_t = amrex::Real;
 
 namespace UrbanPop {
 
