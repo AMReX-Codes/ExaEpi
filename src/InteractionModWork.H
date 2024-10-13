@@ -122,8 +122,11 @@ void InteractionModWork<PCType, PTDType, PType>::fastInteractWork (PCType& agent
 
             int max_communities = getCommunityIndex.max();
             int max_workgroup = agents.getMaxGroup(IntIdx::workgroup) + 1;
-            AMREX_ALWAYS_ASSERT(max_workgroup <= np);
+            //if (max_workgroup > np) Print() << "max workgroup " << max_workgroup << " np " << np << "\n";
+            //AMREX_ALWAYS_ASSERT(max_workgroup <= np);
             int max_naics = agents.getMaxGroup(IntIdx::naics) + 1;
+            if (max_communities * max_workgroup * max_naics > 10000000)
+                Print() << "WARNING: large allocations for interactions could result in poor performance. Reduce max grid size.\n";
 
             for (int d = 0; d < n_disease; d++) {
                 Gpu::DeviceVector<int> infected_workgroup_d(max_communities * max_workgroup * max_naics, 0);

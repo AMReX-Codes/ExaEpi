@@ -111,7 +111,7 @@ void InteractionModWorkNborhood<PCType, PTDType, PType>::fastInteractWorkNborhoo
 
             int max_communities = getCommunityIndex.max();
             int max_nborhood = agents.getMaxGroup(IntIdx::work_nborhood) + 1;
-            AMREX_ALWAYS_ASSERT(max_nborhood <= np);
+            //AMREX_ALWAYS_ASSERT(max_nborhood <= np);
 
             for (int d = 0; d < n_disease; d++) {
                 Gpu::DeviceVector<int> infected_community_d(max_communities, 0);

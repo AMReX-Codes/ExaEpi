@@ -389,7 +389,7 @@ void runAgent ()
 
             // Typical day
             pc.morningCommute(mask_behavior);
-            //pc.interactDay(mask_behavior);
+            pc.interactDay(mask_behavior);
             pc.eveningCommute(mask_behavior);
             pc.interactEvening(mask_behavior);
             pc.interactNight(mask_behavior);

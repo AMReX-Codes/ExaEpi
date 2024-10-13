@@ -442,6 +442,7 @@ void UrbanPopData::initAgents (AgentContainer &pc, const ExaEpi::TestParams &par
             auto iv = IntVect(home_i_ptr[i], home_j_ptr[i]);
             AMREX_ASSERT(tilebox.contains(iv));
             /*
+            // this is the code for checking particle locations within boxes that is called by Ok()
             AgentContainer::CellAssignor assignor;
             IntVect iv2 = assignor(p, plo, dxi, domain);
             AMREX_ASSERT(tilebox.contains(iv2));
