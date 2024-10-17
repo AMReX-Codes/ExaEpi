@@ -153,7 +153,7 @@ def print_header(df):
 #include <sstream>
 
 using std::string;
-using float32_t = float;
+using float32_t = amrex::Real;
 
 namespace UrbanPop {{
 
@@ -259,6 +259,30 @@ static std::vector<string> split_string(const string &s, char delim) {
     print(hdr, file=f_hdr)
     f_hdr.close()
     print("Wrote", len(df.columns), "fields to", hdr_fname)
+
+
+def process_census_bg_shape_file(dir_names):
+    geoid_locs_map = {}
+    for dname in dir_names:
+        # remove trailing slash if it exists
+        if dname[-1] == "/":
+            dname = dname[:-1]
+        shape_fname = dname + "/" + os.path.split(dname)[1] + ".shp"
+        # don't actually need to compute the centroid because the block group file has it under the INTPTLAT10 and INTPTLON10 cols
+        #df = geopandas.read_file(shape_fname, include_fields=["GEOID10", "geometry"])
+        #df = df.to_crs(crs=4326)
+        #df["centroid"] = df.centroid
+        print("Reading shape files at", shape_fname)
+        df = geopandas.read_file(shape_fname, include_fields=["GEOID10", "INTPTLAT10", "INTPTLON10"], ignore_geometry=True)
+        df.GEOID10 = df.GEOID10.astype("int64")
+        df.INTPTLAT10 = df.INTPTLAT10.astype("float32")
+        df.INTPTLON10 = df.INTPTLON10.astype("float32")
+        df.to_csv(shape_fname + ".csv")
+        print("Wrote", len(df.index), "GEOID locations to", shape_fname + ".csv")
+        #print(df.dtypes)
+        geoid_locs_map.update(df.set_index("GEOID10").T.to_dict("list"))
+    print("GEOID to locations map contains", len(geoid_locs_map), "entries")
+    return geoid_locs_map
 
 
 def process_nt_dt_feather_files(fnames, out_fname):
@@ -423,14 +447,14 @@ def allocate_educators(df, out_fname):
     df_educators.to_csv(out_fname + ".educators.csv", sep=' ', index=False)
     print("Wrote", out_fname + ".educators.csv in %.3f s" % (time.time() - t))
 
+    # need to reset the work lat/lng after potentially changing the work geoids for educators
+    df["work_lat"] = df["work_geoid"].map(geoid_locs_map).apply(lambda x: x[0]).astype("float32")
+    df["work_lng"] = df["work_geoid"].map(geoid_locs_map).apply(lambda x: x[1]).astype("float32")
 
 
-def process_feather_files(fnames, out_fname, geoid_locs_map, df_dt_nt, long_ids):
-    global PUMS_ID_LEN
-    global NAICS_LEN
-
-    start_t = time.time()
+def process_pop_feather_files(fnames):
     dfs = []
+    start_t = time.time()
     for fname in fnames:
         print("Reading data from", fname, end=': ')
         t = time.time()
@@ -440,15 +464,17 @@ def process_feather_files(fnames, out_fname, geoid_locs_map, df_dt_nt, long_ids)
         print(len(dfs[-1].index), "records in %.3f s" % (time.time() - t))
 
     df = pandas.concat(dfs)
-    print("Processed", len(df.index), "records in %.3f s" % (time.time() - start_t))
-
     df.geoid = df.geoid.astype("int64")
-    df.h_id = df.h_id.str.split("-").str[-1].astype("int32")
-
     # need to sort to ensure the order is the same between the population files and the daytime/nighttime files
     df.sort_values(by=['p_id'], inplace=True)
-    # shouldn't need to sort this one
-    #df_dt_nt.sort_values(by=['p_id'], inplace=True)
+    # remove all not found in include list
+    cols_to_purge = set(list(df.columns.values)) - set(include_fields)
+    df.drop(columns=cols_to_purge, inplace=True)
+    print("Processed", len(df.index), "records in %.3f s" % (time.time() - start_t))
+    return df
+
+
+def merge_dt_nt(df, df_dt_nt):
     if not np.array_equal(df.p_id.values, df_dt_nt.p_id.values):
         print("Mismatched p_ids for population vs daytime/nightime")
         sys.exit(0)
@@ -456,14 +482,24 @@ def process_feather_files(fnames, out_fname, geoid_locs_map, df_dt_nt, long_ids)
         print("Mismatched geoids for population vs daytime/nightime")
         sys.exit(0)
 
-    # remove all not found in include list
-    cols_to_purge = set(list(df.columns.values)) - set(include_fields)
-    df.drop(columns=cols_to_purge, inplace=True)
+    df.insert(df.columns.get_loc("geoid") + 1, "work_geoid", int(0))
+    # get values from worker data
+    df["work_geoid"] = df_dt_nt["dest_geoid"].values
+    for col in ["role", "naics", "grade", "school_id"]:
+        df[col] = df_dt_nt[col].values
+        if not np.array_equal(df[col].values, df_dt_nt[col].values):
+            print("Mismatched", col, "for population vs daytime/nightime")
+            sys.exit(0)
 
+    if not np.array_equal(df.work_geoid.values, df_dt_nt.dest_geoid.values):
+        print("Mismatched work geoids for population vs daytime/nightime")
+        sys.exit(0)
+
+
+def set_types(df):
     if "hh_income" in include_fields:
         # pack structure by moving int32_t value to before all int8_t values
         df.insert(4, "hh_income", df.pop("hh_income"))
-
     if "pums_id" in include_fields:
         # set specific ID types
         PUMS_ID_LEN = df.pums_id.map(len).max()
@@ -478,32 +514,7 @@ def process_feather_files(fnames, out_fname, geoid_locs_map, df_dt_nt, long_ids)
         #df['pr_naics'] = df['pr_naics'].replace(["^\s*$"], 'NA', regex=True)
         df['pr_naics'] = df['pr_naics'].replace([''], 'NA', regex=True)
 
-    df.rename(columns={"geoid": "home_geoid"}, inplace=True)
-    df.rename(columns={"h_id": "household_id"}, inplace=True)
-
-    # add lat/long locations from geoids
-    df.insert(df.columns.get_loc("home_geoid") + 1, "home_lat", float(0))
-    df.home_lat = df.home_lat.astype("float32")
-    df.insert(df.columns.get_loc("home_lat") + 1, "home_lng", float(0))
-    df.home_lng = df.home_lng.astype("float32")
-
-    df.insert(df.columns.get_loc("home_lng") + 1, "work_geoid", int(0))
-    df.insert(df.columns.get_loc("work_geoid") + 1, "work_lat", float(0))
-    df.work_lat = df.work_lat.astype("float32")
-    df.insert(df.columns.get_loc("work_lat") + 1, "work_lng", float(0))
-    df.work_lng = df.work_lng.astype("float32")
-
-    # get values from worker data
-    df["work_geoid"] = df_dt_nt["dest_geoid"].values
-    for col in ["role", "naics", "grade", "school_id"]:
-        df[col] = df_dt_nt[col].values
-        if not np.array_equal(df[col].values, df_dt_nt[col].values):
-            print("Mismatched", col, "for population vs daytime/nightime")
-            sys.exit(0)
-
-    if not np.array_equal(df.work_geoid.values, df_dt_nt.dest_geoid.values):
-        print("Mismatched work geoids for population vs daytime/nightime")
-        sys.exit(0)
+    df.h_id = df.h_id.str.split("-").str[-1].astype("int32")
 
     for field_type in df:
         if field_type in categ_types:
@@ -529,88 +540,17 @@ def process_feather_files(fnames, out_fname, geoid_locs_map, df_dt_nt, long_ids)
                 else:
                     df[field_type] = df[field_type].astype("int64")
 
-    t = time.time()
 
-    print("Setting lat/long for data", end=" ", flush=True)
-    # find lat/long for each row entry
-    df["home_lat"] = df["home_geoid"].map(geoid_locs_map).apply(lambda x: x[0]).astype("float32")
-    df["home_lng"] = df["home_geoid"].map(geoid_locs_map).apply(lambda x: x[1]).astype("float32")
-
-    df["work_lat"] = df["work_geoid"].map(geoid_locs_map).apply(lambda x: x[0]).astype("float32")
-    df["work_lng"] = df["work_geoid"].map(geoid_locs_map).apply(lambda x: x[1]).astype("float32")
-    print("\nSet lat/long for", len(df.index), "agents in %.3f s" % (time.time() - t))
-
-    #print("Sorting by geoid")
-    print("Sorting by lat/lng")
-    t = time.time()
-    df.sort_values(by=["home_lat", "home_lng"], inplace=True)
-    print("Sorted in %.3f s" % (time.time() - t))
-    out_fname_csv = out_fname + ".csv"
-    out_fname_idx = out_fname + ".idx"
-    print("Writing CSV text data to", out_fname_csv, "and block group indexes to", out_fname_idx)
-    t = time.time()
+def print_agents(df, work_geoids_map, out_fname):
     num_rows = len(df.index)
-    # make sure all the p_ids are globally unique and just integers
-    if not long_ids:
-        df['p_id'] = np.arange(0, num_rows)
-
-    df.rename(columns={"p_id": "id"}, inplace=True)
-    for col in df.columns:
-        if col.startswith("pr_") and col != 'pr_naics':
-            df.rename(columns={col: col[3:]}, inplace=True)
-        elif col.startswith("h_"):
-            df.rename(columns={col: "home_" + col[2:]}, inplace=True)
-        elif col.startswith("w_"):
-            df.rename(columns={col: "work_" + col[2:]}, inplace=True)
-        elif col.startswith("hh_"):
-            df.rename(columns={col: "household_" + col[3:]}, inplace=True)
-
-    print("Fields are:\n", df.dtypes, sep="")
-
-    print_header(df)
-
-    allocate_educators(df, out_fname)
-    # need to reset the work lat/lng after potentially changing the work geoids for educators
-    df["work_lat"] = df["work_geoid"].map(geoid_locs_map).apply(lambda x: x[0]).astype("float32")
-    df["work_lng"] = df["work_geoid"].map(geoid_locs_map).apply(lambda x: x[1]).astype("float32")
-
-    t = time.time()
-    naics_types = list(categ_types['naics'].categories)
-    num_naics = len(naics_types)
-    work_geoids_map = {}
-    work_geoids = df.work_geoid.unique()
-    num_workers = 0
-    for i, geoid in enumerate(work_geoids):
-        # don't include wfh
-        subset_df = df.loc[(df['work_geoid'] == geoid) & (df['role'] == 1) & (df['naics'] != NAICS_WFH)]
-        naics_counts = []
-        for naics_i in range(num_naics):
-            naics_counts.append(len(subset_df.loc[subset_df['naics'] == naics_i]))
-        work_pops = [len(subset_df.index)]
-        if work_pops[0] != sum(naics_counts):
-            print("ERROR: NAICS codes don't sum up to work population for geoid", geoid, work_pops[0], sum(naics_counts))
-            sys.exit(0)
-        num_workers += work_pops[0]
-        work_pops.extend(naics_counts)
-        work_geoids_map[geoid] = work_pops
-    print("workers population", num_workers)
-    print("Found", len(df.home_geoid.unique()), "home locations and", len(work_geoids_map),
-          "work locations in %.3f s" % (time.time() - t))
-
     # start with a distinct marker so that the file can be read in parallel more easily
     df.index = ['*'] * num_rows
-
-    # set school ids to be unique only to work geoid
-    work_geoids = df.work_geoid.unique()
-    for geoid in work_geoids:
-        subset_df = df.loc[(df['work_geoid'] == geoid) & (df['school_id'] != 0)]
-        if len(subset_df) == 0:
-            continue
-        # set school id to be unique only to work geoid
-        min_school_id = subset_df['school_id'].min() - 1
-        df.loc[(df['work_geoid'] == geoid) & (df['school_id'] != 0), 'school_id'] -= min_school_id
-
     # print each geoid in turn so we can track the file offsets
+    t = time.time()
+    naics_types = list(categ_types['naics'].categories)
+    out_fname_idx = out_fname + ".idx"
+    out_fname_csv = out_fname + ".csv"
+    print("Writing CSV text data to", out_fname_csv, "and block group indexes to", out_fname_idx)
     with open(out_fname_idx, mode='w') as f:
         print("geoid lat lng foff h_pop w_pop", ' '.join(naics_types), file=f)
         geoids = df.home_geoid.unique()
@@ -638,31 +578,89 @@ def process_feather_files(fnames, out_fname, geoid_locs_map, df_dt_nt, long_ids)
                   file=f)
     print("Wrote", len(df.index), "records in %.3f s" % (time.time() - t))
 
-    fips_codes = []
-    for i, geoid in enumerate(geoids):
-        fips_codes.append(int(str(geoid)[:5]))
-    print("FIPS codes:", sorted(set(fips_codes)))
+
+def compute_worker_populations(df):
+    # compute worker populations
+    t = time.time()
+    naics_types = list(categ_types['naics'].categories)
+    num_naics = len(naics_types)
+    work_geoids_map = {}
+    work_geoids = df.work_geoid.unique()
+    num_workers = 0
+    for i, geoid in enumerate(work_geoids):
+        # don't include wfh
+        subset_df = df.loc[(df['work_geoid'] == geoid) & (df['role'] == 1) & (df['naics'] != NAICS_WFH)]
+        naics_counts = []
+        for naics_i in range(num_naics):
+            naics_counts.append(len(subset_df.loc[subset_df['naics'] == naics_i]))
+        work_pops = [len(subset_df.index)]
+        if work_pops[0] != sum(naics_counts):
+            print("ERROR: NAICS codes don't sum up to work population for geoid", geoid, work_pops[0], sum(naics_counts))
+            sys.exit(0)
+        num_workers += work_pops[0]
+        work_pops.extend(naics_counts)
+        work_geoids_map[geoid] = work_pops
+    print("workers population", num_workers)
+    print("Found", len(df.home_geoid.unique()), "home locations and", len(work_geoids_map),
+          "work locations in %.3f s" % (time.time() - t))
+    return work_geoids_map
 
 
-def process_census_bg_shape_file(dir_names, geoid_locs_map):
-    for dname in dir_names:
-        # remove trailing slash if it exists
-        if dname[-1] == "/":
-            dname = dname[:-1]
-        shape_fname = dname + "/" + os.path.split(dname)[1] + ".shp"
-        # don't actually need to compute the centroid because the block group file has it under the INTPTLAT10 and INTPTLON10 cols
-        #df = geopandas.read_file(shape_fname, include_fields=["GEOID10", "geometry"])
-        #df = df.to_crs(crs=4326)
-        #df["centroid"] = df.centroid
-        print("Reading shape files at", shape_fname)
-        df = geopandas.read_file(shape_fname, include_fields=["GEOID10", "INTPTLAT10", "INTPTLON10"], ignore_geometry=True)
-        df.GEOID10 = df.GEOID10.astype("int64")
-        df.INTPTLAT10 = df.INTPTLAT10.astype("float32")
-        df.INTPTLON10 = df.INTPTLON10.astype("float32")
-        df.to_csv(shape_fname + ".csv")
-        print("Wrote", len(df.index), "GEOID locations to", shape_fname + ".csv")
-        #print(df.dtypes)
-        geoid_locs_map.update(df.set_index("GEOID10").T.to_dict("list"))
+def rename_fields(df):
+    df.rename(columns={"geoid": "home_geoid"}, inplace=True)
+    df.rename(columns={"h_id": "household_id"}, inplace=True)
+
+    df.rename(columns={"p_id": "id"}, inplace=True)
+    for col in df.columns:
+        if col.startswith("pr_") and col != 'pr_naics':
+            df.rename(columns={col: col[3:]}, inplace=True)
+        elif col.startswith("h_"):
+            df.rename(columns={col: "home_" + col[2:]}, inplace=True)
+        elif col.startswith("w_"):
+            df.rename(columns={col: "work_" + col[2:]}, inplace=True)
+        elif col.startswith("hh_"):
+            df.rename(columns={col: "household_" + col[3:]}, inplace=True)
+
+
+def set_lnglat(df):
+    t = time.time()
+    print("Setting lat/long for data", end=" ", flush=True)
+    # add lat/long locations from geoids
+    df.insert(df.columns.get_loc("home_geoid") + 1, "home_lat", float(0))
+    df.insert(df.columns.get_loc("home_lat") + 1, "home_lng", float(0))
+    df.insert(df.columns.get_loc("work_geoid") + 1, "work_lat", float(0))
+    df.insert(df.columns.get_loc("work_lat") + 1, "work_lng", float(0))
+
+    df.home_lat = df.home_lat.astype("float32")
+    df.home_lng = df.home_lng.astype("float32")
+    df.work_lat = df.work_lat.astype("float32")
+    df.work_lng = df.work_lng.astype("float32")
+
+    # find lat/long for each row entry
+    df["home_lat"] = df["home_geoid"].map(geoid_locs_map).apply(lambda x: x[0]).astype("float32")
+    df["home_lng"] = df["home_geoid"].map(geoid_locs_map).apply(lambda x: x[1]).astype("float32")
+
+    df["work_lat"] = df["work_geoid"].map(geoid_locs_map).apply(lambda x: x[0]).astype("float32")
+    df["work_lng"] = df["work_geoid"].map(geoid_locs_map).apply(lambda x: x[1]).astype("float32")
+
+    df.sort_values(by=["home_lat", "home_lng"], inplace=True)
+
+    print("\nSet lat/long for", len(df.index), "agents in %.3f s" % (time.time() - t))
+
+
+def adjust_school_ids(df):
+    # set school ids to be unique only to work geoid
+    work_geoids = df.work_geoid.unique()
+    school_id_map = {}
+    for geoid in work_geoids:
+        subset_df = df.loc[(df['work_geoid'] == geoid) & (df['school_id'] != 0)]
+        if len(subset_df) == 0:
+            continue
+
+        subset_school_ids = subset_df.school_id.unique()
+        subset_school_id_map = {key: i + 1 for i, key in enumerate(subset_school_ids)}
+        school_id_map.update(subset_school_id_map)
+    df['school_id'] = df['school_id'].map(school_id_map).apply(lambda x: x).fillna(0).astype("int32")
 
 
 if __name__ == "__main__":
@@ -682,12 +680,23 @@ if __name__ == "__main__":
     parser.add_argument("--long_ids", "-l", action="store_true", help="Use original long UrbanPop ids for agents")
     args = parser.parse_args()
 
-    geoid_locs_map = {}
-    process_census_bg_shape_file(args.shape_files_dir, geoid_locs_map)
-    print("GEOID to locations map contains", len(geoid_locs_map), "entries")
-
+    geoid_locs_map = process_census_bg_shape_file(args.shape_files_dir)
     df_dt_nt = process_nt_dt_feather_files(args.day_night_files, args.output)
-
-    process_feather_files(args.files, args.output, geoid_locs_map, df_dt_nt, args.long_ids)
+    df = process_pop_feather_files(args.files)
+    merge_dt_nt(df, df_dt_nt)
+    set_types(df)
+    rename_fields(df)
+    set_lnglat(df)
+    # make sure all the ids are globally unique and just integers
+    if not args.long_ids:
+        df['id'] = np.arange(0, len(df.index))
+    print("Fields are:\n", df.dtypes, sep="")
+    print_header(df)
+    allocate_educators(df, args.output)
+    work_geoids_map = compute_worker_populations(df)
+    adjust_school_ids(df)
+    print_agents(df, work_geoids_map, args.output)
+    fips_codes = sorted(set([int(str(geoid)[:5]) for geoid in df.work_geoid.unique()]))
+    print("FIPS codes:", fips_codes)
 
     print("Processed", len(args.files), "files in %.2f s" % (time.time() - t))
