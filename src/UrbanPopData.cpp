@@ -439,8 +439,7 @@ void UrbanPopData::initAgents (AgentContainer &pc, const ExaEpi::TestParams &par
             p.pos(0) = agent.home_lng;
             p.pos(1) = agent.home_lat;
             lnglat_to_grid(agent.home_lng, agent.home_lat, home_i_ptr[i], home_j_ptr[i]);
-            auto iv = IntVect(home_i_ptr[i], home_j_ptr[i]);
-            AMREX_ASSERT(tilebox.contains(iv));
+            AMREX_ASSERT(tilebox.contains(IntVect(home_i_ptr[i], home_j_ptr[i])));
             /*
             // this is the code for checking particle locations within boxes that is called by Ok()
             AgentContainer::CellAssignor assignor;
