@@ -82,19 +82,19 @@ void assign_school (int* school_grade, int* school_id, const int age_group, cons
         // under 5
         *school_grade = 0;
         //*school_id = 5; // note - need to handle playgroups
-        *school_id = nborhood + 1; // cannot be zero - that means no school
+        *school_id = SchoolType::day_care + nborhood; // one daycare per nborhood
     } else if (age_group == 1) {
         // 5 to 17
         int il4 = Random_int(100, engine);
         if (il4 < 36) {
-            *school_id = 3 + (nborhood / 2);  // elementary school, in neighborhoods 1 and 2
+            *school_id = SchoolType::elem_3 + (nborhood / 2);  // elementary school, in neighborhoods 1 and 2
             *school_grade = 5;
             AMREX_ALWAYS_ASSERT(*school_id < 5);
         } else if (il4 < 68) {
-            *school_id = 2;  // middle school, one for all neighborhoods
+            *school_id = SchoolType::middle;  // middle school, one for all neighborhoods
             *school_grade = 9;
         } else if (il4 < 93) {
-            *school_id = 1;  // high school, one for all neighborhoods
+            *school_id = SchoolType::high;  // high school, one for all neighborhoods
             *school_grade = 12;
         } else {
             *school_id = 0;  // not in school, presumably 18-year-olds or some home-schooled, etc
@@ -481,7 +481,7 @@ void CensusData::initAgents (AgentContainer& pc,       /*!< Agents */
                     amrex::Gpu::Atomic::AddNoRet(&student_counts_arr(i, j, k, SchoolType::middle), 1);
                 } else if (school_id_ptr[ip] == SchoolType::high) {
                     amrex::Gpu::Atomic::AddNoRet(&student_counts_arr(i, j, k, SchoolType::high), 1);
-                } else if (school_grade_ptr[ip] == 0) {
+                } else if (school_grade_ptr[ip] >= SchoolType::day_care) {
                     amrex::Gpu::Atomic::AddNoRet(&student_counts_arr(i, j, k, SchoolType::day_care), 1);
                 }
 
@@ -823,17 +823,15 @@ void CensusData::assignTeachersAndWorkgroup (AgentContainer& pc       /*!< Agent
         auto school_grade_ptr = school_grade_h.data();
         auto school_id_ptr = school_id_h.data();
         auto work_nborhood_ptr = work_nborhood_h.data();
-        //auto nborhood_ptr = nborhood_h.data();
 
         for (int ip = 0; ip < np; ++ip) {
 
             int comm_to = (int) domain.index(IntVect(AMREX_D_DECL(work_i_ptr[ip],work_j_ptr[ip],0)));
-            if (comm_to >= Ncommunity) {
-                continue;
-            }
+            if (comm_to >= Ncommunity) continue;
             int to = 0;
             while (comm_to >= Start[to+1]) { to++; }
 
+            // if teachers are needed, and the agent is of age 18-64, and is working
             if (total_teacher_unit.data()[to] && (age_group_ptr[ip] == 2 || age_group_ptr[ip] == 3) && workgroup_ptr[ip] > 0) {
                 int elem3_teacher  = elem3_teacher_counts_ptr[comm_to];
                 int elem4_teacher  = elem4_teacher_counts_ptr[comm_to];
@@ -842,8 +840,8 @@ void CensusData::assignTeachersAndWorkgroup (AgentContainer& pc       /*!< Agent
                 int daycr_teacher  = daycr_teacher_counts_ptr[comm_to];
                 int total          = total_teacher_counts_ptr[comm_to];
 
-                // 50% chance of being a teacher if in working-age population (until max_teacher_numb is met)
                 if ((elem3_teacher + elem4_teacher + middle_teacher + high_teacher + daycr_teacher) < total) {
+                    // still need to allocate more teachers to reach total required
                     int available_slots[5] = {
                         elem3_teacher  < elem3_teacher_counts.data()[comm_to],
                         elem4_teacher  < elem4_teacher_counts.data()[comm_to],
@@ -859,46 +857,37 @@ void CensusData::assignTeachersAndWorkgroup (AgentContainer& pc       /*!< Agent
                         // teachers are assigned the grade they teach
                         if (choice < available_slots[0]) {
                             school_grade_ptr[ip] = 5;  // 3rd grade - generic for elementary
-                            school_id_ptr[ip] = 3;  // elementary school for kids in Neighbordhood 1 & 2
-                            workgroup_ptr[ip] = 3 ;
+                            school_id_ptr[ip] = SchoolType::elem_3;  // elementary school for kids in Neighbordhood 1 & 2
                             work_nborhood_ptr[ip] = 1; // assuming the first elementary school is located in Neighbordhood 1
                             elem3_teacher_counts_ptr[comm_to]++;
                         } else if (choice < available_slots[0] + available_slots[1]) {
                             school_grade_ptr[ip] = 5;  // 3rd grade - generic for elementary
-                            school_id_ptr[ip] = 4;  // elementary school for kids in Neighbordhood 3 & 4
-                            workgroup_ptr[ip] = 4 ;
+                            school_id_ptr[ip] = SchoolType::elem_4;  // elementary school for kids in Neighbordhood 3 & 4
                             work_nborhood_ptr[ip] = 3; // assuming the first elementary school is located in Neighbordhood 3
                             elem4_teacher_counts_ptr[comm_to]++;
                         } else if (choice < available_slots[0] + available_slots[1] + available_slots[2]) {
                             school_grade_ptr[ip] = 9;  // 7th grade - generic for middle
-                            school_id_ptr[ip] = 2;  // middle school for kids in all Neighbordhoods (1 through 4)
-                            workgroup_ptr[ip] = 2 ;
+                            school_id_ptr[ip] = SchoolType::middle;  // middle school for kids in all Neighbordhoods (1 through 4)
                             work_nborhood_ptr[ip] = 3; // assuming the middle school is located in Neighbordhood 2
                             middle_teacher_counts_ptr[comm_to]++;
                         } else if (choice < available_slots[0] + available_slots[1] + available_slots[2] + available_slots[3]) {
                             school_grade_ptr[ip] = 12;  // 10th grade - generic for high school
-                            school_id_ptr[ip] = 1;  // high school for kids in all Neighbordhoods (1 through 4)
-                            workgroup_ptr[ip] = 1 ;
+                            school_id_ptr[ip] = SchoolType::high;  // high school for kids in all Neighbordhoods (1 through 4)
                             work_nborhood_ptr[ip] = 4; // assuming the high school is located in Neighbordhood 4
                             high_teacher_counts_ptr[comm_to]++;
                         } else if (choice < total_available) {
                             school_grade_ptr[ip] = 0; // generic for daycare
-                            //school_id_ptr[ip] = nborhood_ptr[ip];  // daycare
-                            school_id_ptr[ip] = amrex::Random_int(4); // randomly select a nborhood
-                            workgroup_ptr[ip] = 5 ;
-                            work_nborhood_ptr[ip] = school_id_ptr[ip]; // deal with daycare/playgroups later
+                            work_nborhood_ptr[ip] = Random_int(4); // randomly select nborhood
+                            school_id_ptr[ip] = SchoolType::day_care + work_nborhood_ptr[ip];
                             daycr_teacher_counts_ptr[comm_to]++;
                         }
+                        // this agent became a teacher - will no longer interact at work so set workgroup to 0
+                        workgroup_ptr[ip] = 0;
                     }
                 } else {
+                    // all teachers allocated
                     AMREX_ALWAYS_ASSERT(Ndaywork[to] > total_teacher_unit.data()[to]);
-                    unsigned int number = (unsigned int) rint( ((Real) Ndaywork[to] - total_teacher_unit.data()[to] ) /
-                                ((Real) workgroup_size * (Start[to+1] - Start[to])) );
-
-                    if (number) {
-                        workgroup_ptr[ip] = 6 + amrex::Random_int(number);
-                        work_nborhood_ptr[ip] = workgroup_ptr[ip] % 4; // each workgroup is assigned to a neighborhood as well
-                    }
+                    // don't need to set nborhood or workgroup - it was already set during worker setup
                 }
             }
         }
