@@ -479,7 +479,9 @@ void UrbanPopData::initAgents (AgentContainer &pc, const ExaEpi::TestParams &par
                 }
             } else {
                 workgroup_ptr[i] = 0;
-                work_nborhood_ptr[i] = 0;
+                // everyone interacts in the work nborhood, even thoes that don't work (they interact during the day in their
+                // home neighborhoods, effectively
+                work_nborhood_ptr[i] = nborhood_ptr[i];
             }
         });
 

@@ -881,8 +881,8 @@ void CensusData::assignTeachersAndWorkgroup (AgentContainer& pc       /*!< Agent
                             school_id_ptr[ip] = SchoolType::day_care + work_nborhood_ptr[ip];
                             daycr_teacher_counts_ptr[comm_to]++;
                         }
-                        // this agent became a teacher - will no longer interact at work so set workgroup to 0
-                        workgroup_ptr[ip] = 0;
+                        // workgroup is the whole school, i.e. adults interact with all other adults in the school
+                        workgroup_ptr[ip] = school_id_ptr[ip];
                     }
                 } else {
                     // all teachers allocated
