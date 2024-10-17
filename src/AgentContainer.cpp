@@ -121,8 +121,7 @@ void AgentContainer::moveAgentsRandomWalk ()
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
 #endif
-        for(MFIter mfi = MakeMFIter(lev, TilingIfNotGPU()); mfi.isValid(); ++mfi)
-        {
+        for (MFIter mfi = MakeMFIter(lev); mfi.isValid(); ++mfi) {
             int gid = mfi.index();
             int tid = mfi.LocalTileIndex();
             auto& ptile = plev[std::make_pair(gid, tid)];
@@ -161,8 +160,7 @@ void AgentContainer::moveAgentsToWork ()
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
 #endif
-        for(MFIter mfi = MakeMFIter(lev, TilingIfNotGPU()); mfi.isValid(); ++mfi)
-        {
+        for (MFIter mfi = MakeMFIter(lev); mfi.isValid(); ++mfi) {
             int gid = mfi.index();
             int tid = mfi.LocalTileIndex();
             auto& ptile = plev[std::make_pair(gid, tid)];
@@ -220,8 +218,7 @@ void AgentContainer::moveAgentsToHome ()
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
 #endif
-        for(MFIter mfi = MakeMFIter(lev, TilingIfNotGPU()); mfi.isValid(); ++mfi)
-        {
+        for (MFIter mfi = MakeMFIter(lev); mfi.isValid(); ++mfi) {
             int gid = mfi.index();
             int tid = mfi.LocalTileIndex();
             auto& ptile = plev[std::make_pair(gid, tid)];
@@ -277,8 +274,7 @@ void AgentContainer::moveRandomTravel (const amrex::Real random_travel_prob)
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
 #endif
-        for (MFIter mfi = MakeMFIter(lev, TilingIfNotGPU()); mfi.isValid(); ++mfi)
-        {
+        for (MFIter mfi = MakeMFIter(lev); mfi.isValid(); ++mfi) {
             auto& ptile = plev[{mfi.index(), mfi.LocalTileIndex()}];
             const auto& ptd = ptile.getParticleTileData();
             auto& aos   = ptile.GetArrayOfStructs();
@@ -327,8 +323,7 @@ void AgentContainer::returnRandomTravel ()
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
 #endif
-        for (MFIter mfi = MakeMFIter(lev, TilingIfNotGPU()); mfi.isValid(); ++mfi)
-        {
+        for (MFIter mfi = MakeMFIter(lev); mfi.isValid(); ++mfi) {
             auto& ptile = plev[{mfi.index(), mfi.LocalTileIndex()}];
             auto& aos   = ptile.GetArrayOfStructs();
             ParticleType* pstruct = &(aos[0]);
@@ -381,8 +376,7 @@ void AgentContainer::updateStatus ( MFPtrVec& a_disease_stats /*!< Community-wis
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
 #endif
-        for(MFIter mfi = MakeMFIter(lev, TilingIfNotGPU()); mfi.isValid(); ++mfi)
-        {
+        for (MFIter mfi = MakeMFIter(lev); mfi.isValid(); ++mfi) {
             int gid = mfi.index();
             int tid = mfi.LocalTileIndex();
             auto& ptile = plev[std::make_pair(gid, tid)];
@@ -429,8 +423,7 @@ void AgentContainer::shelterStart ()
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
 #endif
-        for(MFIter mfi = MakeMFIter(lev, TilingIfNotGPU()); mfi.isValid(); ++mfi)
-        {
+        for (MFIter mfi = MakeMFIter(lev); mfi.isValid(); ++mfi) {
             int gid = mfi.index();
             int tid = mfi.LocalTileIndex();
             auto& ptile = plev[std::make_pair(gid, tid)];
@@ -466,8 +459,7 @@ void AgentContainer::shelterStop ()
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
 #endif
-        for(MFIter mfi = MakeMFIter(lev, TilingIfNotGPU()); mfi.isValid(); ++mfi)
-        {
+        for (MFIter mfi = MakeMFIter(lev); mfi.isValid(); ++mfi) {
             int gid = mfi.index();
             int tid = mfi.LocalTileIndex();
             auto& ptile = plev[std::make_pair(gid, tid)];
@@ -499,8 +491,7 @@ void AgentContainer::infectAgents ()
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
 #endif
-        for(MFIter mfi = MakeMFIter(lev, TilingIfNotGPU()); mfi.isValid(); ++mfi)
-        {
+        for (MFIter mfi = MakeMFIter(lev); mfi.isValid(); ++mfi) {
             int gid = mfi.index();
             int tid = mfi.LocalTileIndex();
             auto& ptile = plev[std::make_pair(gid, tid)];

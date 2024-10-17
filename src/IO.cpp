@@ -212,8 +212,7 @@ void writeFIPSData (const AgentContainer& agents, /*!< Agents (particle) contain
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
             {
-                for (MFIter mfi(*mf_vec[lev], TilingIfNotGPU()); mfi.isValid(); ++mfi)
-                {
+                for (MFIter mfi(*mf_vec[lev]); mfi.isValid(); ++mfi) {
                     auto unit_arr = censusData.unit_mf[mfi].array();
                     auto cell_data_arr = (*mf_vec[lev])[mfi].array();
 

@@ -28,9 +28,6 @@ void ExaEpi::Utils::get_test_params (   TestParams& params,         /*!< Test pa
     params.size = {1, 1};
     pp.query("size", params.size);
 
-    params.max_grid_size = 10;
-    pp.query("max_grid_size", params.max_grid_size);
-
     pp.get("nsteps", params.nsteps);
 
     params.plot_int = -1;
@@ -61,12 +58,16 @@ void ExaEpi::Utils::get_test_params (   TestParams& params,         /*!< Test pa
         params.ic_type = ICType::Census;
         pp.get("census_filename", params.census_filename);
         pp.get("workerflow_filename", params.workerflow_filename);
+        params.max_grid_size = 10;
     } else if (ic_type == "urbanpop") {
         params.ic_type = ICType::UrbanPop;
         pp.get("urbanpop_filename", params.urbanpop_filename);
+        params.max_grid_size = 100;
     } else {
         amrex::Abort("ic_type not recognized (currently supported 'census')");
     }
+
+    pp.query("max_grid_size", params.max_grid_size);
 
     pp.getarr("initial_case_type", params.initial_case_type,0,params.num_diseases);
     if (params.num_diseases == 1) {

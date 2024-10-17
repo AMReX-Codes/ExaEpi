@@ -103,7 +103,7 @@ void InteractionModHome<PCType, PTDType, PType>::fastInteractHome (PCType& agent
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
 #endif
-        for (MFIter mfi = agents.MakeMFIter(lev, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+        for (MFIter mfi = agents.MakeMFIter(lev); mfi.isValid(); ++mfi) {
             auto& ptile = agents.ParticlesAt(lev, mfi);
             const auto& ptd = ptile.getParticleTileData();
             const auto np = ptile.GetArrayOfStructs().numParticles();
@@ -113,21 +113,25 @@ void InteractionModHome<PCType, PTDType, PType>::fastInteractHome (PCType& agent
             auto family_ptr = soa.GetIntData(IntIdx::family).data();
             auto nborhood_ptr = soa.GetIntData(IntIdx::nborhood).data();
 
-            GetCommunityIndex<PTDType> getCommunityIndex(agents.Geom(lev), mfi.tilebox());
+            GetCommunityIndex<PTDType> getCommunityIndex;
+            getCommunityIndex.init(agents.Geom(lev), mfi.tilebox(), agents.comm_mf[mfi].array());
 
             // calculate the max group values for indexing
             int max_communities = getCommunityIndex.max();
             int max_family = agents.getMaxGroup(IntIdx::family) + 1;
             int max_nborhood = agents.getMaxGroup(IntIdx::nborhood) + 1;
             int num_ncs = max_family / FAMILIES_PER_CLUSTER + 1;
-            if (max_communities * num_ncs * max_nborhood > 10000000)
-                Print() << "WARNING: large allocations for interactions could result in poor performance. Reduce max grid size.\n";
+
             /*
-            Print() << mfi.tilebox() << " np " << np << " max communities " << max_communities
-                    << " family vector size " << max_communities * max_family
-                    << " nc vector size " << max_communities * num_ncs * max_nborhood
-                    << "\n";
+            if (max_communities == 9) {
+                Print() << mfi.tilebox() << " np " << np << " max communities " << max_communities
+                        << " max family " << max_family << " max nborhood " << max_nborhood << " max ncs " << num_ncs
+                        << " family vector size " << max_communities * max_family
+                        << " nc vector size " << max_communities * num_ncs * max_nborhood
+                        << "\n";
+            }
             */
+
             for (int d = 0; d < n_disease; d++) {
                 // calculate separately for infected children and infected adults, since they have different transmission rates
                 for (auto adults : {true, false}) {

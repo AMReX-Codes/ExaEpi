@@ -72,15 +72,14 @@ void InteractionModGeneric<AC,ACT,ACTD,A>::interactAgents( AC& a_agents, /*!< Ag
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
 #endif
-        for(MFIter mfi = a_agents.MakeMFIter(lev, TilingIfNotGPU()); mfi.isValid(); ++mfi)
-        {
+        for (MFIter mfi = a_agents.MakeMFIter(lev); mfi.isValid(); ++mfi) {
             DenseBins<A> bins;
             auto& ptile = a_agents.ParticlesAt(lev, mfi);
             auto& aos   = ptile.GetArrayOfStructs();
             const size_t np = aos.numParticles();
             auto pstruct_ptr = aos().dataPtr();
 
-            const Box& box = mfi.validbox();
+            const Box& box = mfi.tilebox();
 
             int ntiles = numTilesInBox(box, true, bin_size);
 

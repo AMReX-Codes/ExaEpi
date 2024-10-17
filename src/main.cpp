@@ -28,10 +28,14 @@ void runAgent();
 void override_amrex_defaults ()
 {
     amrex::ParmParse pp("amrex");
-
     // ExaEpi should never require mananaged memory in the Arena
-    bool the_arena_is_managed = true;
+    bool the_arena_is_managed = false;
     pp.queryAdd("the_arena_is_managed", the_arena_is_managed);
+
+    amrex::ParmParse pp2("particles");
+    // enable for CPUs, disable for GPUs
+    bool do_tiling = TilingIfNotGPU();
+    pp2.queryAdd("do_tiling", do_tiling);
 }
 
 /*! \brief Main function: initializes AMReX, calls runAgent(), finalizes AMReX */
@@ -313,8 +317,8 @@ void runAgent ()
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (!system::regtest_reduction) reduction(+:mmc[:4])
 #endif
-                        for (MFIter mfi(*(disease_stats[d]),true); mfi.isValid(); ++mfi)
-                        {
+                        //for (MFIter mfi(*(disease_stats[d]), TilingIfNotGPU_()); mfi.isValid(); ++mfi) {
+                        for (MFIter mfi(*(disease_stats[d])); mfi.isValid(); ++mfi) {
                             Box const& bx = mfi.tilebox();
                             auto const& dfab = disease_stats[d]->const_array(mfi);
                             AMREX_LOOP_3D(bx, ii, jj, kk,

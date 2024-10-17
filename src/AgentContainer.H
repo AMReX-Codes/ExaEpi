@@ -152,6 +152,8 @@ public:
     amrex::Real min_lng = 0, min_lat = 0;
     amrex::Real gspacing_x = 0, gspacing_y = 0;
 
+    amrex::iMultiFab comm_mf;
+
 protected:
 
     int m_symptomatic_withdraw = 1; /*!< whether symptomatic agents withdraw or not */
@@ -196,8 +198,8 @@ struct LngLatToGrid {
     void operator() (Real lng, Real lat, int &x, int &y) const {
         Real rx = (lng - min_lng) / gspacing_x;
         Real ry = (lat - min_lat) / gspacing_y;
-        x = static_cast<int>(rx + 0.001);
-        y = static_cast<int>(ry + 0.001);
+        x = static_cast<int>(rx + 0.001_rt);
+        y = static_cast<int>(ry + 0.001_rt);
     }
 };
 
@@ -212,8 +214,8 @@ struct GridToLngLat {
 
     AMREX_GPU_HOST_DEVICE
     void operator() (int x, int y, Real &lng, Real &lat) const {
-        lng = (Real)x * gspacing_x + min_lng + 0.001;
-        lat = (Real)y * gspacing_y + min_lat + 0.001;
+        lng = (Real)x * gspacing_x + min_lng + 0.001_rt;
+        lat = (Real)y * gspacing_y + min_lat + 0.001_rt;
     }
 };
 

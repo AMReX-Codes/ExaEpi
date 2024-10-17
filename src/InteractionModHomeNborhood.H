@@ -94,7 +94,7 @@ void InteractionModHomeNborhood<PCType, PTDType, PType>::fastInteractHomeNborhoo
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
 #endif
-        for (MFIter mfi = agents.MakeMFIter(lev, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+        for (MFIter mfi = agents.MakeMFIter(lev); mfi.isValid(); ++mfi) {
             auto& ptile = agents.ParticlesAt(lev, mfi);
             const auto& ptd = ptile.getParticleTileData();
             const auto np = ptile.GetArrayOfStructs().numParticles();
@@ -103,12 +103,18 @@ void InteractionModHomeNborhood<PCType, PTDType, PType>::fastInteractHomeNborhoo
             auto& soa = ptile.GetStructOfArrays();
             auto nborhood_ptr = soa.GetIntData(IntIdx::nborhood).data();
 
-            GetCommunityIndex<PTDType> getCommunityIndex(agents.Geom(lev), mfi.tilebox());
+            GetCommunityIndex<PTDType> getCommunityIndex;
+            getCommunityIndex.init(agents.Geom(lev), mfi.tilebox(), agents.comm_mf[mfi].array());
 
             int max_communities = getCommunityIndex.max();
             int max_nborhood = agents.getMaxGroup(IntIdx::nborhood) + 1;
             AMREX_ALWAYS_ASSERT(max_nborhood <= np);
-
+            /*
+            Print() << mfi.tilebox() << " np " << np << " max communities " << max_communities
+                    << " max nborhood " << max_nborhood
+                    << " nborhood vector size " << max_communities * max_nborhood
+                    << "\n";
+            */
             for (int d = 0; d < n_disease; d++) {
                 Gpu::DeviceVector<int> infected_community_d(max_communities, 0);
                 Gpu::DeviceVector<int> infected_nborhood_d(max_communities * max_nborhood, 0);

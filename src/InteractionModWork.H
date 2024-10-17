@@ -108,8 +108,9 @@ void InteractionModWork<PCType, PTDType, PType>::fastInteractWork (PCType& agent
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
 #endif
-        for (MFIter mfi = agents.MakeMFIter(lev, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+        for (MFIter mfi = agents.MakeMFIter(lev); mfi.isValid(); ++mfi) {
             auto& ptile = agents.ParticlesAt(lev, mfi);
+
             const auto& ptd = ptile.getParticleTileData();
             const auto np = ptile.GetArrayOfStructs().numParticles();
             if (np == 0) continue;
@@ -118,16 +119,17 @@ void InteractionModWork<PCType, PTDType, PType>::fastInteractWork (PCType& agent
             auto workgroup_ptr = soa.GetIntData(IntIdx::workgroup).data();
             auto naics_ptr = soa.GetIntData(IntIdx::naics).data();
 
-            GetCommunityIndex<PTDType> getCommunityIndex(agents.Geom(lev), mfi.tilebox());
+            GetCommunityIndex<PTDType> getCommunityIndex;
+            getCommunityIndex.init(agents.Geom(lev), mfi.tilebox(), agents.comm_mf[mfi].array());
 
             int max_communities = getCommunityIndex.max();
             int max_workgroup = agents.getMaxGroup(IntIdx::workgroup) + 1;
-            //if (max_workgroup > np) Print() << "max workgroup " << max_workgroup << " np " << np << "\n";
-            //AMREX_ALWAYS_ASSERT(max_workgroup <= np);
             int max_naics = agents.getMaxGroup(IntIdx::naics) + 1;
-            if (max_communities * max_workgroup * max_naics > 10000000)
-                Print() << "WARNING: large allocations for interactions could result in poor performance. Reduce max grid size.\n";
 
+            //Print() << mfi.tilebox() << " np " << np << " max communities " << max_communities
+            //        << " max workgroup " << max_workgroup << " max naics " << max_naics
+            //        << " workgroup vector size " << max_communities * max_workgroup * max_naics
+            //        << "\n";
             for (int d = 0; d < n_disease; d++) {
                 Gpu::DeviceVector<int> infected_workgroup_d(max_communities * max_workgroup * max_naics, 0);
                 auto infected_workgroup_d_ptr = infected_workgroup_d.data();

@@ -148,14 +148,14 @@ void interactAgentsImpl(IModel &interaction_model, AgentContainer& agents, int b
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
 #endif
-        for (MFIter mfi = agents.MakeMFIter(lev, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+        for (MFIter mfi = agents.MakeMFIter(lev); mfi.isValid(); ++mfi) {
             auto& ptile = agents.ParticlesAt(lev, mfi);
             const auto& ptd = ptile.getParticleTileData();
             const auto np = ptile.GetArrayOfStructs().numParticles();
             if (np == 0) continue;
 
             auto& soa = ptile.GetStructOfArrays();
-            auto num_tiles = numTilesInBox(mfi.validbox(), true, bin_size);
+            auto num_tiles = numTilesInBox(mfi.tilebox(), true, bin_size);
 
             int max_group = 0;
             if (bin_idx != -1) {
@@ -173,17 +173,14 @@ void interactAgentsImpl(IModel &interaction_model, AgentContainer& agents, int b
 
             // agents are binned by community + another group. These values can change from one time step to the next so they
             // have to be recomputed (rebuild the bins) every time step
-            Binner<PTDType> binner(agents.Geom(lev), bin_size, mfi.validbox(), max_group, bin_idx);
+            Binner<PTDType> binner(agents.Geom(lev), bin_size, mfi.tilebox(), max_group, bin_idx);
             auto [bins_ptr, found] = interaction_model.getBins({mfi.index(), mfi.LocalTileIndex()});
             // If Redistribute() changes the order of particles (the default), then we need to rebuild each time step
-            //if (!found) {
-                // FIXME: there should be a command-line option to switch between the GPU and serial versions
-                // The GPU bin policy is faster, but non-deterministic.
-                if (interaction_model.fast_bin)
-                    bins_ptr->build(BinPolicy::GPU, np, ptd, num_tiles * max_group, binner);
-                else
-                    bins_ptr->build(BinPolicy::Serial, np, ptd, num_tiles * max_group, binner);
-            //}
+            // The GPU bin policy is faster, but non-deterministic.
+            if (interaction_model.fast_bin)
+                bins_ptr->build(BinPolicy::GPU, np, ptd, num_tiles * max_group, binner);
+            else
+                bins_ptr->build(BinPolicy::Serial, np, ptd, num_tiles * max_group, binner);
 
             AMREX_ALWAYS_ASSERT(bins_ptr->numBins() >= 0);
             auto inds = bins_ptr->permutationPtr();
@@ -244,23 +241,54 @@ Real infectProb(const PTDType &ptd, int infectious_i, int susceptible_i, const R
 template <typename PTDType>
 struct GetCommunityIndex
 {
-        GetCommunityIndex (const Geometry &geom, const Box &_valid_box) :  valid_box(_valid_box) {
+        //AMREX_GPU_HOST_DEVICE
+        void init (const Geometry &geom, const Box &_valid_box, Array4<int> const& comm_arr) {
+            valid_box = _valid_box;
             dxi = geom.InvCellSizeArray();
             plo = geom.ProbLoArray();
             domain = geom.Domain();
             bin_size = {AMREX_D_DECL(1, 1, 1)};
+
+            int max_communities = numTilesInBox(valid_box, true, bin_size);
+            comm_to_local_index_d.resize(max_communities);
+            comm_to_local_index_d_ptr = comm_to_local_index_d.data();
+            auto d_ptr = comm_to_local_index_d_ptr;
+            // FIXME: there must be a better way of doing this
+            ParallelFor(max_communities, [=] AMREX_GPU_DEVICE (int i) noexcept {
+                d_ptr[i] = -1;
+            });
+            Gpu::synchronize();
+
+            num_comms = 0;
+            int* num_comms_ptr = &num_comms;
+            auto bx = valid_box;
+
+            auto bsize = bin_size;
+            ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
+                if (comm_arr(i, j, k) != -1) {
+                    Box tbx;
+                    auto ti = getTileIndex(IntVect(i, j), bx, true, bsize, tbx);
+                    d_ptr[ti] = Gpu::Atomic::Add(num_comms_ptr, 1);
+                }
+            });
+            Gpu::synchronize();
         }
 
         AMREX_GPU_HOST_DEVICE
         int operator() (const PTDType& ptd, int i) const noexcept {
             Box tbx;
             auto iv = getParticleCell(ptd, i, plo, dxi, domain);
-            return getTileIndex(iv, valid_box, true, bin_size, tbx);
+
+            auto index = comm_to_local_index_d_ptr[getTileIndex(iv, valid_box, true, bin_size, tbx)];
+
+            AMREX_ASSERT(index >= 0);
+            AMREX_ASSERT(index < num_comms);
+            return index;
         }
 
         AMREX_GPU_HOST_DEVICE
         int max() {
-            return numTilesInBox(valid_box, true, bin_size);
+            return num_comms;
         }
 
 
@@ -271,6 +299,9 @@ struct GetCommunityIndex
         Box domain;
         IntVect bin_size;
         Box valid_box;
+        Gpu::DeviceVector<int> comm_to_local_index_d;
+        int* comm_to_local_index_d_ptr;
+        int num_comms;
 };
 
 

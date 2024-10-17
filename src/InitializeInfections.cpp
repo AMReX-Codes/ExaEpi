@@ -51,7 +51,7 @@ static int infect_random_community (AgentContainer& pc, /*!< Agent container (pa
     const auto domain = geom.Domain();
 
     int num_infected = 0;
-    for (MFIter mfi = pc.MakeMFIter(0, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+    for (MFIter mfi = pc.MakeMFIter(0); mfi.isValid(); ++mfi) {
         DenseBins<AgentContainer::ParticleType>& bins = bin_map[std::make_pair(mfi.index(), mfi.LocalTileIndex())];
         auto& agents_tile = pc.GetParticles(0)[std::make_pair(mfi.index(), mfi.LocalTileIndex())];
         auto& aos = agents_tile.GetArrayOfStructs();
@@ -60,7 +60,7 @@ static int infect_random_community (AgentContainer& pc, /*!< Agent container (pa
 
         if (np == 0) continue;
         auto pstruct_ptr = aos().dataPtr();
-        const Box& box = mfi.validbox();
+        const Box& box = mfi.tilebox();
 
         int ntiles = numTilesInBox(box, true, bin_size);
 
@@ -83,13 +83,12 @@ static int infect_random_community (AgentContainer& pc, /*!< Agent container (pa
         auto symptomdev_period_ptr = soa.GetRealData(r_RT+r0(d_idx)+RealIdxDisease::symptomdev_period).data();
 
         auto comm_arr = comm_mf[mfi].array();
-        auto bx = mfi.tilebox();
 
         const auto* lparm = pc.getDiseaseParameters_d(d_idx);
 
         Gpu::DeviceScalar<int> num_infected_d(num_infected);
         int* num_infected_p = num_infected_d.dataPtr();
-        ParallelForRNG(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k, amrex::RandomEngine const& engine) noexcept
+        ParallelForRNG(box, [=] AMREX_GPU_DEVICE (int i, int j, int k, amrex::RandomEngine const& engine) noexcept
         {
             if (comm_arr(i, j, k) != random_comm) return;
             Box tbx;

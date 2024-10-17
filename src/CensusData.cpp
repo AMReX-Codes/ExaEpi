@@ -181,8 +181,7 @@ void CensusData::initAgents (AgentContainer& pc,       /*!< Agents */
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
 #endif
-    for (MFIter mfi(unit_mf, TilingIfNotGPU()); mfi.isValid(); ++mfi)
-    {
+    for (MFIter mfi(unit_mf); mfi.isValid(); ++mfi) {
         auto unit_arr = unit_mf[mfi].array();
         auto FIPS_arr = FIPS_mf[mfi].array();
         auto comm_arr = comm_mf[mfi].array();
@@ -514,6 +513,9 @@ void CensusData::initAgents (AgentContainer& pc,       /*!< Agents */
 
     demo.CopyToHostAsync(demo.Unit_on_proc_d, demo.Unit_on_proc);
     amrex::Gpu::streamSynchronize();
+
+    pc.comm_mf.define(comm_mf.boxArray(), comm_mf.DistributionMap(), 1, 0);
+    iMultiFab::Copy(pc.comm_mf, comm_mf, 0, 0, 1, 0);
 }
 
 /*! \brief Read worker flow data from file and set work location for agents
@@ -648,8 +650,7 @@ void CensusData::read_workerflow (AgentContainer& pc,           /*!< Agent conta
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
 #endif
-    for (MFIter mfi(unit_mf, TilingIfNotGPU()); mfi.isValid(); ++mfi)
-    {
+    for (MFIter mfi(unit_mf); mfi.isValid(); ++mfi) {
         auto& agents_tile = pc.GetParticles(0)[std::make_pair(mfi.index(),mfi.LocalTileIndex())];
         auto& soa = agents_tile.GetStructOfArrays();
         auto age_group_ptr = soa.GetIntData(IntIdx::age_group).data();
@@ -782,7 +783,7 @@ void CensusData::assignTeachersAndWorkgroup (AgentContainer& pc       /*!< Agent
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
 #endif
-    for (MFIter mfi(unit_mf, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+    for (MFIter mfi(unit_mf); mfi.isValid(); ++mfi) {
         auto& agents_tile = pc.GetParticles(0)[std::make_pair(mfi.index(),mfi.LocalTileIndex())];
         auto& soa = agents_tile.GetStructOfArrays();
 
