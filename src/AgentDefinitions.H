@@ -224,5 +224,44 @@ bool isAnAdult (const int      a_idx, /*!< Agent index */
     return a_ptd.m_idata[IntIdx::age_group][a_idx] > 1;
 }
 
+// grade definitions
+// 0: "childcare",
+// 1: "k12pub_preschl", 2: "k12pub_kind", 3: "k12pub_1st", 4: "k12pub_2nd", 5: "k12pub_3rd", 6: "k12pub_4th", 7: "k12pub_5th",
+// 8: "k12pub_6th", 9: "k12pub_7th", 10: "k12pub_8th",
+// 11: "k12pub_9th", 12: "k12pub_10th", 13: "k12pub_11th", 14: "k12pub_12th",
+// 15: "k12pv_preschl", 16: "k12pv_kind", 17: "k12pv_1st", 18: "k12pv_2nd", 19: "k12pv_3rd", 20: "k12pv_4th", 21: "k12pv_5th",
+// 22: "k12pv_6th", 23: "k12pv_7th", 24: "k12pv_8th",
+// 25: "k12pv_9th", 26: "k12pv_10th", 27: "k12pv_11th", 28: "k12pv_12th",
+// 29: "undergrad", 30: "grad"
+
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+static bool inChildcare(const int grade) {
+    return (grade == 0);
+}
+
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+static bool inElemSchool(const int grade) {
+    // public or private school
+    // includes preschool
+    return (grade >= 1 && grade <= 7) || (grade >= 15 && grade <= 21);
+}
+
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+static bool inMiddleSchool(const int grade) {
+    return (grade >= 8 && grade <= 10) || (grade >= 22 && grade <= 24);
+}
+
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+static bool inHighSchool(const int grade) {
+    return (grade >= 11 && grade <= 14) || (grade >= 25 && grade <= 28);
+}
+
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+static bool inCollege(const int grade) {
+    return (grade >= 29);
+}
+
+
+
 
 #endif

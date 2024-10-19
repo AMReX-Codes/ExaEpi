@@ -101,29 +101,6 @@ public:
         return m_num_diseases;
     }
 
-    /* Since read_workerflow update worker status Unit-wise and not community-wise - Get total teacher needed for each unit */
-    inline const amrex::Gpu::DeviceVector<int>& getUnitTeacherCounts() const {
-        return m_unit_teacher_counts_d;
-    }
-    inline const amrex::Gpu::DeviceVector<int>& getCommDayCrTeacherCounts() const {
-        return m_comm_teacher_counts_daycr_d;
-    }
-    inline const amrex::Gpu::DeviceVector<int>& getCommHighTeacherCounts() const {
-        return m_comm_teacher_counts_high_d;
-    }
-    inline const amrex::Gpu::DeviceVector<int>& getCommMiddleTeacherCounts() const {
-        return m_comm_teacher_counts_middle_d;
-    }
-    inline const amrex::Gpu::DeviceVector<int>& getCommElem3TeacherCounts() const {
-        return m_comm_teacher_counts_elem3_d;
-    }
-    inline const amrex::Gpu::DeviceVector<int>& getCommElem4TeacherCounts() const {
-        return m_comm_teacher_counts_elem4_d;
-    }
-    inline const amrex::Gpu::DeviceVector<int>& getCommTeacherCounts() const {
-        return m_comm_teacher_counts_total_d;
-    }
-
     /*! \brief return the symptomatic withdrawal status */
     inline int symptomaticWithdraw() const {
         return m_symptomatic_withdraw;
@@ -134,15 +111,12 @@ public:
         return m_symptomatic_withdraw_compliance;
     }
 
+    void printStudentTeacherCounts() const;
+
     amrex::iMultiFab m_student_counts;
-    amrex::Gpu::DeviceVector<int> m_unit_teacher_counts_d;
-    amrex::Gpu::DeviceVector<int> m_comm_teacher_counts_total_d;
-    amrex::Gpu::DeviceVector<int> m_comm_teacher_counts_high_d;
-    amrex::Gpu::DeviceVector<int> m_comm_teacher_counts_middle_d;
-    amrex::Gpu::DeviceVector<int> m_comm_teacher_counts_elem3_d;
-    amrex::Gpu::DeviceVector<int> m_comm_teacher_counts_elem4_d;
-    amrex::Gpu::DeviceVector<int> m_comm_teacher_counts_daycr_d;
-    std::vector<long> m_student_teacher_ratios = {20, 20, 20, 20, 20, 1000000000}; // ignore daycare teachers since daycare interaction isnt handled yet!
+    //std::vector<long> m_student_teacher_ratios = {15, 15, 15, 15, 15, 15};
+    std::vector<long> m_student_teacher_ratios = {20, 20, 20, 20, 20, 20};
+    //std::vector<long> m_student_teacher_ratios = {100, 100, 100, 100, 100, 100};
 
     int m_num_diseases; /*!< Number of diseases */
     std::vector<std::string> m_disease_names; /*!< names of the diseases */

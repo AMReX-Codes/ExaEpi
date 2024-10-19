@@ -374,6 +374,7 @@ void UrbanPopData::initAgents (AgentContainer &pc, const ExaEpi::TestParams &par
             FIPS_arr(x, y, 0, 1) = tract_codes_ptr[i];
             comm_arr(x, y, 0) = comms_ptr[i];
         });
+        Gpu::synchronize();
 
         if (num_communities == 0) continue;
 
@@ -483,6 +484,7 @@ void UrbanPopData::initAgents (AgentContainer &pc, const ExaEpi::TestParams &par
                 work_nborhood_ptr[i] = nborhood_ptr[i];
             }
         });
+        Gpu::synchronize();
 
         // now ensure that all members of the same family have the same home nborhood
         ParallelFor (np, [=] AMREX_GPU_DEVICE (int i) noexcept {
@@ -495,6 +497,7 @@ void UrbanPopData::initAgents (AgentContainer &pc, const ExaEpi::TestParams &par
             }
             nborhood_ptr[i] = nborhood;
         });
+        Gpu::synchronize();
 
     }
 
@@ -526,6 +529,8 @@ void UrbanPopData::initAgents (AgentContainer &pc, const ExaEpi::TestParams &par
             << "Communities: " << all_num_communities << " (balance " << load_balance_communities << ")\n";
 
     num_communities = all_num_communities;
+
+    pc.printStudentTeacherCounts();
 }
 
 

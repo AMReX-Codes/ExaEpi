@@ -42,7 +42,7 @@ struct CensusData
 
     void read_workerflow (AgentContainer& pc, const std::string &workerflow_filename, const int workgroup_size);
 
-  private:
+  //private:
     void assignTeachersAndWorkgroup (AgentContainer& pc, const int workgroup_size);
 
 };

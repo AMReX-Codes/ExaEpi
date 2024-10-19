@@ -709,3 +709,46 @@ void AgentContainer::interactNight (MultiFab& a_mask_behavior /*!< Masking behav
         m_interactions[ExaEpi::InteractionNames::home_nborhood]->interactAgents(*this, a_mask_behavior);
     }
 }
+
+void AgentContainer::printStudentTeacherCounts() const {
+    ReduceOps<ReduceOpSum, ReduceOpSum, ReduceOpSum, ReduceOpSum, ReduceOpSum,
+                ReduceOpSum, ReduceOpSum, ReduceOpSum, ReduceOpSum, ReduceOpSum> reduce_ops;
+    auto r = ParticleReduce<ReduceData<int, int, int, int, int, int, int, int, int, int>> (
+                *this, [=] AMREX_GPU_DEVICE (const AgentContainer::ParticleTileType::ConstParticleTileDataType& ptd,
+                                            const int i) noexcept
+                -> GpuTuple<int, int, int, int, int, int, int, int, int, int>
+            {
+                int counts[10] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+                if (ptd.m_idata[IntIdx::school_id][i] > 0) {
+                    int pos = (ptd.m_idata[IntIdx::workgroup][i] > 0 ? 0 : 5);
+                    int grade = ptd.m_idata[IntIdx::school_grade][i];
+                    if (inHighSchool(grade)) counts[pos] = 1;
+                    else if (inMiddleSchool(grade)) counts[pos + 1] = 1;
+                    else if (inElemSchool(grade)) counts[pos + 2] = 1;
+                    else if (inChildcare(grade)) counts[pos + 3] = 1;
+                    else if (inCollege(grade)) counts[pos + 4] = 1;
+                }
+                return {counts[0], counts[1], counts[2], counts[3], counts[4],
+                        counts[5], counts[6], counts[7], counts[8], counts[9]};
+            }, reduce_ops);
+
+    std::array<Long, 10> counts = {amrex::get<0>(r), amrex::get<1>(r), amrex::get<2>(r), amrex::get<3>(r), amrex::get<4>(r),
+                                  amrex::get<5>(r), amrex::get<6>(r), amrex::get<7>(r), amrex::get<8>(r), amrex::get<9>(r)};
+    ParallelDescriptor::ReduceLongSum(&counts[0], 10, ParallelDescriptor::IOProcessorNumber());
+    if (ParallelDescriptor::MyProc() == ParallelDescriptor::IOProcessorNumber()) {
+        int total_educators = 0;
+        int total_students = 0;
+        for (int i = 0; i < 5; i++) {
+            total_educators += counts[i];
+            total_students += counts[i + 5];
+        }
+        Print() << "School counts: (educators, students, ratio)\n" << std::fixed << std::setprecision(1)
+                << "  High       " << counts[0] << " " << counts[5] << " " << ((Real)counts[5] / counts[0]) << "\n"
+                << "  Middle     " << counts[1] << " " << counts[6] << " " << ((Real)counts[6] / counts[1]) << "\n"
+                << "  Elementary " << counts[2] << " " << counts[7] << " " << ((Real)counts[7] / counts[2]) << "\n"
+                << "  Childcare  " << counts[3] << " " << counts[8] << " " << ((Real)counts[8] / counts[3]) << "\n"
+                << "  College    " << counts[4] << " " << counts[9] << " " << ((Real)counts[9] / counts[4]) << "\n"
+                << "  Total      " << total_educators << " " << total_students << " "
+                << ((Real)total_students / total_educators) << "\n";
+    }
+}
