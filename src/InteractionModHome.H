@@ -137,11 +137,10 @@ void InteractionModHome<PCType, PTDType, PType>::fastInteractHome (PCType& agent
             */
 
             // set vectors to store counts of infected agents for each group
-            {BL_PROFILE("allocate_modhome_vectors");
             infected_family_d[OMP_THREAD_NUM].resize(max_communities * max_family);
             infected_family_not_withdrawn_d[OMP_THREAD_NUM].resize(max_communities * max_family);
             infected_nc_d[OMP_THREAD_NUM].resize(max_communities * num_ncs * max_nborhood);
-            }
+
             auto infected_family_d_ptr = infected_family_d[OMP_THREAD_NUM].data();
             auto infected_family_not_withdrawn_d_ptr = infected_family_not_withdrawn_d[OMP_THREAD_NUM].data();
             auto infected_nc_d_ptr = infected_nc_d[OMP_THREAD_NUM].data();
@@ -175,7 +174,6 @@ void InteractionModHome<PCType, PTDType, PType>::fastInteractHome (PCType& agent
                         }
                     });
                     Gpu::synchronize();
-                    {BL_PROFILE("Set_infected_probs")
                     // Loop to compute infection probability for each susceptible agent.
                     // For each agent, find count of infectious agents in each group and use that as the exponent to compute the
                     // infection probability. In cases where there is an overlap (e.g. infectious agents in same family
@@ -210,7 +208,6 @@ void InteractionModHome<PCType, PTDType, PType>::fastInteractHome (PCType& agent
                         }
                     });
                     Gpu::synchronize();
-                    }
                 }
             }
         }
