@@ -728,24 +728,12 @@ void CensusData::assignTeachersAndWorkgroup (AgentContainer& pc, const int workg
             }
         });
     }
-    /*
-    int total_unfilled = 0;
-    for (int i = 0; i < Ncommunity; i++) {
-        for (int j = 0; j < 5; j++) if (teacher_counts_ptr[j][i] > 0) total_unfilled += teacher_counts_ptr[j][i];
-    }
-    std::stringstream os;
-    os << ParallelDescriptor::MyProc() << " Total unfilled before " << total_unfilled << "\n";
-    AllPrint() << os.str();
-    */
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
 #endif
     for (MFIter mfi(unit_mf); mfi.isValid(); ++mfi) {
         auto& agents_tile = pc.GetParticles(0)[std::make_pair(mfi.index(),mfi.LocalTileIndex())];
         auto& soa = agents_tile.GetStructOfArrays();
-
-        auto Ndaywork = demo.Ndaywork.data();
-        auto Start = demo.Start.data();
 
         auto np = soa.numParticles();
 
@@ -807,14 +795,5 @@ void CensusData::assignTeachersAndWorkgroup (AgentContainer& pc, const int workg
         });
         Gpu::synchronize();
     }
-    /*
-    total_unfilled = 0;
-    for (int i = 0; i < Ncommunity; i++) {
-        for (int j = 0; j < 5; j++) if (teacher_counts_ptr[j][i] > 0) total_unfilled += teacher_counts_ptr[j][i];
-    }
-    std::stringstream os2;
-    os2 << ParallelDescriptor::MyProc() << " Total unfilled after " << total_unfilled << "\n";
-    AllPrint() << os2.str();
-    */
 }
 

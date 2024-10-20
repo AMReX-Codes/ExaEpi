@@ -250,14 +250,9 @@ struct GetCommunityIndex
             bin_size = {AMREX_D_DECL(1, 1, 1)};
 
             int max_communities = numTilesInBox(valid_box, true, bin_size);
-            comm_to_local_index_d.resize(max_communities);
+            comm_to_local_index_d.resize(max_communities, -1);
             comm_to_local_index_d_ptr = comm_to_local_index_d.data();
             auto d_ptr = comm_to_local_index_d_ptr;
-            // FIXME: there must be a better way of doing this
-            ParallelFor(max_communities, [=] AMREX_GPU_DEVICE (int i) noexcept {
-                d_ptr[i] = -1;
-            });
-            Gpu::synchronize();
 
             num_comms = 0;
             int* num_comms_ptr = &num_comms;
@@ -304,6 +299,18 @@ struct GetCommunityIndex
         int num_comms;
 };
 
+#ifdef AMREX_USE_CUDA
+#define dev_memset cudaMemset
+#else
+#define dev_memset memset
+#endif
 
+#ifdef AMREX_USE_OMP
+#define OMP_MAX_THREADS omp_get_max_threads()
+#define OMP_THREAD_NUM omp_get_thread_num()
+#else
+#define OMP_MAX_THREADS 1
+#define OMP_THREAD_NUM 0
+#endif
 
 #endif

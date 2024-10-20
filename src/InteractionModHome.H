@@ -99,6 +99,11 @@ void InteractionModHome<PCType, PTDType, PType>::fastInteractHome (PCType& agent
 
     HomeCandidate<PTDType> isHomeCandidate;
 
+    // each thread needs its own vector
+    Vector<Gpu::DeviceVector<int>> infected_family_d(OMP_MAX_THREADS);
+    Vector<Gpu::DeviceVector<int>> infected_family_not_withdrawn_d(OMP_MAX_THREADS);
+    Vector<Gpu::DeviceVector<int>> infected_nc_d(OMP_MAX_THREADS);
+
     for (int lev = 0; lev < agents.numLevels(); ++lev) {
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
@@ -123,26 +128,32 @@ void InteractionModHome<PCType, PTDType, PType>::fastInteractHome (PCType& agent
             int num_ncs = max_family / FAMILIES_PER_CLUSTER + 1;
 
             /*
-            if (max_communities == 9) {
-                Print() << mfi.tilebox() << " np " << np << " max communities " << max_communities
-                        << " max family " << max_family << " max nborhood " << max_nborhood << " max ncs " << num_ncs
-                        << " family vector size " << max_communities * max_family
-                        << " nc vector size " << max_communities * num_ncs * max_nborhood
-                        << "\n";
-            }
+            AllPrint() << "Thread " << omp_get_thread_num() << " "
+                       << mfi.tilebox() << " np " << np << " max communities " << max_communities
+                       << " max family " << max_family << " max nborhood " << max_nborhood << " max ncs " << num_ncs
+                       << " family vector size " << max_communities * max_family
+                       << " nc vector size " << max_communities * num_ncs * max_nborhood
+                       << "\n";
             */
+
+            // set vectors to store counts of infected agents for each group
+            {BL_PROFILE("allocate_modhome_vectors");
+            infected_family_d[OMP_THREAD_NUM].resize(max_communities * max_family);
+            infected_family_not_withdrawn_d[OMP_THREAD_NUM].resize(max_communities * max_family);
+            infected_nc_d[OMP_THREAD_NUM].resize(max_communities * num_ncs * max_nborhood);
+            }
+            auto infected_family_d_ptr = infected_family_d[OMP_THREAD_NUM].data();
+            auto infected_family_not_withdrawn_d_ptr = infected_family_not_withdrawn_d[OMP_THREAD_NUM].data();
+            auto infected_nc_d_ptr = infected_nc_d[OMP_THREAD_NUM].data();
 
             for (int d = 0; d < n_disease; d++) {
                 // calculate separately for infected children and infected adults, since they have different transmission rates
                 for (auto adults : {true, false}) {
-                    // set vectors to store counts of infected agents for each group
-                    Gpu::DeviceVector<int> infected_family_d(max_communities * max_family, 0);
-                    auto infected_family_d_ptr = infected_family_d.data();
-                    Gpu::DeviceVector<int> infected_family_not_withdrawn_d(max_communities * max_family, 0);
-                    auto infected_family_not_withdrawn_d_ptr = infected_family_not_withdrawn_d.data();
-                    Gpu::DeviceVector<int> infected_nc_d(max_communities * num_ncs * max_nborhood, 0);
-                    auto infected_nc_d_ptr = infected_nc_d.data();
-
+                    {BL_PROFILE("fill_modhome_vectors");
+                    dev_memset(infected_family_d_ptr, 0, infected_family_d[OMP_THREAD_NUM].size() * sizeof(int));
+                    dev_memset(infected_family_not_withdrawn_d_ptr, 0, infected_family_not_withdrawn_d[OMP_THREAD_NUM].size() * sizeof(int));
+                    dev_memset(infected_nc_d_ptr, 0, infected_nc_d[OMP_THREAD_NUM].size() * sizeof(int));
+                    }
                     auto prob_ptr = soa.GetRealData(RealIdx::nattribs + r0(d) + RealIdxDisease::prob).data();
                     auto lparm = agents.getDiseaseParameters_d(d);
                     auto lparm_h = agents.getDiseaseParameters_h(d);
@@ -164,6 +175,7 @@ void InteractionModHome<PCType, PTDType, PType>::fastInteractHome (PCType& agent
                         }
                     });
                     Gpu::synchronize();
+                    {BL_PROFILE("Set_infected_probs")
                     // Loop to compute infection probability for each susceptible agent.
                     // For each agent, find count of infectious agents in each group and use that as the exponent to compute the
                     // infection probability. In cases where there is an overlap (e.g. infectious agents in same family
@@ -198,6 +210,7 @@ void InteractionModHome<PCType, PTDType, PType>::fastInteractHome (PCType& agent
                         }
                     });
                     Gpu::synchronize();
+                    }
                 }
             }
         }

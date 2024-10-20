@@ -103,6 +103,8 @@ void InteractionModWork<PCType, PTDType, PType>::fastInteractWork (PCType& agent
 
     WorkCandidate<PTDType> isCandidate;
 
+    Vector<Gpu::DeviceVector<int>> infected_workgroup_d(OMP_MAX_THREADS);
+
     for (int lev = 0; lev < agents.numLevels(); ++lev) {
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
@@ -125,13 +127,15 @@ void InteractionModWork<PCType, PTDType, PType>::fastInteractWork (PCType& agent
             int max_workgroup = agents.getMaxGroup(IntIdx::workgroup) + 1;
             int max_naics = agents.getMaxGroup(IntIdx::naics) + 1;
 
+            infected_workgroup_d[OMP_THREAD_NUM].resize(max_communities * max_workgroup * max_naics);
+            auto infected_workgroup_d_ptr = infected_workgroup_d[OMP_THREAD_NUM].data();
+
             //Print() << mfi.tilebox() << " np " << np << " max communities " << max_communities
             //        << " max workgroup " << max_workgroup << " max naics " << max_naics
             //        << " workgroup vector size " << max_communities * max_workgroup * max_naics
             //        << "\n";
             for (int d = 0; d < n_disease; d++) {
-                Gpu::DeviceVector<int> infected_workgroup_d(max_communities * max_workgroup * max_naics, 0);
-                auto infected_workgroup_d_ptr = infected_workgroup_d.data();
+                dev_memset(infected_workgroup_d_ptr, 0, infected_workgroup_d[OMP_THREAD_NUM].size() * sizeof(int));
 
                 auto prob_ptr = soa.GetRealData(RealIdx::nattribs + r0(d) + RealIdxDisease::prob).data();
                 auto lparm = agents.getDiseaseParameters_d(d);

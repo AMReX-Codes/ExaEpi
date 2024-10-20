@@ -90,6 +90,10 @@ void InteractionModHomeNborhood<PCType, PTDType, PType>::fastInteractHomeNborhoo
 
     HomeNborhoodCandidate<PTDType> isCandidate;
 
+    Vector<Gpu::DeviceVector<int>> infected_community_d(OMP_MAX_THREADS);
+    Vector<Gpu::DeviceVector<int>> infected_nborhood_d(OMP_MAX_THREADS);
+
+
     for (int lev = 0; lev < agents.numLevels(); ++lev) {
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
@@ -109,6 +113,12 @@ void InteractionModHomeNborhood<PCType, PTDType, PType>::fastInteractHomeNborhoo
             int max_communities = getCommunityIndex.max();
             int max_nborhood = agents.getMaxGroup(IntIdx::nborhood) + 1;
             AMREX_ALWAYS_ASSERT(max_nborhood <= np);
+
+            infected_community_d[OMP_THREAD_NUM].resize(max_communities);
+            infected_nborhood_d[OMP_THREAD_NUM].resize(max_communities * max_nborhood);
+            auto infected_community_d_ptr = infected_community_d[OMP_THREAD_NUM].data();
+            auto infected_nborhood_d_ptr = infected_nborhood_d[OMP_THREAD_NUM].data();
+
             /*
             Print() << mfi.tilebox() << " np " << np << " max communities " << max_communities
                     << " max nborhood " << max_nborhood
@@ -116,10 +126,8 @@ void InteractionModHomeNborhood<PCType, PTDType, PType>::fastInteractHomeNborhoo
                     << "\n";
             */
             for (int d = 0; d < n_disease; d++) {
-                Gpu::DeviceVector<int> infected_community_d(max_communities, 0);
-                Gpu::DeviceVector<int> infected_nborhood_d(max_communities * max_nborhood, 0);
-                auto infected_community_d_ptr = infected_community_d.data();
-                auto infected_nborhood_d_ptr = infected_nborhood_d.data();
+                dev_memset(infected_community_d_ptr, 0, infected_community_d[OMP_THREAD_NUM].size() * sizeof(int));
+                dev_memset(infected_nborhood_d_ptr, 0, infected_nborhood_d[OMP_THREAD_NUM].size() * sizeof(int));
 
                 auto prob_ptr = soa.GetRealData(RealIdx::nattribs + r0(d) + RealIdxDisease::prob).data();
                 auto lparm = agents.getDiseaseParameters_d(d);

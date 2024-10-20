@@ -215,6 +215,7 @@ void runAgent ()
         }
     }
 
+    /*
     string agents_fname = std::string("agents.") + (params.ic_type == ICType::UrbanPop ? "urbanpop" : "census") + ".csv";
     pc.WriteAsciiFile(agents_fname);
     if (ParallelDescriptor::IOProcessor()) {
@@ -246,8 +247,7 @@ void runAgent ()
                  << "symptomatic\n";
         agents_f.close();
     }
-
-    //if (params.ic_type == ICType::UrbanPop) return;
+    */
 
     std::vector<int>  step_of_peak(params.num_diseases, 0);
     std::vector<Long> num_infected_peak(params.num_diseases, 0);

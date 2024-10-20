@@ -113,6 +113,9 @@ void InteractionModSchool<PCType, PTDType, PType>::fastInteractSchool (PCType& a
 
     SchoolCandidate<PTDType> isCandidate;
 
+    Vector<Gpu::DeviceVector<int>> infected_school_d(OMP_MAX_THREADS);
+    Vector<Gpu::DeviceVector<int>> infected_daycare_d(OMP_MAX_THREADS);
+
     for (int lev = 0; lev < agents.numLevels(); ++lev) {
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
@@ -134,6 +137,12 @@ void InteractionModSchool<PCType, PTDType, PType>::fastInteractSchool (PCType& a
             int max_communities = getCommunityIndex.max();
             int max_school_grade = agents.getMaxGroup(IntIdx::school_grade) + 1;
             int max_school_id = agents.getMaxGroup(IntIdx::school_id) + 1;
+
+            infected_school_d[OMP_THREAD_NUM].resize(max_communities * max_school_id * max_school_grade);
+            infected_daycare_d[OMP_THREAD_NUM].resize(max_communities * max_school_id * max_school_grade);
+            auto infected_school_d_ptr = infected_school_d[OMP_THREAD_NUM].data();
+            auto infected_daycare_d_ptr = infected_daycare_d[OMP_THREAD_NUM].data();
+
             /*
             Print() << mfi.tilebox() << " np " << np << " max communities " << max_communities
                     << " max school id " << max_school_id << " max school grade " << max_school_grade
@@ -142,10 +151,8 @@ void InteractionModSchool<PCType, PTDType, PType>::fastInteractSchool (PCType& a
             */
             for (int d = 0; d < n_disease; d++) {
                 for (auto adults : {true, false}) {
-                    Gpu::DeviceVector<int> infected_school_d(max_communities * max_school_id * max_school_grade, 0);
-                    auto infected_school_d_ptr = infected_school_d.data();
-                    Gpu::DeviceVector<int> infected_daycare_d(max_communities * max_school_id * max_school_grade, 0);
-                    auto infected_daycare_d_ptr = infected_daycare_d.data();
+                    dev_memset(infected_school_d_ptr, 0, infected_school_d[OMP_THREAD_NUM].size() * sizeof(int));
+                    dev_memset(infected_daycare_d_ptr, 0, infected_daycare_d[OMP_THREAD_NUM].size() * sizeof(int));
 
                     auto prob_ptr = soa.GetRealData(RealIdx::nattribs + r0(d) + RealIdxDisease::prob).data();
                     auto lparm = agents.getDiseaseParameters_d(d);

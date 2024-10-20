@@ -101,7 +101,7 @@ AgentContainer::AgentContainer (const amrex::Geometry            & a_geom,  /*!<
 #endif
     }
 
-    max_attribute_values.fill(0);
+    max_attribute_values.fill(-1);
 }
 
 
@@ -631,9 +631,9 @@ std::array<Long, 9> AgentContainer::getTotals (const int a_d /*!< disease index 
 
 int AgentContainer::getMaxGroup (const int group_idx) {
     BL_PROFILE("getMaxGroup");
-    if (max_attribute_values[group_idx] == 0) {
-        amrex::ReduceOps<ReduceOpMax> reduce_ops;
-        auto r = amrex::ParticleReduce<ReduceData<int>> (*this,
+    if (max_attribute_values[group_idx] == -1) {
+        ReduceOps<ReduceOpMax> reduce_ops;
+        auto r = ParticleReduce<ReduceData<int>> (*this,
             [=] AMREX_GPU_DEVICE (const AgentContainer::ParticleTileType::ConstParticleTileDataType& ptd, const int i) noexcept
             -> GpuTuple<int>
             {
