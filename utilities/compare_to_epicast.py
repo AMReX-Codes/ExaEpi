@@ -12,10 +12,6 @@ import matplotlib.pyplot as plt
 from scipy.integrate import solve_ivp
 from scipy.optimize import minimize
 
-# Doubles title/axis-label/tick-label/legend sizes everywhere, since they all scale off
-# font.size by default and none of them are overridden elsewhere in this script.
-plt.rcParams["font.size"] *= 2
-
 sys.path.insert(0, os.path.dirname(__file__))
 from read_epicast_events import (
     read_events_bin,
@@ -23,6 +19,9 @@ from read_epicast_events import (
     aggregate_infections_by_source,
     SOURCE_CATEGORIES,
 )
+from plos_compbio_style import apply_style, FULL_PAGE_WIDTH_IN, FONT_TICK, AXES_LINEWIDTH
+
+apply_style()
 
 
 def load_epicast(fname):
@@ -684,10 +683,10 @@ def _mark_day_zero(ax, x, label, color):
     """Draw a vertical marker + label at x-position `x`, marking where some curve's own day 0
     lands after a shift is applied, so a shifted curve's origin stays visible instead of implicit.
     """
-    ax.axvline(x, color=color, linestyle=":", linewidth=2, zorder=0, alpha=0.7)
+    ax.axvline(x, color=color, linestyle=":", linewidth=1, zorder=0, alpha=0.7)
     ax.annotate(
         label, xy=(x, 0.98), xycoords=("data", "axes fraction"),
-        rotation=90, va="top", ha="right", fontsize=12, color=color, alpha=0.8,
+        rotation=90, va="top", ha="right", fontsize=FONT_TICK, color=color, alpha=0.8,
     )
 
 
@@ -721,12 +720,14 @@ _CONTEXT_COLS = {
 
 def plot_context(ax, exaepi_data):
     """Plot per-context expected infections from ExaEpi diagnostic columns."""
-    ax.set_title("Expected infections by context (ExaEpi)")
+    # Shortened from "Expected infections by context (ExaEpi)" -- doesn't fit at PLOS's 8-12pt
+    # font floor on this panel's now-much-smaller width.
+    ax.set_title("Infections by context (ExaEpi)")
     ax.set_xlabel("Days")
     ax.set_ylabel("Expected new infections")
     ax.set_xlim([0, args.xlimit])
-    ax.grid(True, which="major")
-    ax.grid(True, which="minor", alpha=0.3)
+    ax.grid(True, which="major", linewidth=AXES_LINEWIDTH)
+    ax.grid(True, which="minor", alpha=0.3, linewidth=AXES_LINEWIDTH)
     ax.minorticks_on()
 
     for entry, group_shift in zip(exaepi_data, shift_by_group):
@@ -735,12 +736,12 @@ def plot_context(ax, exaepi_data):
             for col, (label_str, color) in _CONTEXT_COLS.items():
                 if col in df.columns:
                     y = df[col].values[:args.xlimit]
-                    ax.plot(x, y, label=label_str, color=color, linewidth=2)
+                    ax.plot(x, y, label=label_str, color=color, linewidth=1)
 
     if exaepi_data:
         _mark_exaepi_start(ax, shift_by_group)
 
-    ax.legend(fontsize=14)
+    ax.legend()
 
 
 _SOURCE_LABELS = {
@@ -801,8 +802,8 @@ def plot_single_source(ax, epicast_data, exaepi_data, source_key, title, ylimit)
     ax.set_ylabel("Fraction of total exposed")
     ax.set_xlim([0, args.xlimit])
     ax.set_ylim([0, ylimit])
-    ax.grid(True, which="major")
-    ax.grid(True, which="minor", alpha=0.3)
+    ax.grid(True, which="major", linewidth=AXES_LINEWIDTH)
+    ax.grid(True, which="minor", alpha=0.3, linewidth=AXES_LINEWIDTH)
     ax.minorticks_on()
 
     col = source_key + "_frac"
@@ -825,12 +826,13 @@ def plot_single_source(ax, epicast_data, exaepi_data, source_key, title, ylimit)
                 y_mat = _align_arrays(entry["dfs"], col, args.xlimit)
                 ax.fill_between(x[: y_mat.shape[1]], y_mat.min(axis=0), y_mat.max(axis=0),
                                 alpha=0.25, color="blue", zorder=1, label="_nolegend_")
-            ax.plot(x[: len(y)], y, color="blue", linewidth=3, linestyle="-", label="Epicast")
+            ax.plot(x[: len(y)], y, color="blue", linewidth=1, linestyle="-", label="Epicast")
             auc = float(np.sum(y))
-            print(f"  AUC Epicast: {auc:.3f}")
+            print(f"  Epicast AUC: {auc:.3f}")
             if legend_label is not None:
-                ax.text(0.98, 0.97 - row * 0.05, f"{legend_label} AUC: {auc:.3f}",
-                        transform=ax.transAxes, ha="right", va="top", fontsize=20, color="blue")
+                text = f"{legend_label} AUC: {auc:.3f}" if args.show_auc else legend_label
+                ax.text(0.98, 0.95 - row * 0.09, text,
+                        transform=ax.transAxes, ha="right", va="top", fontsize=FONT_TICK, color="blue")
                 row += 1
             reference_y = _shift_array(y, epicast_shift, args.xlimit)
 
@@ -846,7 +848,7 @@ def plot_single_source(ax, epicast_data, exaepi_data, source_key, title, ylimit)
                 y_mat = _align_arrays(entry["dfs"], col, args.xlimit)
                 ax.fill_between(x[: y_mat.shape[1]], y_mat.min(axis=0), y_mat.max(axis=0),
                                 alpha=0.25, color="red", zorder=1, label="_nolegend_")
-            ax.plot(x[: len(y)], y, color="red", linewidth=3, linestyle="-", label="ExaEpi")
+            ax.plot(x[: len(y)], y, color="red", linewidth=1, linestyle="-", label="ExaEpi")
             auc = float(np.sum(y))
             gof_str = ""
             if reference_y is not None:
@@ -856,10 +858,11 @@ def plot_single_source(ax, epicast_data, exaepi_data, source_key, title, ylimit)
                     r2_str    = f"{r2:.3f}"    if np.isfinite(r2)    else "N/A"
                     nrmse_str = f"{nrmse:.3f}" if np.isfinite(nrmse) else "N/A"
                     gof_str = f"  R²={r2_str}  NRMSE={nrmse_str}"
-            print(f"  AUC ExaEpi: {auc:.3f}{gof_str}")
+            print(f"  ExaEpi AUC: {auc:.3f}{gof_str}")
             if legend_label is not None:
-                ax.text(0.98, 0.97 - row * 0.05, f"{legend_label} AUC: {auc:.3f}",
-                        transform=ax.transAxes, ha="right", va="top", fontsize=20, color="red")
+                text = f"{legend_label} AUC: {auc:.3f}" if args.show_auc else legend_label
+                ax.text(0.98, 0.95 - row * 0.09, text,
+                        transform=ax.transAxes, ha="right", va="top", fontsize=FONT_TICK, color="red")
                 row += 1
 
 
@@ -883,7 +886,8 @@ def plot_series(ax, epicast_data, exaepi_data, label, seir_dfs=None, fit_results
     # curves stay visually distinguishable (a short fixed color list ran out of contrast for
     # more than a couple of curves).
 #    seir_colors = ([plt.cm.Greens(x) for x in np.linspace(0.35, 0.85, len(seir_dfs))]
-    seir_colors = ([plt.cm.Greens(x) for x in np.linspace(0.55, 0.75, len(seir_dfs))]
+    #seir_colors = ([plt.cm.Greens(x) for x in np.linspace(0.55, 0.75, len(seir_dfs))]
+    seir_colors = ([plt.cm.Greens(x) for x in np.linspace(0.55, 1.0, len(seir_dfs))]
                    if seir_dfs else [])
 
     col_name   = label.lower().replace(" ", "_")
@@ -913,7 +917,7 @@ def plot_series(ax, epicast_data, exaepi_data, label, seir_dfs=None, fit_results
     if fit_results and seir_col is not None:
         for (series_lbl, _, _, _, _, _, _, _, _, fdf) in fit_results:
             fit_y = fdf[seir_col].values[: args.xlimit]
-            ax.plot(np.arange(len(fit_y)), fit_y, color="green", linewidth=6, linestyle="-", zorder=1)
+            ax.plot(np.arange(len(fit_y)), fit_y, color="green", linewidth=2, linestyle="-", zorder=1)
             auc = np.sum(fit_y)
             fit_lbl = f"SEIRHD fit ({series_lbl})" if series_lbl else "SEIRHD fit"
             auc_lines.append((fit_lbl, auc, "green", False, _shift_array(fit_y, 0, args.xlimit), False, True))
@@ -935,7 +939,7 @@ def plot_series(ax, epicast_data, exaepi_data, label, seir_dfs=None, fit_results
 
             ax.fill_between(x_vals, y_min, y_max, alpha=0.25, color=color,
                             zorder=1, label="_nolegend_")
-            ax.plot(x_vals, y_medoid, label=plot_label, color=color, linewidth=2, zorder=2)
+            ax.plot(x_vals, y_medoid, label=plot_label, color=color, linewidth=1, zorder=2)
             auc = float(np.sum(y_medoid))
             y_for_gof = _shift_array(y_medoid, x_shift, args.xlimit)
         else:
@@ -943,7 +947,7 @@ def plot_series(ax, epicast_data, exaepi_data, label, seir_dfs=None, fit_results
             x_vals = (df[x_col] + x_shift) if x_col else np.arange(len(df[col]))
             y_vals = df[col]
             auc    = float(np.sum(y_vals[: args.xlimit]))
-            ax.plot(x_vals, y_vals, label=plot_label, color=color, linewidth=2, zorder=2)
+            ax.plot(x_vals, y_vals, label=plot_label, color=color, linewidth=1, zorder=2)
             y_for_gof = _shift_array(y_vals.values, x_shift, args.xlimit)
 
         return legend_label, auc, color, is_wildcard, y_for_gof
@@ -972,13 +976,16 @@ def plot_series(ax, epicast_data, exaepi_data, label, seir_dfs=None, fit_results
             ax.plot(
                 np.arange(len(seir_y)), seir_y,
                 label=f"{short_lbl} (β={p['beta']}, h={p['hosp_rate']}, μ={p['mu']})",
-                color=color, linewidth=4, linestyle="-",
+                color=color, linewidth=1.5, linestyle="-",
             )
             auc_lines.append((short_lbl, np.sum(seir_y), color, False,
                                _shift_array(seir_y, 0, args.xlimit), False, True))
 
+    # Shortened from "Number of " + label (e.g. "Number of Cumulative Exposed") -- doesn't fit at
+    # PLOS's 8-12pt font floor on this panel's now-much-smaller width; the plot's own title
+    # already names the series, so the axis label doesn't need to restate it in full.
     ax.set_xlabel("Days")
-    ax.set_ylabel("Number of " + label)
+    ax.set_ylabel(label)
     ax.set_xlim([0, args.xlimit])
 
     if epicast_shift:
@@ -1012,8 +1019,8 @@ def plot_series(ax, epicast_data, exaepi_data, label, seir_dfs=None, fit_results
         ax.set_ylim([0, 1.1 * max(max_vals)])
 
     ax.set_title(label)
-    ax.grid(True, which="major")
-    ax.grid(True, which="minor", alpha=0.3)
+    ax.grid(True, which="major", linewidth=AXES_LINEWIDTH)
+    ax.grid(True, which="minor", alpha=0.3, linewidth=AXES_LINEWIDTH)
     ax.minorticks_on()
 
     # Annotate per-series summary values in the upper-right corner (or lower-right for the
@@ -1068,8 +1075,8 @@ def plot_series(ax, epicast_data, exaepi_data, label, seir_dfs=None, fit_results
         # entry placed ends up at the bottom -- draw in reverse to keep the on-plot top-to-bottom
         # reading order matching the other plots' top-anchored (va="top") AUC block above.
         for row, (lbl_str, max_val, color) in enumerate(reversed(text_entries)):
-            ax.text(0.98, 0.03 + row * 0.055, f"Max {lbl_str}: {max_val:,.0f}",
-                    transform=ax.transAxes, ha="right", va="bottom", fontsize=20, color=color)
+            ax.text(0.98, 0.03 + row * 0.09, f"Max {lbl_str}: {max_val:,.0f}",
+                    transform=ax.transAxes, ha="right", va="bottom", fontsize=FONT_TICK, color=color)
     else:
         row = 0
         for lbl, auc, color, is_wildcard, y_for_gof, is_reference, is_seir in auc_lines:
@@ -1082,7 +1089,7 @@ def plot_series(ax, epicast_data, exaepi_data, label, seir_dfs=None, fit_results
                     r2_str    = f"{r2:.3f}"    if np.isfinite(r2)    else "N/A"
                     nrmse_str = f"{nrmse:.3f}" if np.isfinite(nrmse) else "N/A"
                     gof_str = f"  R²={r2_str}  NRMSE={nrmse_str}"
-            print(f"  AUC {lbl_str}: {auc:,.0f}{gof_str}")
+            print(f"  {lbl_str} AUC: {auc:,.0f}{gof_str}")
             if is_seir and exaepi_reference_y is not None:
                 gof_x = _goodness_of_fit(exaepi_reference_y, y_for_gof)
                 if gof_x is not None:
@@ -1091,8 +1098,9 @@ def plot_series(ax, epicast_data, exaepi_data, label, seir_dfs=None, fit_results
                     nrmse_x_str = f"{nrmse_x:.3f}" if np.isfinite(nrmse_x) else "N/A"
                     print(f"    vs ExaEpi:  R²={r2_x_str}  NRMSE={nrmse_x_str}")
             if lbl is not None:
-                ax.text(0.98, 0.97 - row * 0.055, f"AUC {lbl}: {auc:,.0f}",
-                        transform=ax.transAxes, ha="right", va="top", fontsize=20, color=color)
+                text = f"{lbl} AUC: {auc:,.0f}" if args.show_auc else lbl
+                ax.text(0.98, 0.95 - row * 0.09, text,
+                        transform=ax.transAxes, ha="right", va="top", fontsize=FONT_TICK, color=color)
                 row += 1
 
 
@@ -1151,6 +1159,12 @@ parser.add_argument(
 )
 parser.add_argument(
     "--output", "-o", required=True, help="Output file name for the plot (e.g., comparison.png)"
+)
+parser.add_argument(
+    "--show_auc", action="store_true", default=False,
+    help="Show each series' AUC value in its on-plot label (e.g. 'Epicast AUC: 1,177,264'). Off "
+         "by default, showing just the series name; AUC values are still printed to the console "
+         "either way.",
 )
 MAX_SEIR_CURVES = 9
 parser.add_argument(
@@ -1435,8 +1449,16 @@ else:
 n = len(selected_plots)
 ncols = 1 if n == 1 else 2
 nrows = (n + ncols - 1) // ncols
-scale = 2  # every subplot is the same physical size regardless of grid shape
-fig, axes_grid = plt.subplots(nrows, ncols, figsize=(6 * ncols * scale, nrows * 3.5 * scale), squeeze=False)
+# Every individual panel keeps the same aspect ratio and footprint regardless of how many end up
+# in the grid (unlike e.g. plot_geo.py, which shrinks each panel as more are added) -- a 2-column
+# grid (the common case) spans the paper's full page width, a 1-column grid spans half; adding
+# more panels only grows the number of ROWS, not each panel's own size. panel_height preserves
+# this script's original 6x3.5 panel aspect ratio, just at the new PLOS scale.
+panel_width = FULL_PAGE_WIDTH_IN / 2
+panel_height = panel_width * (3.5 / 6)
+fig, axes_grid = plt.subplots(
+    nrows, ncols, figsize=(ncols * panel_width, nrows * panel_height), squeeze=False, layout="constrained"
+)
 axes = axes_grid.flatten()
 
 _selected_source_keys = [_SOURCE_PLOT_TO_KEY[p] for p in selected_plots if p in _SOURCE_PLOT_TO_KEY]
@@ -1460,7 +1482,6 @@ for i in range(n, len(axes)):
     axes[i].set_visible(False)
 
 # plt.suptitle("ExaEpi vs Epicast Comparison", y=1.05)
-plt.tight_layout()
-plt.savefig(args.output, bbox_inches="tight")
+plt.savefig(args.output, dpi=300)
 print(f"Wrote {args.output}")
 #plt.show()

@@ -30,9 +30,9 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from plot_geo import load_exaepi_grid_stats, _parse_day_from_plot_dir  # noqa: E402
-from plot_geo_epicast import reconstruct_epicast_snapshot  # noqa: E402
+from plot_geo import load_exaepi_grid_stats, _parse_day_from_plot_dir, reconstruct_epicast_snapshot  # noqa: E402
 from read_epicast_events import read_events_bin  # noqa: E402
+from plos_compbio_style import apply_style, HALF_PAGE_WIDTH_IN, HALF_PAGE_HEIGHT_IN, AXES_LINEWIDTH  # noqa: E402
 
 import geopandas as gp  # noqa: E402
 
@@ -146,7 +146,6 @@ def main():
         "--metric gini.",
     )
     parser.add_argument("--output", "-o", default="spread_timeseries.png", help="Output plot file")
-    parser.add_argument("--fontsize", type=int, default=18, help="Base font size for the plot (default: 18)")
     args = parser.parse_args()
 
     if not args.plot_dirs and not args.events_file:
@@ -154,7 +153,7 @@ def main():
     if args.metric == "moran" and not args.shape_files:
         parser.error("--metric moran requires --shape_files (to build the spatial adjacency matrix)")
 
-    plt.rcParams.update({"font.size": args.fontsize})
+    apply_style()
     geo_unit = "county" if args.county_level else "tract"
 
     shp_data = None
@@ -169,7 +168,7 @@ def main():
         shp_data = pd.concat(shp_dfs)
         shp_data["GEOID10"] = shp_data["GEOID10"].astype("int64")
 
-    fig, ax = plt.subplots(figsize=(12, 7))
+    fig, ax = plt.subplots(figsize=(HALF_PAGE_WIDTH_IN, HALF_PAGE_HEIGHT_IN), layout="constrained")
 
     if args.plot_dirs:
         days, values = [], []
@@ -189,7 +188,7 @@ def main():
         order = np.argsort(days)
         days = np.array(days)[order]
         values = np.array(values)[order]
-        ax.plot(days, values, "-", label="ExaEpi", color="tab:red", lw=5)
+        ax.plot(days, values, "-", label="ExaEpi", color="tab:red", lw=1.5)
 
     if args.events_file:
         print("Reading Epicast data from", args.events_file)
@@ -211,24 +210,23 @@ def main():
                 v = gini(grid_stats_df["infected"].values)
             values.append(v)
             print(f"Epicast day {resolved_day}: {args.metric} = {v:.4f} (n={len(grid_stats_df)} {geo_unit}s)")
-        ax.plot(days, values, "-", label="Epicast", color="tab:blue", lw=5)
+        ax.plot(days, values, "-", label="Epicast", color="tab:blue", lw=1.5)
 
     ax.set_xlabel("Day")
     if args.metric == "moran":
         #ax.axhline(0.0, color="gray", linestyle="--", linewidth=1, alpha=0.7, label="Spatial randomness (I=0)")
-        ax.axhline(0.0, color="gray", linestyle="--", linewidth=1, alpha=0.7)
-        ax.set_ylabel(f"Global Moran's I of infected count (per {geo_unit})")
+        ax.axhline(0.0, color="gray", linestyle="--", linewidth=AXES_LINEWIDTH, alpha=0.7)
+        ax.set_ylabel("Moran's I")
         #ax.set_title("Spatial autocorrelation of infections over time")
     else:
         ax.set_ylim(0, 1)
-        ax.set_ylabel(f"Gini coefficient of infected count (per {geo_unit})")
+        ax.set_ylabel("Gini coefficient")
         #ax.set_title("Geographic spread of infections over time")
     ax.grid(True, alpha=0.3)
     ax.set_xlim(0, 120)
     ax.legend()
 
-    plt.tight_layout()
-    plt.savefig(args.output, bbox_inches="tight")
+    plt.savefig(args.output)
     print("Wrote plot to", args.output)
 
 

@@ -47,6 +47,7 @@ import pandas as pd
 
 sys.path.insert(0, os.path.dirname(__file__))
 from read_exaepi_agents import read_agent_fields
+from plos_compbio_style import apply_style, HALF_PAGE_WIDTH_IN, HALF_PAGE_HEIGHT_IN
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 EPICAST_DIR = os.path.join(REPO_ROOT, "data", "results", "emerge-paper", "epicast")
@@ -172,26 +173,28 @@ def plot_comparison(ax, epicast_sizes, exaepi_sizes, xlabel, title, cdf, weight_
         sys.exit(f"--logx requires strictly positive sizes, but {title} has a minimum of "
                  f"{min(epicast_sizes.min(), exaepi_sizes.min())}")
 
-    def label_with_stats(name, sizes):
+    def print_stats(name, sizes):
         # Weighted by size (each group of size s stands in for s members who experience that
         # group size) rather than one point per group -- a plain per-group histogram makes the
         # many small groups look dominant even when most members are actually in a big one, so
-        # both the plot and its summary stats are weighted throughout by weight_noun.
-        n_members = sizes.sum()
+        # both the plot and its summary stats are weighted throughout by weight_noun. Printed
+        # rather than shown in the legend -- this figure is only ~3.1in wide in the paper, with no
+        # room for it at PLOS's 8-12pt font floor, and the legend should just name the series.
         weighted_mean = np.average(sizes, weights=sizes)
         sorted_sizes = np.sort(sizes)
         cum_members = np.cumsum(sorted_sizes)
         weighted_median = sorted_sizes[np.searchsorted(cum_members, cum_members[-1] / 2)]
-        # Split across two lines -- matplotlib legends render "\n" fine, and this label is long
-        # enough on one line to overlap the histogram's peak bars.
-        return (f"{name}: n={len(sizes):,} groups ({n_members:,} {weight_noun}s)\n"
-                f"mean={weighted_mean:.1f}, median={weighted_median:.1f}, max={sizes.max():,}")
+        print(
+            f"{title} -- {name}: n={len(sizes):,}, mean={weighted_mean:.1f}, "
+            f"median={weighted_median:.1f}, max={sizes.max():,}"
+        )
 
     if cdf:
         for sizes, color, label in (
-            (epicast_sizes, "blue", label_with_stats("Epicast", epicast_sizes)),
-            (exaepi_sizes, "red", label_with_stats("ExaEpi", exaepi_sizes)),
+            (epicast_sizes, "blue", "Epicast"),
+            (exaepi_sizes, "red", "ExaEpi"),
         ):
+            print_stats(label, sizes)
             sorted_sizes = np.sort(sizes)
             # Weighted cumulative fraction: cumsum(sorted_sizes) at position i is exactly "how
             # many workers are in a group of size <= sorted_sizes[i]" (each group's own size is
@@ -200,7 +203,7 @@ def plot_comparison(ax, epicast_sizes, exaepi_sizes, xlabel, title, cdf, weight_
             cumulative_frac = np.cumsum(sorted_sizes) / sorted_sizes.sum()
             # alpha<1, like the histogram's fill, so an overlapping segment blends to a visibly
             # distinct color instead of the later-drawn line fully hiding the other
-            ax.step(sorted_sizes, cumulative_frac, where="post", color=color, linewidth=2,
+            ax.step(sorted_sizes, cumulative_frac, where="post", color=color, linewidth=1,
                     alpha=0.7, label=label)
         ax.set_ylabel(f"Cumulative fraction of {weight_noun}s")
     else:
@@ -241,10 +244,12 @@ def plot_comparison(ax, epicast_sizes, exaepi_sizes, xlabel, title, cdf, weight_
             # exceed combined_max. Drop any such edges before appending it, or the result isn't
             # monotonically increasing and numpy.histogram rejects it outright.
             bins = np.append(bins[bins < combined_max], combined_max)
+        print_stats("Epicast", epicast_sizes)
+        print_stats("ExaEpi", exaepi_sizes)
         ax.hist(epicast_sizes, bins=bins, weights=epicast_sizes, density=True, color="blue",
-                alpha=0.5, edgecolor="black", label=label_with_stats("Epicast", epicast_sizes))
+                alpha=0.5, label="Epicast")
         ax.hist(exaepi_sizes, bins=bins, weights=exaepi_sizes, density=True, color="red",
-                alpha=0.5, edgecolor="black", label=label_with_stats("ExaEpi", exaepi_sizes))
+                alpha=0.5, label="ExaEpi")
         ax.set_ylabel(f"Density ({weight_noun}-weighted)")
 
     if logx:
@@ -262,12 +267,12 @@ def plot_comparison(ax, epicast_sizes, exaepi_sizes, xlabel, title, cdf, weight_
     #ax.set_ylim(top=ax.get_ylim()[1] * 1.25)
 
     ax.set_xlabel(xlabel)
-    ax.set_title(title)
-    ax.grid(True, alpha=0.3)
-    ax.legend(fontsize=8)
+    ax.grid(True, alpha=0.3, linewidth=0.5)
+    ax.legend()
 
 
 def main():
+    apply_style()
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument(
         "--plot_dir", "-p", required=True,
@@ -317,7 +322,10 @@ def main():
         "school": args.epicast_school,
     }
 
-    fig, axes = plt.subplots(1, len(args.groups), figsize=(6 * len(args.groups), 5))
+    # Total width fixed at the paper's half-page width regardless of how many groups are plotted
+    # side by side -- each panel just gets narrower as more are added (see plos_compbio_style.py).
+    # Height stays the shared standard regardless of how many panels there are.
+    fig, axes = plt.subplots(1, len(args.groups), figsize=(HALF_PAGE_WIDTH_IN, HALF_PAGE_HEIGHT_IN), layout="constrained")
     if len(args.groups) == 1:
         axes = [axes]
 
@@ -329,8 +337,7 @@ def main():
                          weight_noun=info["weight_noun"], logx=args.logx, logy=args.logy,
                          xlim=args.xlim)
 
-    plt.tight_layout()
-    plt.savefig(args.output, dpi=300, bbox_inches="tight")
+    plt.savefig(args.output, dpi=300)
     print(f"{'CDF' if cdf else 'Histogram'} comparison saved to {args.output}")
 
 

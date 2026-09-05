@@ -1,8 +1,8 @@
 """Shared, dependency-light geographic-aggregation helper for the plot_geo* scripts.
 
-Deliberately has no imports beyond the standard library -- plot_geo.py needs yt and
-plot_geo_epicast.py needs read_epicast_events, but neither of those should be required just to
-reuse this one function, so it lives on its own rather than in either of those modules.
+Deliberately has no imports beyond the standard library -- plot_geo.py needs both yt (for ExaEpi
+plotfiles) and read_epicast_events (for Epicast), but neither of those should be required just to
+reuse this one function, so it lives on its own rather than in that module.
 """
 
 

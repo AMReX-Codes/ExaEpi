@@ -36,14 +36,17 @@ import yt
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from read_exaepi_agents import read_agent_fields  # noqa: E402
+from plos_compbio_style import apply_style, HALF_PAGE_WIDTH_IN, HALF_PAGE_HEIGHT_IN  # noqa: E402
 
 SQ_M_PER_SQ_KM = 1_000_000.0
 MIN_BIN_COUNT = 5  # minimum communities in a density bin before its median is plotted
 
-# Per series: scatter color, trend-line color, and label.
+# Per series: scatter color, trend-line color, and label. Labels are kept short -- the
+# "(home)"/"(work)" clarification belongs in the caption -- since this figure is only ~3.1in wide
+# in the paper, leaving no room for a longer legend at PLOS's 8-12pt font floor.
 SERIES_STYLE = {
-    "night": {"scatter": "#2a78d6", "trend": "#0b3d78", "label": "Nighttime (home)"},
-    "day": {"scatter": "#eb9134", "trend": "#a83214", "label": "Daytime (work)"},
+    "night": {"scatter": "#2a78d6", "trend": "#0b3d78", "label": "Nighttime"},
+    "day": {"scatter": "#eb9134", "trend": "#a83214", "label": "Daytime"},
 }
 
 
@@ -118,7 +121,7 @@ def _add_series(ax, df, pop_col, density_col, style, log, label_suffix=""):
     """Scatter one (population, density) series plus its own binned-median trend line, and
     return the Pearson correlation (log10 density, population) for the printed summary."""
     sub = df[df[pop_col] > 0]
-    ax.scatter(sub[pop_col], sub[density_col], s=100, alpha=0.35, color=style["scatter"],
+    ax.scatter(sub[pop_col], sub[density_col], s=20, alpha=0.35, color=style["scatter"],
                linewidths=0, label=style["label"] + label_suffix)
 
     # Median community size within density bins -- shows the trend through the scatter's heavy
@@ -136,16 +139,15 @@ def _add_series(ax, df, pop_col, density_col, style, log, label_suffix=""):
             center = (bins[i - 1] + bins[i]) / 2
             bin_centers.append(10 ** center if log else center)
             bin_medians.append(sel.median())
-    ax.plot(bin_medians, bin_centers, color=style["trend"], lw=5,
-            label=f"Median {style['label'].lower()} size (binned)")
+    ax.plot(bin_medians, bin_centers, color=style["trend"], lw=1.5,
+            label=f"{style['label']} median")
 
     log_density = np.log10(sub[density_col])
     return np.corrcoef(log_density, sub[pop_col])[0, 1], len(sub)
 
 
 def plot_community_size_vs_density(df, output, log=False):
-    plt.rcParams.update({"font.size": 18})
-    fig, ax = plt.subplots(figsize=(10, 8))
+    fig, ax = plt.subplots(figsize=(HALF_PAGE_WIDTH_IN, HALF_PAGE_HEIGHT_IN), layout="constrained")
 
     for series, pop_col, density_col in (("night", "night_pop", "density_night"),
                                           ("day", "day_pop", "density_day")):
@@ -158,14 +160,14 @@ def plot_community_size_vs_density(df, output, log=False):
         ax.set_yscale("log")
     ax.set_xlabel("Community size (population)")
     ax.set_ylabel("Population density (people / km²)")
-    ax.legend(frameon=False, fontsize=18, loc="upper left")
+    ax.legend(frameon=False, loc="upper left")
     ax.set_ylim(0.01, 1000000)
-    plt.tight_layout()
     print("Plotting results to", output)
-    plt.savefig(output, bbox_inches="tight")
+    plt.savefig(output)
 
 
 def main():
+    apply_style()
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument(
         "--plot_dir", "-p", required=True,

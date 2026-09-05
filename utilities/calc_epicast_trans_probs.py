@@ -1,13 +1,17 @@
 #!/usr/bin/env -S python -u
 
 import argparse
+import os
+import sys
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import gamma, pearsonr
 from scipy.optimize import minimize, differential_evolution
-import sys
 
-plt.rcParams.update({"font.size": 20})
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from plos_compbio_style import apply_style, FULL_PAGE_WIDTH_IN, FONT_TICK, AXES_LINEWIDTH  # noqa: E402
+
+apply_style()
 
 # latent period
 exposed_to_presymp = [0.0] * 1
@@ -28,7 +32,7 @@ transitions = [
     # (exposed_to_presymp, 1.5, 3.0, 0.0, "Exposed to Presymptomatic"),
     # (infectious, 1.5, 3, 3.0, "Infectious Period"),
     # (infectious, 5.221, 0.946, 2.24, "Infectious Period"),
-    # (infectious, 3.54, 1.22, 2.75, "Infectious Period"),
+    (infectious, 3.54, 1.22, 2.75, "Infectious Period"),
     # (infectious, 2.5, 1.3, 3.0, "Infectious Period"),
     # (infectious, 11.95, 0.51, 1.0, "Infectious Period"),
     # (incubation, 2.82, 1.36, 1.0, "Incubation Period"),
@@ -168,9 +172,14 @@ SERIES_COLORS = ["red", "green", "darkorange", "purple", "brown", "magenta", "ol
 
 groups = group_transitions(transitions)
 
-figsize = (10, 8) if len(groups) == 1 else (10 * len(groups), 8)
+# Total width fixed at the paper's full-page width regardless of how many groups there are --
+# each panel just gets narrower as more groups are added, rather than the whole figure growing
+# past the page (see plos_compbio_style.py). Height matches the same 4:3-ish aspect used for
+# every other ordinary (non-map) plot in the paper.
+panel_width = FULL_PAGE_WIDTH_IN / len(groups)
+figsize = (FULL_PAGE_WIDTH_IN, panel_width * 0.75)
 
-fig, axes = plt.subplots(1, len(groups), figsize=figsize, squeeze=False)
+fig, axes = plt.subplots(1, len(groups), figsize=figsize, squeeze=False, layout="constrained")
 
 for idx, group in enumerate(groups):
     ax = axes[0][idx]
@@ -192,6 +201,7 @@ for idx, group in enumerate(groups):
     bars = ax.bar(
         range(days),
         trans_probs,
+        width=1.0,
         color="blue",
         alpha=0.2,
         label="Epicast (cumulative)",
@@ -205,7 +215,7 @@ for idx, group in enumerate(groups):
                 f"{prob:.2f}",
                 ha="center",
                 va="bottom",
-                fontsize=20,
+                fontsize=FONT_TICK,
             )
 
     # --- Plot each manually-tuned gamma in the group as its own series ---
@@ -233,8 +243,8 @@ for idx, group in enumerate(groups):
             # steps-post/pre that would imply the jump happens at the day boundary.
             drawstyle="steps-mid",
             marker="o",
-            markersize=8,
-            lw=2,
+            markersize=4,
+            lw=1,
             label=label,
         )
 
@@ -265,11 +275,11 @@ for idx, group in enumerate(groups):
             day_indices,
             gamma_opt,
             color="green",
-            lw=2,
+            lw=1,
             linestyle="-",
             drawstyle="steps-mid",
             marker="^",
-            markersize=8,
+            markersize=4,
             label=f"Optimized gamma (α={shape_opt:.2f}, β={scale_opt:.2f}, loc={loc_opt:.2f} , r={corr_opt:.3f})",
         )
 
@@ -281,11 +291,10 @@ for idx, group in enumerate(groups):
     ax.set_xlim(0, days - 1)
     ax.set_ylim(0, 1.2)
     ax.set_xlabel("Days")
-    ax.set_ylabel("Cumulative Probability")
+    ax.set_ylabel("Cumulative probability")
     ax.set_title(group_title)
-    ax.grid(True, alpha=0.3)
-    ax.legend(fontsize=16, loc="upper center", bbox_to_anchor=(0.5, 1.0))
+    ax.grid(True, alpha=0.3, linewidth=AXES_LINEWIDTH)
+    ax.legend(loc="upper center", bbox_to_anchor=(0.5, 1.0))
 
-plt.tight_layout()
-plt.savefig("epicast_transitions_comparison.png", bbox_inches="tight", dpi=300)
-plt.show()
+plt.savefig("epicast_transitions_comparison.png", dpi=300)
+#plt.show()

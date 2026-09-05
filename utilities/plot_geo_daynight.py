@@ -39,6 +39,7 @@ import yt
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from read_exaepi_agents import read_agent_fields  # noqa: E402
+from plos_compbio_style import apply_style, HALF_PAGE_WIDTH_IN, AXES_LINEWIDTH, FONT_TICK  # noqa: E402
 
 # Same worker/student definition used by check_nt_dt.py: naics != -1 identifies a worker
 # (regardless of school_id); among the rest, school_id != 0 identifies a student. The two are
@@ -130,9 +131,7 @@ def compute_day_night_pop(plot_dir, county_level=False, population="all"):
 
 
 def main():
-    plt.rcParams["xtick.labelsize"] = 16
-    plt.rcParams["ytick.labelsize"] = 16
-    plt.rcParams["font.size"] = 24
+    apply_style()
 
     parser = argparse.ArgumentParser(
         description="Plot an ExaEpi choropleth of daytime-minus-nighttime population per tract/county"
@@ -227,12 +226,11 @@ def main():
     ymax = min(float(args.coord_bounds[3]), float(geo_df.INTPTLAT10.astype("float").max()) + 0.5)
     yrange = ymax - ymin
 
-    panel_width = 16.0
-    fig_x = panel_width
-    fig_y = panel_width * yrange / xrange
+    fig_x = HALF_PAGE_WIDTH_IN
+    fig_y = fig_x * yrange / xrange
     print(f"Plot dimensions: lng/lat {xmin}, {xmax}, {ymin}, {ymax}, figure size: {fig_x}, {fig_y}")
 
-    fig, ax = plt.subplots(figsize=(fig_x, fig_y))
+    fig, ax = plt.subplots(figsize=(fig_x, fig_y), layout="constrained")
 
     # Diverging colormap bounded by the 99th percentile of |diff| by default, so a handful of
     # extreme tracts (usually tiny-population ones where any change looks huge in relative terms)
@@ -257,24 +255,26 @@ def main():
         )
     norm = mcolors.TwoSlopeNorm(vmin=vmin, vcenter=0, vmax=vmax)
 
-    title = "ExaEpi daytime − nighttime population"
+    # "ExaEpi" is dropped from the title (kept for the caption instead) -- this figure is only
+    # ~3.1in wide in the paper, and the full "ExaEpi daytime - nighttime population" doesn't fit
+    # at PLOS's 8-12pt font floor.
+    title = "Day − night population"
     if args.population != "all":
         title += f" ({args.population})"
 
-    states.boundary.plot(ax=ax, lw=1, color="black")
+    states.boundary.plot(ax=ax, lw=AXES_LINEWIDTH, color="black")
     geo_df.plot(ax=ax, column="diff", cmap="bwr", legend=True, norm=norm)
-    # geopandas appends the colorbar as a new axes on the same figure; grab it to double its tick
-    # label size (it otherwise inherits the much smaller default rcParams ytick.labelsize).
-    fig.axes[-1].tick_params(labelsize=24)
+    # geopandas appends the colorbar as a new axes on the same figure; grab it to match the shared
+    # tick label size (it otherwise inherits matplotlib's own default, not our rcParams override).
+    fig.axes[-1].tick_params(labelsize=FONT_TICK)
     ax.set_title(title)
     ax.tick_params(left=False, bottom=False, labelbottom=False, labelleft=False)
     ax.set_frame_on(False)
     ax.set_xlim([xmin, xmax])
     ax.set_ylim([ymin, ymax])
 
-    plt.tight_layout()
     print("Plotting results to", args.output)
-    plt.savefig(args.output, bbox_inches="tight")
+    plt.savefig(args.output)
 
 
 if __name__ == "__main__":

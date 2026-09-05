@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 
 """Compare an ExaEpi run against an Epicast run over a sequence of days, at the level of individual
-communities (see plot_geo.py / plot_geo_epicast.py for the single-choropleth-per-day view this
-builds on). Two outputs are produced:
+communities (see plot_geo.py for the single-choropleth-per-day view this builds on, and for the
+loaders and compare_day() this reuses). Two outputs are produced:
   - a day-scalar summary plot with three series:
       * Spearman's rho: rank correlation of per-community infection rate. Captures whether the two
         simulators agree on WHICH communities are hit hardest -- the relative ranking -- regardless
@@ -37,11 +37,8 @@ county level instead.
 
 import os
 import sys
-import glob
 import argparse
-import numpy as np
 import pandas as pd
-from scipy.stats import spearmanr
 import matplotlib
 
 # This script only ever saves figures to a file, never displays them -- force the non-interactive
@@ -50,105 +47,20 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from plot_geo import load_exaepi_grid_stats, _parse_day_from_plot_dir  # noqa: E402
-from plot_geo_epicast import reconstruct_epicast_snapshot  # noqa: E402
+from plot_geo import (  # noqa: E402
+    load_exaepi_grid_stats,
+    _parse_day_from_plot_dir,
+    reconstruct_epicast_snapshot,
+    expand_plot_dirs,
+    compare_day,
+)
 from read_epicast_events import read_events_bin  # noqa: E402
-
-
-def _is_plotfile_dir(path):
-    """An ExaEpi/AMReX plotfile directory always contains a top-level 'Header' file -- use that,
-    rather than just the directory name, to tell an individual plotfile apart from a parent
-    directory that merely holds several of them.
-    """
-    return os.path.isdir(path) and os.path.isfile(os.path.join(path, "Header"))
-
-
-def expand_plot_dirs(paths):
-    """Expand each of `paths` into the individual ExaEpi plotfile directories it refers to, so
-    callers can point at a whole run's worth of output without listing every plt* directory by
-    hand. Each entry in `paths` may be: a single plotfile directory (e.g. plt00050), a parent
-    directory containing many plotfile subdirectories (e.g. a run's output directory), or a glob
-    pattern (e.g. "results/plt*"). Returns the resulting directories deduplicated and sorted by the
-    day parsed from their name.
-    """
-    expanded = []
-    for path in paths:
-        path = path.rstrip("/")
-        if _is_plotfile_dir(path):
-            expanded.append(path)
-        elif os.path.isdir(path):
-            children = sorted(
-                os.path.join(path, name) for name in os.listdir(path) if _is_plotfile_dir(os.path.join(path, name))
-            )
-            if not children:
-                raise SystemExit(f"No plotfile subdirectories (containing a Header file) found under {path}")
-            expanded.extend(children)
-        else:
-            matches = sorted(p for p in glob.glob(path) if _is_plotfile_dir(p))
-            if not matches:
-                raise SystemExit(f"No plotfile directories matched: {path}")
-            expanded.extend(matches)
-
-    seen = set()
-    unique = [d for d in expanded if not (d in seen or seen.add(d))]
-    unique.sort(key=_parse_day_from_plot_dir)
-    return unique
-
-
-def weighted_pearsonr(x, y, w):
-    """Weighted Pearson correlation coefficient between x and y, weighted by w. Unlike plain
-    Pearson r, a community's contribution to the correlation scales with its weight -- so a handful
-    of low-weight communities disagreeing doesn't move r as much as a handful of high-weight ones
-    would.
-    """
-    x, y, w = np.asarray(x, dtype=float), np.asarray(y, dtype=float), np.asarray(w, dtype=float)
-    wsum = w.sum()
-    xbar = (w * x).sum() / wsum
-    ybar = (w * y).sum() / wsum
-    cov_xy = (w * (x - xbar) * (y - ybar)).sum()
-    var_x = (w * (x - xbar) ** 2).sum()
-    var_y = (w * (y - ybar) ** 2).sum()
-    return cov_xy / np.sqrt(var_x * var_y)
-
-
-def weighted_rmse(x, y, w):
-    """Weighted root-mean-square of (x - y), weighted by w -- a direct magnitude-of-disagreement
-    metric (not a correlation), so it isn't fooled by two similar values swapping relative order
-    and isn't blind to a systematic offset between x and y the way a correlation coefficient is.
-    """
-    x, y, w = np.asarray(x, dtype=float), np.asarray(y, dtype=float), np.asarray(w, dtype=float)
-    return np.sqrt((w * (x - y) ** 2).sum() / w.sum())
-
-
-def compare_day(exaepi_df, epicast_df):
-    """Merge one day's ExaEpi and Epicast per-community DataFrames on GEOID10 and return
-    (rho, pval, r, rmse, n, merged_df): the Spearman rank correlation, infection-weighted Pearson
-    correlation, and infection-weighted RMSE of infection rate (infected / pop) between the two.
-    Rate rather than raw infected count is compared so that communities of very different
-    population size are compared on a like-for-like basis. r and rmse are weighted by each
-    community's average infected count (across the two simulators) rather than its population, so
-    that a community currently at or near zero infection doesn't get outsized influence just
-    because it has a large population -- a rate difference there is mostly noise, whereas the same
-    difference in a heavily-infected community reflects a real, larger-magnitude disagreement.
-    merged_df carries a rate_exaepi/rate_epicast column per matched community (GEOID10) -- the
-    community-by-community comparison underlying the summary scalars, for callers that want to look
-    beyond them. Returns (None, None, None, None, n, merged_df) if fewer than two communities match,
-    since none of these are meaningful below that.
-    """
-    df = pd.merge(exaepi_df, epicast_df, on="GEOID10", suffixes=("_exaepi", "_epicast"))
-    df = df[(df.pop_exaepi > 0) & (df.pop_epicast > 0)].copy()
-    df["rate_exaepi"] = df.infected_exaepi / df.pop_exaepi
-    df["rate_epicast"] = df.infected_epicast / df.pop_epicast
-    if len(df) < 2:
-        return None, None, None, None, len(df), df
-    rho, pval = spearmanr(df.rate_exaepi, df.rate_epicast)
-    weight = (df.infected_exaepi + df.infected_epicast) / 2.0
-    r = weighted_pearsonr(df.rate_exaepi, df.rate_epicast, weight)
-    rmse = weighted_rmse(df.rate_exaepi, df.rate_epicast, weight)
-    return rho, pval, r, rmse, len(df), df
+from plos_compbio_style import apply_style, HALF_PAGE_WIDTH_IN, HALF_PAGE_HEIGHT_IN  # noqa: E402
 
 
 def main():
+    apply_style()
+
     parser = argparse.ArgumentParser(
         description="Compare ExaEpi and Epicast per-community infection rates across days: a "
         "Spearman-rho-vs-day summary plot, plus a community-by-community scatter plot per day"
@@ -205,6 +117,14 @@ def main():
         help="Output file name for the community-by-community scatter plot (one panel per day: "
         "ExaEpi infection rate vs Epicast infection rate, one point per matched community). If "
         "omitted, this plot is skipped and only the rho-vs-day plot is produced.",
+    )
+    parser.add_argument(
+        "--show_rmse",
+        action="store_true",
+        default=False,
+        help="Also plot the infection-weighted RMSE as a third series (on a secondary axis, since "
+        "it's in rate units rather than the -1..1 range of the two correlations). Off by default; "
+        "the RMSE is still computed and printed/written to --csv either way.",
     )
     args = parser.parse_args()
 
@@ -266,60 +186,65 @@ def main():
         result_df.to_csv(args.csv, index=False)
         print("Wrote table to", args.csv)
 
-    fig, ax = plt.subplots(figsize=(16, 10))
-    l1 = ax.plot(result_df.day, result_df.rho, label="Spearman's rho (rank)", lw=2)
-    l2 = ax.plot(result_df.day, result_df.pearson_r, label="Pearson's r (infection-weighted, magnitude)", lw=2)
-    ax.set_xlabel("Day", fontsize=20)
-    ax.set_ylabel("Correlation (ExaEpi vs Epicast infection rate)", fontsize=20)
-    ax.set_ylim(-1.05, 1.05)
-    ax.axhline(0, color="gray", lw=0.8, ls="--")
-    ax.tick_params(axis="both", labelsize=16)
+    # Labels are kept short (the "infection-weighted"/"rank"/"magnitude" detail belongs in the
+    # figure caption, not the plot itself) since this whole figure is only ~3.1in wide in the
+    # paper -- a long label/legend string simply has no room to fit at PLOS's 8-12pt font floor,
+    # regardless of layout engine.
+    fig, ax = plt.subplots(figsize=(HALF_PAGE_WIDTH_IN, HALF_PAGE_HEIGHT_IN), layout="constrained")
+    l1 = ax.plot(result_df.day, result_df.rho, label="Spearman's ρ", lw=1)
+    l2 = ax.plot(result_df.day, result_df.pearson_r, label="Pearson's r", lw=1)
+    ax.set_xlabel("Day")
+    ax.set_ylabel("Correlation")
+    ax.set_xlim(left=0)
+    ymin = min(result_df.rho.min(), result_df.pearson_r.min())
+    ax.set_ylim(ymin - 0.05, 1.05)
+    ax.axhline(0, color="gray", lw=0.5, ls="--")
 
-    ax_rmse = ax.twinx()
-    l3 = ax_rmse.plot(
-        result_df.day,
-        result_df.rmse,
-        color="tab:green",
-        ls="--",
-        lw=2,
-        label="RMSE (infection-weighted, right axis)",
-    )
-    ax_rmse.set_ylabel("RMSE of infection rate (ExaEpi vs Epicast)", fontsize=20)
-    ax_rmse.set_ylim(bottom=0)
-    ax_rmse.tick_params(axis="y", labelsize=16)
+    lines = l1 + l2
+    if args.show_rmse:
+        ax_rmse = ax.twinx()
+        l3 = ax_rmse.plot(
+            result_df.day,
+            result_df.rmse,
+            color="tab:green",
+            ls="--",
+            lw=1,
+            label="RMSE",
+        )
+        ax_rmse.set_ylabel("RMSE")
+        ax_rmse.set_ylim(bottom=0)
+        lines = lines + l3
 
-    lines = l1 + l2 + l3
-    ax.legend(lines, [line.get_label() for line in lines], fontsize=16)
-    ax.set_title("Spatial agreement between ExaEpi and Epicast", fontsize=24)
-    fig.tight_layout()
+    ax.legend(lines, [line.get_label() for line in lines])
     print("Plotting results to", args.output)
-    fig.savefig(args.output, bbox_inches="tight")
+    fig.savefig(args.output)
 
     if not args.scatter_output:
         return
 
     # Community-by-community scatter: one panel per day, ExaEpi rate vs Epicast rate, one point per
     # matched community. All panels share the same axis range so panels are visually comparable
-    # across days, and a y=x reference line marks perfect agreement.
+    # across days, and a y=x reference line marks perfect agreement. Total width is fixed at the
+    # paper's half-page width regardless of how many days there are (see paper_style.py) -- each
+    # panel just gets narrower as more days are added.
     axis_max = max(max(df.rate_exaepi.max(), df.rate_epicast.max()) for df, _ in scatter_panels)
     axis_max = axis_max * 1.05 if axis_max > 0 else 1.0
 
     n = len(scatter_panels)
-    panel_width = 5.0
-    fig2, axes2 = plt.subplots(1, n, figsize=(panel_width * n, panel_width), squeeze=False)
+    panel_width = HALF_PAGE_WIDTH_IN / n
+    fig2, axes2 = plt.subplots(1, n, figsize=(HALF_PAGE_WIDTH_IN, panel_width), squeeze=False, layout="constrained")
     axes2 = axes2[0]
     for ax, (df, label) in zip(axes2, scatter_panels):
-        ax.plot([0, axis_max], [0, axis_max], color="gray", lw=1, ls="--", zorder=1)
-        ax.scatter(df.rate_exaepi, df.rate_epicast, s=12, alpha=0.5, zorder=2)
+        ax.plot([0, axis_max], [0, axis_max], color="gray", lw=0.5, ls="--", zorder=1)
+        ax.scatter(df.rate_exaepi, df.rate_epicast, s=6, alpha=0.5, linewidths=0, zorder=2)
         ax.set_xlim(0, axis_max)
         ax.set_ylim(0, axis_max)
         ax.set_aspect("equal")
         ax.set_xlabel("ExaEpi infection rate")
         ax.set_ylabel("Epicast infection rate")
         ax.set_title(label)
-    fig2.tight_layout()
     print("Plotting community-by-community scatter to", args.scatter_output)
-    fig2.savefig(args.scatter_output, bbox_inches="tight")
+    fig2.savefig(args.scatter_output)
 
 
 if __name__ == "__main__":

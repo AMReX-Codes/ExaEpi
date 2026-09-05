@@ -20,6 +20,7 @@ the first plotfile of a run (typically plt00000), so this script requires that f
 """
 
 import argparse
+import os
 import sys
 
 import matplotlib.pyplot as plt
@@ -29,6 +30,9 @@ import pandas as pd
 import yt
 import yt.frontends.amrex.api  # noqa: F401  (registers the AMReX frontend's IO handlers)
 from yt.frontends.amrex.data_structures import AMReXDataset
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from plos_compbio_style import apply_style, HALF_PAGE_WIDTH_IN, HALF_PAGE_HEIGHT_IN  # noqa: E402
 
 
 def _agent_df(ds, *fields):
@@ -144,6 +148,7 @@ FIELD_INFO = {
 
 
 def main():
+    apply_style()
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--plot_dir", "-p", required=True, help="ExaEpi plotfile directory, e.g. plt00000")
     parser.add_argument(
@@ -198,37 +203,36 @@ def main():
     if args.logx and all_sizes.min() <= 0:
         sys.exit(f"--logx requires strictly positive {stat_noun}s, but the minimum is {all_sizes.min()}")
 
-    fig, ax = plt.subplots(figsize=(5, 4))
+    fig, ax = plt.subplots(figsize=(HALF_PAGE_WIDTH_IN, HALF_PAGE_HEIGHT_IN), layout="constrained")
     left_edge = float(all_sizes.min()) if args.logx else 0
     colors = ["tab:blue", "tab:red", "tab:green", "tab:orange"]
 
-    def label_with_stats(name, sizes):
+    def print_stats(name, sizes):
         # Weighted by size (each group of size s stands in for s members who experience that
         # group size) rather than one point per group -- a plain per-group view makes the many
         # small groups look dominant even when most members are actually in a big one, so both
-        # the plot and its summary stats are member-weighted throughout. Split across two lines
-        # -- matplotlib legends render "\n" fine, and this label is long enough on one line to
-        # push the legend box wider than the whole figure.
-        n_members = sizes.sum()
+        # the plot and its summary stats are member-weighted throughout. Printed rather than shown
+        # in the legend -- this figure is only ~3.1in wide in the paper, with no room for it at
+        # PLOS's 8-12pt font floor, and the legend should just name the series.
         weighted_mean = np.average(sizes, weights=sizes)
         sorted_sizes = np.sort(sizes)
         cum_members = np.cumsum(sorted_sizes)
         weighted_median = sorted_sizes[np.searchsorted(cum_members, cum_members[-1] / 2)]
-        return (
-            f"{name}: n={len(sizes):,} ({n_members:,} {stat_noun}s)\n"
-            f"mean={weighted_mean:.2f}, median={weighted_median:.2f}, max={sizes.max():,}"
+        print(
+            f"{name}: n={len(sizes):,}, mean={weighted_mean:.1f}, median={weighted_median:.1f}, "
+            f"max={sizes.max():,}"
         )
 
     if args.cdf:
         for (name, sizes), color in zip(series_list, colors):
+            print_stats(name, sizes)
             # Weighted cumulative fraction: cumsum(sorted_sizes) at position i is exactly "how
             # many members are in a group of size <= sorted_sizes[i]" (each group's own size is
             # both its x-value and its member-count contribution), divided by the total member
             # count.
             sorted_sizes = np.sort(sizes)
             cumulative_frac = np.cumsum(sorted_sizes) / sorted_sizes.sum()
-            ax.step(sorted_sizes, cumulative_frac, where="post", color=color, alpha=0.7,
-                    label=label_with_stats(name, sizes))
+            ax.step(sorted_sizes, cumulative_frac, where="post", color=color, alpha=0.7, label=name)
         ax.set_ylabel("Cumulative fraction of members")
     else:
         # These are all integer counts, so by default give each distinct value its own bin
@@ -273,9 +277,9 @@ def main():
             bins_arr = np.asarray(bins)
             bins = np.append(bins_arr[bins_arr < data_max], data_max).tolist()
         for (name, sizes), color in zip(series_list, colors):
+            print_stats(name, sizes)
             ax.hist(sizes, bins=bins, weights=sizes, density=len(series_list) > 1, color=color,
-                    alpha=0.5 if len(series_list) > 1 else 0.7, edgecolor="black",
-                    label=label_with_stats(name, sizes))
+                    alpha=0.5 if len(series_list) > 1 else 0.7, label=name)
         ax.set_ylabel(f"Density ({stat_noun}-weighted)" if len(series_list) > 1 else f"Frequency ({stat_noun}s)")
     if args.logx:
         ax.set_xscale("log")
@@ -289,20 +293,15 @@ def main():
         # tens of thousands) too tightly for the figure width, running labels into each other.
         # Fewer ticks plus thousands separators keeps them legible; skipped for --logx, which
         # already gets its own (multiplicative) tick locator suited to a log axis.
-        ax.xaxis.set_major_locator(mticker.MaxNLocator(nbins=6))
+        ax.xaxis.set_major_locator(mticker.MaxNLocator(nbins=4))
         ax.xaxis.set_major_formatter(mticker.StrMethodFormatter("{x:,.0f}"))
-    # Headroom above the tallest bar/curve for the legend to sit in -- with only a handful of
-    # bins/series, "best" placement sometimes has nowhere left to go but on top of a peak,
-    # especially for a single narrow-peaked series (e.g. neighborhood size) or the two-line-per-
-    # series labels used here.
-    ax.set_ylim(top=ax.get_ylim()[1] * 1.25)
     ax.set_xlabel(xlabel)
     #ax.set_title(f"Histogram of ExaEpi {args.field} sizes")
-    ax.grid(True, alpha=0.3)
-    ax.legend(fontsize=8)
+    ax.grid(True, alpha=0.3, linewidth=0.5)
+    if len(series_list) > 1:
+        ax.legend()
 
-    plt.tight_layout()
-    plt.savefig(output, dpi=300, bbox_inches="tight")
+    plt.savefig(output, dpi=300)
     print(f"{'CDF' if args.cdf else 'Histogram'} saved to {output}")
 
 

@@ -1,27 +1,63 @@
 #!/usr/bin/env python
 
-import pylab as plt
+"""Plot ExaEpi and/or Epicast infection-spread choropleths over a sequence of days.
+
+Pass --exaepi_dir alone to plot only ExaEpi (one row), --events_file alone to plot only Epicast
+(one row), or both together to plot them stacked in two rows (Epicast on top, ExaEpi below) with
+each day's column additionally labeled with that day's Spearman rho, infection-weighted Pearson r,
+and infection-weighted RMSE between the two (see compare_day() for how these are computed and what
+they mean) -- a per-community comparison that plot_geo_compare.py also uses (importing the loaders
+and compare_day from here) to plot those same three quantities as a day-scalar time series instead.
+
+Days are given explicitly as a list (--day), since a single day value has to resolve independently
+to an Epicast snapshot (reconstructed from the events log) and/or a matching ExaEpi plotfile
+directory (looked up by the day parsed from its name) -- there's no single natural sequence of
+"days" shared by both data sources the way there is for ExaEpi's plotfile directories alone.
+
+Epicast's finest geographic unit is the Census tract, not the block group ExaEpi communities use --
+so ExaEpi is aggregated up to the tract by default (or further to the county, with
+--county_level), and a tract (or county) shapefile is required via --shape_files, not a block group
+one, whenever Epicast is involved.
+"""
+
+import os
 import re
 import sys
-import os
+import glob
+import argparse
 import numpy as np
 import pandas as pd
-import argparse
 import geopandas as gp
-import matplotlib.pyplot as plt
-import matplotlib as mp
-import yt
+import matplotlib
+from scipy.stats import spearmanr
+
+# This script only ever saves figures to a file, never displays them -- force the non-interactive
+# Agg backend so rendering never touches an X server. Must happen before pyplot is imported.
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt  # noqa: E402
+import matplotlib as mp  # noqa: E402
+import yt  # noqa: E402
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from geo_agg_utils import aggregate_to_county  # noqa: E402
+from read_epicast_events import read_events_bin  # noqa: E402
+from plos_compbio_style import (  # noqa: E402
+    apply_style,
+    FONT_TICK,
+    FONT_LABEL,
+    AXES_LINEWIDTH,
+    FULL_PAGE_WIDTH_IN,
+)
 
 
 def _parse_day_from_plot_dir(plot_dir):
     """Extract the trailing step/day number from an ExaEpi plotfile directory name, e.g.
-    'plt00050' or 'plt00050/' -> 50. Returns None if no trailing digits are found.
+    'plt00050' or 'plt00050/' -> 50.
     """
     m = re.search(r"(\d+)$", plot_dir.rstrip("/"))
-    return int(m.group(1)) if m else None
+    if not m:
+        raise SystemExit(f"Could not parse a trailing day/step number from plotfile directory: {plot_dir}")
+    return int(m.group(1))
 
 
 def load_exaepi_grid_stats(plot_dir, tract_level=False, county_level=False):
@@ -67,30 +103,200 @@ def load_exaepi_grid_stats(plot_dir, tract_level=False, county_level=False):
     return grid_stats_df
 
 
-def main():
-    plt.rcParams["xtick.labelsize"] = 16
-    plt.rcParams["ytick.labelsize"] = 16
-    plt.rcParams["font.size"] = 24
+_ACTIVE_STATES = {"exposed", "presymptomatic", "symptomatic", "asymptomatic"}
 
-    parser = argparse.ArgumentParser(description="Plot UrbanPop ExaEpi outputs")
-    # parser.add_argument("--output", "-o", required=True, help="Output file")
+
+def reconstruct_epicast_snapshot(events_df, demog_df, day=None, county_level=False):
+    """Given already-loaded Epicast events/demographics (see read_events_bin), reconstruct a
+    snapshot DataFrame (columns GEOID10, pop, never_infected, infected, immune) as of the given
+    0-based day (default: the last day in the data; clamped if it exceeds that), aggregated up to
+    the county level if county_level is set (Epicast's native granularity is the tract). Returns
+    (grid_stats_df, day).
+
+    Epicast's run.events.bin file has no per-timestep snapshot the way an ExaEpi plotfile does --
+    it's a log of AgentTransition events (one row per disease_state change). To get a "snapshot as
+    of day D" comparable to ExaEpi's per-community pop/never_infected/infected/immune columns, this
+    reconstructs each agent's most recent disease_state (and the tract they were in when that
+    transition happened) among all their events with timestep <= day D, then buckets agents by
+    that tract:
+        immune         = last state is "recovered"
+        infected       = last state is exposed/presymptomatic/symptomatic/asymptomatic (still active)
+        never_infected = tract population (from the file's demographics) minus the above two
+    Agents with zero events by day D never appear in the reconstruction and are implicitly counted
+    as never_infected via that subtraction.
+    """
+    max_day = int(events_df.timestep.max() // 2)
+    day = max_day if day is None else day
+    if day > max_day:
+        print(f"WARNING: requested day {day} exceeds the last available day ({max_day}); using {max_day} instead")
+        day = max_day
+    cutoff_timestep = 2 * day + 1
+    print(f"Reconstructing snapshot at day {day} (timestep <= {cutoff_timestep})")
+
+    # Reconstruct each agent's most recent disease_state (and the tract of that transition) among
+    # events at or before the cutoff -- see the docstring above for why this, rather than a simple
+    # per-column aggregate, is needed to get a snapshot-like view out of a transition log.
+    sub = events_df[events_df.timestep <= cutoff_timestep]
+    last_idx = sub.groupby("true_agent_id")["timestep"].idxmax()
+    last_events = sub.loc[last_idx]
+
+    immune = last_events[last_events.disease_state == "recovered"].groupby("tract_fips").size()
+    infected = last_events[last_events.disease_state.isin(_ACTIVE_STATES)].groupby("tract_fips").size()
+
+    grid_stats_df = demog_df.rename(columns={"fips": "tract_fips", "total": "pop"})[["tract_fips", "pop"]].copy()
+    grid_stats_df = grid_stats_df.set_index("tract_fips")
+    grid_stats_df["immune"] = immune
+    grid_stats_df["infected"] = infected
+    grid_stats_df = grid_stats_df.fillna(0)
+    # A small number of tracts can end up with pop < immune+infected (an agent's last event before
+    # the cutoff landed in a different tract than earlier events for that same agent -- Epicast's
+    # location_id records where each transition happened, not a fixed home tract). Clip rather than
+    # let those tracts go negative.
+    grid_stats_df["never_infected"] = (grid_stats_df["pop"] - grid_stats_df["immune"] - grid_stats_df["infected"]).clip(lower=0)
+    grid_stats_df = grid_stats_df.reset_index()
+
+    grid_stats_df["GEOID10"] = grid_stats_df["tract_fips"].astype("int64")
+    grid_stats_df = grid_stats_df[["GEOID10", "pop", "never_infected", "infected", "immune"]]
+    if county_level:
+        grid_stats_df = aggregate_to_county(grid_stats_df)
+    return grid_stats_df, day
+
+
+def _is_plotfile_dir(path):
+    """An ExaEpi/AMReX plotfile directory always contains a top-level 'Header' file -- use that,
+    rather than just the directory name, to tell an individual plotfile apart from a parent
+    directory that merely holds several of them.
+    """
+    return os.path.isdir(path) and os.path.isfile(os.path.join(path, "Header"))
+
+
+def expand_plot_dirs(paths):
+    """Expand each of `paths` into the individual ExaEpi plotfile directories it refers to, so
+    callers can point at a whole run's worth of output without listing every plt* directory by
+    hand. Each entry in `paths` may be: a single plotfile directory (e.g. plt00050), a parent
+    directory containing many plotfile subdirectories (e.g. a run's output directory), or a glob
+    pattern (e.g. "results/plt*"). Returns the resulting directories deduplicated and sorted by the
+    day parsed from their name.
+    """
+    expanded = []
+    for path in paths:
+        path = path.rstrip("/")
+        if _is_plotfile_dir(path):
+            expanded.append(path)
+        elif os.path.isdir(path):
+            children = sorted(
+                os.path.join(path, name) for name in os.listdir(path) if _is_plotfile_dir(os.path.join(path, name))
+            )
+            if not children:
+                raise SystemExit(f"No plotfile subdirectories (containing a Header file) found under {path}")
+            expanded.extend(children)
+        else:
+            matches = sorted(p for p in glob.glob(path) if _is_plotfile_dir(p))
+            if not matches:
+                raise SystemExit(f"No plotfile directories matched: {path}")
+            expanded.extend(matches)
+
+    seen = set()
+    unique = [d for d in expanded if not (d in seen or seen.add(d))]
+    unique.sort(key=_parse_day_from_plot_dir)
+    return unique
+
+
+def weighted_pearsonr(x, y, w):
+    """Weighted Pearson correlation coefficient between x and y, weighted by w. Unlike plain
+    Pearson r, a community's contribution to the correlation scales with its weight -- so a handful
+    of low-weight communities disagreeing doesn't move r as much as a handful of high-weight ones
+    would.
+    """
+    x, y, w = np.asarray(x, dtype=float), np.asarray(y, dtype=float), np.asarray(w, dtype=float)
+    wsum = w.sum()
+    xbar = (w * x).sum() / wsum
+    ybar = (w * y).sum() / wsum
+    cov_xy = (w * (x - xbar) * (y - ybar)).sum()
+    var_x = (w * (x - xbar) ** 2).sum()
+    var_y = (w * (y - ybar) ** 2).sum()
+    return cov_xy / np.sqrt(var_x * var_y)
+
+
+def weighted_rmse(x, y, w):
+    """Weighted root-mean-square of (x - y), weighted by w -- a direct magnitude-of-disagreement
+    metric (not a correlation), so it isn't fooled by two similar values swapping relative order
+    and isn't blind to a systematic offset between x and y the way a correlation coefficient is.
+    """
+    x, y, w = np.asarray(x, dtype=float), np.asarray(y, dtype=float), np.asarray(w, dtype=float)
+    return np.sqrt((w * (x - y) ** 2).sum() / w.sum())
+
+
+def compare_day(exaepi_df, epicast_df):
+    """Merge one day's ExaEpi and Epicast per-community DataFrames on GEOID10 and return
+    (rho, pval, r, rmse, n, merged_df): the Spearman rank correlation, infection-weighted Pearson
+    correlation, and infection-weighted RMSE of infection rate (infected / pop) between the two.
+    Rate rather than raw infected count is compared so that communities of very different
+    population size are compared on a like-for-like basis. r and rmse are weighted by each
+    community's average infected count (across the two simulators) rather than its population, so
+    that a community currently at or near zero infection doesn't get outsized influence just
+    because it has a large population -- a rate difference there is mostly noise, whereas the same
+    difference in a heavily-infected community reflects a real, larger-magnitude disagreement.
+    merged_df carries a rate_exaepi/rate_epicast column per matched community (GEOID10) -- the
+    community-by-community comparison underlying the summary scalars, for callers that want to look
+    beyond them. Returns (None, None, None, None, n, merged_df) if fewer than two communities match,
+    since none of these are meaningful below that.
+    """
+    df = pd.merge(exaepi_df, epicast_df, on="GEOID10", suffixes=("_exaepi", "_epicast"))
+    df = df[(df.pop_exaepi > 0) & (df.pop_epicast > 0)].copy()
+    df["rate_exaepi"] = df.infected_exaepi / df.pop_exaepi
+    df["rate_epicast"] = df.infected_epicast / df.pop_epicast
+    if len(df) < 2:
+        return None, None, None, None, len(df), df
+    rho, pval = spearmanr(df.rate_exaepi, df.rate_epicast)
+    weight = (df.infected_exaepi + df.infected_epicast) / 2.0
+    r = weighted_pearsonr(df.rate_exaepi, df.rate_epicast, weight)
+    rmse = weighted_rmse(df.rate_exaepi, df.rate_epicast, weight)
+    return rho, pval, r, rmse, len(df), df
+
+
+def main():
+    apply_style()
+
+    parser = argparse.ArgumentParser(
+        description="Plot ExaEpi and/or Epicast choropleths, one column per day. With both given, "
+        "rows are stacked (Epicast on top, ExaEpi below) and each column is labeled with that "
+        "day's rho/r/RMSE; with only one given, that single row is plotted with no stats."
+    )
     parser.add_argument(
-        "--plot_dir",
+        "--exaepi_dir",
         "-p",
-        required=True,
         nargs="+",
-        help="One or more plot directories (e.g. plt00000 plt00010 plt00020). A single directory "
-        "plots one choropleth as before; multiple directories are plotted as a horizontal "
-        "sequence, one panel per directory, each labeled by the day parsed from its name.",
+        default=None,
+        help="Where to find ExaEpi plotfiles: a parent directory containing many plotfile "
+        "subdirectories, a single plotfile directory, or a glob pattern. Which specific day(s) get "
+        "plotted is chosen by --day, not by which directories match here -- this just needs to "
+        "cover them. At least one of --exaepi_dir/--events_file is required.",
+    )
+    parser.add_argument(
+        "--events_file",
+        "-f",
+        default=None,
+        help="Epicast run.events.bin file. At least one of --exaepi_dir/--events_file is required.",
+    )
+    parser.add_argument(
+        "--day",
+        "-d",
+        type=int,
+        nargs="+",
+        default=[None],
+        help="One or more 0-based days to plot, one column each (default: the last day available). "
+        "Each day is used to reconstruct the Epicast snapshot and/or look up the matching ExaEpi "
+        "plotfile (by the day parsed from its directory name), whichever apply.",
     )
     parser.add_argument(
         "--shape_files",
         "-s",
         required=True,
         nargs="+",
-        help="Census block group shape files (.shp), or Census tract shape files if --tract_level "
-        "is passed. Available from\n"
-        + "https://www.census.gov/cgi-bin/geo/shapefiles/index.php?year=2010&layergroup=Block+Groups",
+        help="Census shape files (.shp) at the granularity being plotted -- tract by default, or "
+        "county if --county_level is passed. Block group shapefiles only work in ExaEpi-only mode "
+        "without --tract_level/--county_level.",
     )
     parser.add_argument(
         "--states_file",
@@ -109,31 +315,50 @@ def main():
         "-b",
         default=[-170, -66.6, 18.5, 71.5],
         nargs="+",
-        help="Range for longitude: min,max",
+        help="Range for longitude/latitude: lon_min lon_max lat_min lat_max",
     )
     parser.add_argument(
         "--tract_level",
         "-t",
         action="store_true",
         default=False,
-        help="Aggregate and plot at the Census tract level (11-digit GEOID, summed across all "
-        "block groups in each tract) instead of the default block group level (12-digit GEOID10). "
-        "Pass a Census tract shapefile (not a block group one) via --shape_files when using this. "
-        "Ignored if --county_level is also passed.",
+        help="Aggregate ExaEpi up to the Census tract level (ignored -- always on -- whenever "
+        "--events_file is given, since Epicast is natively tract-level). Only meaningful in "
+        "ExaEpi-only mode, where the default is the finer Census block group level.",
     )
     parser.add_argument(
         "--county_level",
         action="store_true",
         default=False,
-        help="Aggregate and plot at the Census county level (5-digit GEOID, summed across all "
-        "block groups in each county) instead of the default block group level. Pass a Census "
-        "county shapefile via --shape_files when using this. Takes precedence over --tract_level.",
+        help="Aggregate/plot at the Census county level instead of the default (Census tract, or "
+        "block group in ExaEpi-only mode without --tract_level). Takes precedence over "
+        "--tract_level. Pass a matching county shapefile via --shape_files.",
     )
-
     args = parser.parse_args()
 
-    geo_unit = "county" if args.county_level else ("tract" if args.tract_level else "block group")
-    geo_unit_pl = "counties" if args.county_level else ("tracts" if args.tract_level else "block groups")
+    if not args.exaepi_dir and not args.events_file:
+        parser.error("At least one of --exaepi_dir/--events_file must be given")
+
+    both = bool(args.exaepi_dir) and bool(args.events_file)
+    uses_epicast = bool(args.events_file)
+    tract_level = (not args.county_level) if (uses_epicast or args.tract_level) else False
+    geo_unit = "county" if args.county_level else ("tract" if tract_level else "block group")
+    geo_unit_pl = "counties" if args.county_level else ("tracts" if tract_level else "block groups")
+    example = {"county": "tl_2010_35_county10.shp", "tract": "tl_2010_35_tract10.shp", "block group": "tl_2010_35_bg10.shp"}[
+        geo_unit
+    ]
+
+    events_df = demog_df = None
+    if args.events_file:
+        print("Reading Epicast data from", args.events_file)
+        events_df, demog_df = read_events_bin(args.events_file)
+        print(f"Read {len(events_df):,} events, {len(demog_df)} Census tracts")
+
+    day_to_plotdir = {}
+    if args.exaepi_dir:
+        exaepi_dirs = expand_plot_dirs(args.exaepi_dir)
+        day_to_plotdir = {_parse_day_from_plot_dir(d): d for d in exaepi_dirs}
+        print(f"Found {len(day_to_plotdir)} ExaEpi plotfile days:", sorted(day_to_plotdir))
 
     shp_dfs = []
     state_codes = []
@@ -156,35 +381,70 @@ def main():
 
     states = gp.read_file(args.states_file)
     states = states[states.STATE.isin(state_codes)]
-    max_count = 30000  # never_infected_agents["count"].max()
+    max_count = 30000
 
-    example = {"county": "tl_2010_35_county10.shp", "tract": "tl_2010_35_tract10.shp", "block group": "tl_2010_35_bg10.shp"}[geo_unit]
+    # rows_spec fixes the row order (Epicast above ExaEpi when both are present) and which data
+    # source feeds each row; only one row is used when only one data source was given.
+    rows_spec = []
+    if args.events_file:
+        rows_spec.append(("Epicast", "epicast"))
+    if args.exaepi_dir:
+        rows_spec.append(("ExaEpi", "exaepi"))
 
-    # Load and merge each plot_dir independently, so a sequence of several directories becomes a
-    # horizontal row of panels (a single directory is just the N=1 case of the same loop).
+    # For each requested day, reconstruct/load whichever data source(s) were given, compute the
+    # rho/r/RMSE comparison (only when both are present), and merge onto the shapefile geometry.
+    # panels holds one (exaepi_geo_df_or_None, epicast_geo_df_or_None, label) tuple per column.
     panels = []
-    for plot_dir in args.plot_dir:
-        grid_stats_df = load_exaepi_grid_stats(plot_dir, tract_level=args.tract_level, county_level=args.county_level)
-        df = pd.merge(shp_data, grid_stats_df, on=["GEOID10"], how="inner")
-        if df.empty:
-            raise SystemExit(
-                f"No rows matched after merging {plot_dir}: 0 of {len(grid_stats_df)} ExaEpi "
-                f"{geo_unit} GEOIDs were found among the {len(shp_data)} shapefile rows. This "
-                f"almost always means --shape_files is at the wrong granularity for the current "
-                f"--tract_level/--county_level setting -- pass a Census {geo_unit} shapefile "
-                f"(e.g. {example}) matching that setting."
+    for day in args.day:
+        epicast_df = None
+        if args.events_file:
+            epicast_df, resolved_day = reconstruct_epicast_snapshot(
+                events_df, demog_df, day=day, county_level=args.county_level
             )
-        day = _parse_day_from_plot_dir(plot_dir)
-        label = f"Day {day}" if day is not None else os.path.basename(plot_dir.rstrip("/"))
-        panels.append((df, label))
-    # df.to_csv("merged.csv")
-    # df[["GEOID10", "pop", "never_infected", "infected", "immune", "dead"]].to_csv("merged.csv")
-    # df[["GEOID10", "pop", "never_infected", "infected", "immune"]].to_csv("merged.csv")
+            if day is not None and resolved_day != day:
+                print(f"WARNING: requested day {day}, but Epicast clamped it to day {resolved_day}")
+        else:
+            resolved_day = day if day is not None else max(day_to_plotdir)
 
-    # Bounds are the union across every panel's data, so the whole sequence shares one consistent
-    # geographic extent instead of each panel framing itself differently.
-    all_lon = pd.concat([df.INTPTLON10.astype("float") for df, _ in panels])
-    all_lat = pd.concat([df.INTPTLAT10.astype("float") for df, _ in panels])
+        exaepi_df = None
+        if args.exaepi_dir:
+            if resolved_day not in day_to_plotdir:
+                available = ", ".join(str(d) for d in sorted(day_to_plotdir))
+                raise SystemExit(
+                    f"No ExaEpi plotfile found for day {resolved_day} among --exaepi_dir. Available "
+                    f"days: {available}"
+                )
+            plot_dir = day_to_plotdir[resolved_day]
+            exaepi_df = load_exaepi_grid_stats(plot_dir, tract_level=tract_level, county_level=args.county_level)
+
+        if both:
+            rho, pval, r, rmse, n, _ = compare_day(exaepi_df, epicast_df)
+            if rho is None:
+                stats_str = f"(only {n} matched {geo_unit_pl})"
+            else:
+                stats_str = f"ρ={rho:.2f}, r={r:.2f}\nRMSE={rmse:.3f}"
+        else:
+            stats_str = None
+        label = (f"Day {resolved_day}", stats_str)
+
+        exaepi_geo_df = pd.merge(shp_data, exaepi_df, on=["GEOID10"], how="inner") if exaepi_df is not None else None
+        epicast_geo_df = (
+            pd.merge(shp_data, epicast_df, on=["GEOID10"], how="inner") if epicast_df is not None else None
+        )
+        for geo_df in (exaepi_geo_df, epicast_geo_df):
+            if geo_df is not None and geo_df.empty:
+                raise SystemExit(
+                    f"No rows matched after merging day {resolved_day}: check --shape_files is a "
+                    f"Census {geo_unit.upper()} shapefile (e.g. {example}) covering the same state "
+                    f"as the data."
+                )
+        panels.append((exaepi_geo_df, epicast_geo_df, label))
+
+    # Bounds are the union across every panel's data (every row), so the whole grid shares one
+    # consistent geographic extent instead of each panel framing itself differently.
+    all_geo_dfs = [df for pair in panels for df in pair[:2] if df is not None]
+    all_lon = pd.concat([df.INTPTLON10.astype("float") for df in all_geo_dfs])
+    all_lat = pd.concat([df.INTPTLAT10.astype("float") for df in all_geo_dfs])
     xmin = max(float(args.coord_bounds[0]), float(all_lon.min()) - 0.5)
     xmax = min(float(args.coord_bounds[1]), float(all_lon.max()) + 0.5)
     xrange = xmax - xmin
@@ -193,38 +453,61 @@ def main():
     yrange = ymax - ymin
 
     n = len(panels)
-    panel_width = 12.0
-    fig_x = panel_width * n
-    fig_y = panel_width * yrange / xrange
+    num_rows = len(rows_spec)
+    # Total figure width is fixed at the paper's full-page width regardless of how many day
+    # columns there are -- each column just gets narrower as more days are added, rather than the
+    # whole figure growing past the page (see paper_style.py).
+    panel_width = FULL_PAGE_WIDTH_IN / n
+    fig_x = FULL_PAGE_WIDTH_IN
+    map_height = num_rows * panel_width * yrange / xrange
+
+    # The title (1-3 lines, depending on whether stats are shown) sits in a margin ABOVE the map
+    # grid, not inside it -- so map_height above is exactly the maps' own height only if that
+    # margin is added on top of it. Without this, the fixed total figure height would force
+    # constrained_layout to steal room from the maps themselves to fit the title, shrinking them
+    # (they'd stay letterboxed to the right aspect ratio, just smaller, with dead space around
+    # them) -- exactly the "too small" problem being fixed here.
+    max_title_lines = max((label[0] + "\n" + (label[1] or "")).count("\n") + 1 for _, _, label in panels)
+    title_pt = FONT_TICK * 1.4 * max_title_lines + 6  # +6pt is matplotlib's own default title pad
+    fig_y = map_height + title_pt / 72
+
     print(f"Plot dimensions: lng/lat {xmin}, {xmax}, {ymin}, {ymax}, figure size: {fig_x}, {fig_y}")
 
-    fig, axes = plt.subplots(1, n, figsize=(fig_x, fig_y), squeeze=False)
-    axes = axes[0]
+    fig, axes = plt.subplots(num_rows, n, figsize=(fig_x, fig_y), squeeze=False, layout="constrained")
+    # Shrink constrained_layout's own default padding to a small margin -- its defaults leave more
+    # breathing room than wanted here, at the direct expense of the maps' own size.
+    fig.get_layout_engine().set(w_pad=0.02, h_pad=0.02, wspace=0.01, hspace=0.01)
 
-    for ax, (df, label) in zip(axes, panels):
-        states.boundary.plot(ax=ax, lw=1, color="black")
-        # Some decent colormaps: RdPu OrRd Greys
-        df.plot(
-            ax=ax,
-            column="infected",
-            cmap="OrRd",
-            legend=True,
-            norm=mp.colors.LogNorm(vmin=1.0, vmax=max_count),  # type: ignore
-        )
-        ax.set_title(label, fontsize=48)
-        ax.tick_params(left=False, bottom=False, labelbottom=False, labelleft=False)
-        ax.set_frame_on(False)
-        ax.set_xlim([xmin, xmax])
-        ax.set_ylim([ymin, ymax])
+    norm = mp.colors.LogNorm(vmin=1.0, vmax=max_count)
+    for j, (exaepi_geo_df, epicast_geo_df, label) in enumerate(panels):
+        for row, (row_name, which) in enumerate(rows_spec):
+            geo_df = epicast_geo_df if which == "epicast" else exaepi_geo_df
+            ax = axes[row][j]
+            states.boundary.plot(ax=ax, lw=AXES_LINEWIDTH, color="black")
+            geo_df.plot(ax=ax, column="infected", cmap="OrRd", legend=False, norm=norm)  # type: ignore
+            ax.tick_params(left=False, bottom=False, labelbottom=False, labelleft=False)
+            ax.set_frame_on(False)
+            ax.set_xlim([xmin, xmax])
+            ax.set_ylim([ymin, ymax])
+            if j == 0:
+                ax.set_ylabel(row_name, fontsize=FONT_LABEL)
+        day_str, stats_str = label
+        # A single multi-line title (matplotlib spaces embedded newlines correctly on its own)
+        # rather than a separately-positioned second text object -- that manual positioning was
+        # tuned for a much larger font scale and stopped fitting once these panels shrank to their
+        # PLOS print size.
+        title = f"{day_str}\n{stats_str}" if stats_str else day_str
+        axes[0][j].set_title(title, fontsize=FONT_TICK, linespacing=1.4)
 
-    axes_all = fig.get_axes()
-    for cb in axes_all[n:-1]:
-        cb.remove()
-    axes_all[-1].set_box_aspect(50)
-    # cb.set_frame_on(False)
-    plt.tight_layout()
+    # A single colorbar spanning every row, rather than one per panel -- built from an explicit
+    # ScalarMappable (since legend=False above) and handed every axes in the grid so matplotlib
+    # sizes/positions it to span the full height instead of attaching to just one panel.
+    sm = mp.cm.ScalarMappable(norm=norm, cmap="OrRd")
+    cbar = fig.colorbar(sm, ax=axes.ravel().tolist(), fraction=0.02, pad=0.02)
+    cbar.ax.tick_params(labelsize=FONT_TICK)
+
     print("Plotting results to", args.output)
-    plt.savefig(args.output, bbox_inches="tight")
+    plt.savefig(args.output)
 
 
 if __name__ == "__main__":
