@@ -883,17 +883,64 @@ void runAgent () {
                 }
             }
 
-            interact(&AgentContainer::interactWork, diag_exp_work);
-            interact(&AgentContainer::interactHospital, diag_exp_hosp);
-            interact(&AgentContainer::interactSchool, diag_exp_school);
-            interact(&AgentContainer::interactNborhoodDay, diag_exp_nbhd);
-            interact(&AgentContainer::interactCommDay, diag_exp_commd);
+            {
+                BL_PROFILE_REGION("ctx_work");
+                interact(&AgentContainer::interactWork, diag_exp_work);
+            }
+            {
+                BL_PROFILE_REGION("ctx_hosp");
+                interact(&AgentContainer::interactHospital, diag_exp_hosp);
+            }
+            {
+                BL_PROFILE_REGION("ctx_school");
+                interact(&AgentContainer::interactSchool, diag_exp_school);
+            }
+            {
+                BL_PROFILE_REGION("ctx_nbhd");
+                interact(&AgentContainer::interactNborhoodDay, diag_exp_nbhd);
+            }
+            {
+                BL_PROFILE_REGION("ctx_commd");
+                interact(&AgentContainer::interactCommDay, diag_exp_commd);
+            }
             pc.eveningCommute(mask_behavior);
             pc.interactEvening(mask_behavior);
-            interact(&AgentContainer::interactHH, diag_exp_hh);
-            interact(&AgentContainer::interactNC, diag_exp_nc);
-            interact(&AgentContainer::interactNborhoodNight, diag_exp_nbhn);
-            interact(&AgentContainer::interactCommNight, diag_exp_commn);
+            {
+                BL_PROFILE_REGION("ctx_hh");
+                interact(&AgentContainer::interactHH, diag_exp_hh);
+            }
+            {
+                BL_PROFILE_REGION("ctx_nc");
+                interact(&AgentContainer::interactNC, diag_exp_nc);
+            }
+            {
+                BL_PROFILE_REGION("ctx_nbhn");
+                interact(&AgentContainer::interactNborhoodNight, diag_exp_nbhn);
+            }
+            {
+                BL_PROFILE_REGION("ctx_commn");
+                interact(&AgentContainer::interactCommNight, diag_exp_commn);
+            }
+
+            // Each interact() call above collected a rank-local sum only (see
+            // AgentContainer::sumContextInfections); reduce all 9 contexts across ranks in one
+            // collective here instead of once per context, so a synchronization point on this
+            // scale only ever happens once a day rather than 9 times.
+            if (params.context_diag) {
+                BL_PROFILE("ContextDiag::reduce");
+                amrex::Real diag_local[9] = {diag_exp_work, diag_exp_hosp, diag_exp_school, diag_exp_nbhd, diag_exp_commd,
+                                             diag_exp_hh,   diag_exp_nc,   diag_exp_nbhn,   diag_exp_commn};
+                amrex::ParallelDescriptor::ReduceRealSum(diag_local, 9);
+                diag_exp_work = diag_local[0];
+                diag_exp_hosp = diag_local[1];
+                diag_exp_school = diag_local[2];
+                diag_exp_nbhd = diag_local[3];
+                diag_exp_commd = diag_local[4];
+                diag_exp_hh = diag_local[5];
+                diag_exp_nc = diag_local[6];
+                diag_exp_nbhn = diag_local[7];
+                diag_exp_commn = diag_local[8];
+            }
 
             if ((params.random_travel_int > 0) && (i % params.random_travel_int == 0)) { pc.returnRandomTravel(); }
 

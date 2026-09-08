@@ -1568,11 +1568,15 @@ void AgentContainer::snapshotProbs (int d) {
     }
 }
 
-/*! \brief Order-independent contribution of the last interaction to expected new infections.
-    Computes sum_i( max(0, 1 - prob_after[i] / prob_before[i]) ) over susceptible agents,
-    where prob_before comes from the preceding snapshotProbs() call.
-    The ratio recovers the standalone survival factor for each agent regardless of what
-    prior interactions have already applied. */
+/*! \brief Order-independent, rank-local contribution of the last interaction to expected new
+    infections. Computes sum_i( max(0, 1 - prob_after[i] / prob_before[i]) ) over susceptible
+    agents, where prob_before comes from the preceding snapshotProbs() call. The ratio recovers
+    the standalone survival factor for each agent regardless of what prior interactions have
+    already applied.
+    This returns each rank's local sum only -- it does not reduce across ranks. Call sites that
+    invoke this once per interaction context (see main.cpp's context_diag block) should collect
+    all contexts' local sums into one array and issue a single ParallelDescriptor::ReduceRealSum
+    over all of them, rather than reducing after every call. */
 amrex::Real AgentContainer::sumContextInfections (int d) {
     BL_PROFILE("AgentContainer::sumContextInfections");
     amrex::Real total = 0.0_rt;
@@ -1610,17 +1614,6 @@ amrex::Real AgentContainer::sumContextInfections (int d) {
             total += tile_sum_d.dataValue();
             ++snap_idx;
         }
-    }
-
-    // Splitting the collective into its own scope, separate from the local-work loop above, is
-    // enough on its own to show load imbalance in TinyProfiler: ReduceRealSum already blocks each
-    // rank until every rank has called it, so a rank that finishes its local scan early just sits
-    // inside this scope waiting -- no separate barrier is needed to capture that. Compare this
-    // region's Min (near the true cost of the reduction) against its Max (near the true cost of the
-    // slowest rank's local work) to see the imbalance directly.
-    {
-        BL_PROFILE("AgentContainer::sumContextInfections::reduce");
-        amrex::ParallelDescriptor::ReduceRealSum(&total, 1);
     }
     return total;
 }
