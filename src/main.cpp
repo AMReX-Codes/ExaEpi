@@ -884,41 +884,46 @@ void runAgent () {
             }
 
             {
-                BL_PROFILE_REGION("ctx_work");
+                // BL_PROFILE_REGION isn't used here: under TinyProfiler its expansion always
+                // declares a variable named tiny_profile_region_vname (not parameterized by the
+                // region name), so nesting it inside the enclosing "Evolution" region triggers a
+                // -Wshadow warning. Instantiating TinyProfileRegion directly with our own name
+                // sidesteps that.
+                amrex::TinyProfileRegion ctx_region("ctx_work");
                 interact(&AgentContainer::interactWork, diag_exp_work);
             }
             {
-                BL_PROFILE_REGION("ctx_hosp");
+                amrex::TinyProfileRegion ctx_region("ctx_hosp");
                 interact(&AgentContainer::interactHospital, diag_exp_hosp);
             }
             {
-                BL_PROFILE_REGION("ctx_school");
+                amrex::TinyProfileRegion ctx_region("ctx_school");
                 interact(&AgentContainer::interactSchool, diag_exp_school);
             }
             {
-                BL_PROFILE_REGION("ctx_nbhd");
+                amrex::TinyProfileRegion ctx_region("ctx_nbhd");
                 interact(&AgentContainer::interactNborhoodDay, diag_exp_nbhd);
             }
             {
-                BL_PROFILE_REGION("ctx_commd");
+                amrex::TinyProfileRegion ctx_region("ctx_commd");
                 interact(&AgentContainer::interactCommDay, diag_exp_commd);
             }
             pc.eveningCommute(mask_behavior);
             pc.interactEvening(mask_behavior);
             {
-                BL_PROFILE_REGION("ctx_hh");
+                amrex::TinyProfileRegion ctx_region("ctx_hh");
                 interact(&AgentContainer::interactHH, diag_exp_hh);
             }
             {
-                BL_PROFILE_REGION("ctx_nc");
+                amrex::TinyProfileRegion ctx_region("ctx_nc");
                 interact(&AgentContainer::interactNC, diag_exp_nc);
             }
             {
-                BL_PROFILE_REGION("ctx_nbhn");
+                amrex::TinyProfileRegion ctx_region("ctx_nbhn");
                 interact(&AgentContainer::interactNborhoodNight, diag_exp_nbhn);
             }
             {
-                BL_PROFILE_REGION("ctx_commn");
+                amrex::TinyProfileRegion ctx_region("ctx_commn");
                 interact(&AgentContainer::interactCommNight, diag_exp_commn);
             }
 
