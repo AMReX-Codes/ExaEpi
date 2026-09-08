@@ -329,9 +329,48 @@ void UrbanPopData::init (ExaEpi::TestParams& params, Geometry& geom, BoxArray& b
     // add in a buffer to ensure we can fit them all in a 2D grid
     geom = getGeometry(num_communities);
 
+    //  allocate block groups to x,y grid locations and use a map to keep track of them for later
+    //  processing. Also accumulate each cell's home population so the boxes built below can be
+    //  distributed across ranks by agent count (see box_population below) instead of just box
+    //  count -- a plain SFC/round-robin map otherwise leaves whichever rank owns a population-dense
+    //  cluster of communities (e.g. an urban county) with far more agents than the rest.
+    int max_x = geom.Domain().bigEnd()[0];
+    int max_y = geom.Domain().bigEnd()[1];
+    Print() << " max " << max_x << "," << max_y << "\n";
+    Vector<Long> cell_population((max_x + 1) * (max_y + 1), 0);
+    int x = 0;
+    int y = 0;
+    for (int bi = 0; bi < block_groups.size(); bi++) {
+        auto& block_group = block_groups[bi];
+        block_group.x = x;
+        block_group.y = y;
+        auto xy = IntVect(x, y);
+        if (xy_to_block_groups.insert({xy, bi}).second == false) { Abort("Duplicate xy location found for block groups"); }
+        cell_population[y * (max_x + 1) + x] += block_group.home_population;
+        x++;
+        if (x > max_x) {
+            x = 0;
+            y++;
+            if (y > max_y) { Abort("Not enough grid points for all the block groups\n"); }
+        }
+        num_communities++;
+    }
+
     ba.define(geom.Domain());
     ba.maxSize(params.max_box_size);
-    dm.define(ba);
+
+    // Sum each box's population from the per-cell populations above, then assign ranks with the
+    // knapsack algorithm so agent count -- not just box count -- is balanced across ranks.
+    std::vector<Long> box_population(ba.size(), 0);
+    for (int k = 0; k < ba.size(); k++) {
+        const Box& bx = ba[k];
+        for (int j = bx.smallEnd(1); j <= bx.bigEnd(1); j++) {
+            for (int i = bx.smallEnd(0); i <= bx.bigEnd(0); i++) {
+                box_population[k] += cell_population[j * (max_x + 1) + i];
+            }
+        }
+    }
+    dm.KnapSackProcessorMap(box_population, ParallelDescriptor::NProcs());
 
     Print() << "Base domain: " << geom.Domain() << "\n";
     Print() << "Max box size: " << params.max_box_size << "\n";
@@ -347,26 +386,6 @@ void UrbanPopData::init (ExaEpi::TestParams& params, Geometry& geom, BoxArray& b
     unit_mf.setVal(-1);
 
     std::ofstream geoid_coords_ofs;
-    //  allocate block groups to x,y grid locations and use a map to keep track of them for later processing
-    int max_x = geom.Domain().bigEnd()[0];
-    int max_y = geom.Domain().bigEnd()[1];
-    Print() << " max " << max_x << "," << max_y << "\n";
-    int x = 0;
-    int y = 0;
-    for (int bi = 0; bi < block_groups.size(); bi++) {
-        auto& block_group = block_groups[bi];
-        block_group.x = x;
-        block_group.y = y;
-        auto xy = IntVect(x, y);
-        if (xy_to_block_groups.insert({xy, bi}).second == false) { Abort("Duplicate xy location found for block groups"); }
-        x++;
-        if (x > max_x) {
-            x = 0;
-            y++;
-            if (y > max_y) { Abort("Not enough grid points for all the block groups\n"); }
-        }
-        num_communities++;
-    }
 
     workgroup_size_table = readWorkgroupSizeTable(params.workgroup_size_filename, params.workgroup_size);
     copyToDeviceAsync(workgroup_size_table, workgroup_size_table_d);
