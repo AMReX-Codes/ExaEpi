@@ -1312,7 +1312,14 @@ std::array<Long, OutputStatus::nattribs> AgentContainer::getTotals (const int a_
             reduce_ops);
     std::array<Long, OutputStatus::nattribs> counts;
     extract_tuple_to_array(r, counts);
-    ParallelDescriptor::ReduceLongSum(&counts[0], OutputStatus::nattribs);
+
+    // Same reasoning as AgentContainer::sumContextInfections: putting the collective in its own
+    // scope, separate from the (already-local, already-fast) ParticleReduce above, is enough for
+    // TinyProfiler to show an imbalanced rank's wait time here instead of inside getTotals itself.
+    {
+        BL_PROFILE("getTotals::reduce");
+        ParallelDescriptor::ReduceLongSum(&counts[0], OutputStatus::nattribs);
+    }
 
     return counts;
 }
@@ -1604,7 +1611,17 @@ amrex::Real AgentContainer::sumContextInfections (int d) {
             ++snap_idx;
         }
     }
-    amrex::ParallelDescriptor::ReduceRealSum(&total, 1);
+
+    // Splitting the collective into its own scope, separate from the local-work loop above, is
+    // enough on its own to show load imbalance in TinyProfiler: ReduceRealSum already blocks each
+    // rank until every rank has called it, so a rank that finishes its local scan early just sits
+    // inside this scope waiting -- no separate barrier is needed to capture that. Compare this
+    // region's Min (near the true cost of the reduction) against its Max (near the true cost of the
+    // slowest rank's local work) to see the imbalance directly.
+    {
+        BL_PROFILE("AgentContainer::sumContextInfections::reduce");
+        amrex::ParallelDescriptor::ReduceRealSum(&total, 1);
+    }
     return total;
 }
 
