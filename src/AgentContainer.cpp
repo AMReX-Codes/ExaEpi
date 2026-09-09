@@ -1580,19 +1580,24 @@ void AgentContainer::snapshotProbs (int d) {
 amrex::Real AgentContainer::sumContextInfections (int d) {
     BL_PROFILE("AgentContainer::sumContextInfections");
     amrex::Real total = 0.0_rt;
-    int snap_idx = 0;
     for (int lev = 0; lev < numLevels(); ++lev) {
+        // mfi.tileIndex() (not a manually incremented counter) indexes m_prob_snapshot: it's the
+        // same fixed per-tile position snapshotProbs()'s *serial* emplace_back() loop assigned,
+        // regardless of the order threads visit tiles in below -- see AMReX_MFIter.H's tileIndex().
+        // That's what makes it safe to parallelize this loop over threads while snapshotProbs()
+        // itself stays a plain serial fill.
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (Gpu::notInLaunchRegion()) reduction(+:total)
+#endif
         for (MFIter mfi = MakeMFIter(lev); mfi.isValid(); ++mfi) {
             auto& ptile = ParticlesAt(lev, mfi);
             const auto& ptd = ptile.getParticleTileData();
             auto& soa = ptile.GetStructOfArrays();
             const auto np = ptile.numParticles();
 
-            if (np == 0) {
-                ++snap_idx;
-                continue;
-            }
+            if (np == 0) { continue; }
 
+            const int snap_idx = mfi.tileIndex();
             AMREX_ASSERT(snap_idx < (int)m_prob_snapshot.size());
             AMREX_ASSERT((int)m_prob_snapshot[snap_idx].size() == np);
 
@@ -1612,7 +1617,6 @@ amrex::Real AgentContainer::sumContextInfections (int d) {
             amrex::Gpu::synchronize();
 
             total += tile_sum_d.dataValue();
-            ++snap_idx;
         }
     }
     return total;

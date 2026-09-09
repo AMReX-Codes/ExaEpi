@@ -865,7 +865,10 @@ void runAgent () {
                 if (params.context_diag) { diag = pc.sumContextInfections(0); }
             };
 
-            pc.morningCommute(mask_behavior);
+            {
+                amrex::TinyProfileRegion diag_region("diag_morningCommute");
+                pc.morningCommute(mask_behavior);
+            }
 
             // Split each (community, school_id, grade) group into fixed-size classes (see
             // AgentContainer::assignSchoolClasses). Only needs to happen once, on a fresh start:
@@ -908,7 +911,10 @@ void runAgent () {
                 amrex::TinyProfileRegion ctx_region("ctx_commd");
                 interact(&AgentContainer::interactCommDay, diag_exp_commd);
             }
-            pc.eveningCommute(mask_behavior);
+            {
+                amrex::TinyProfileRegion diag_region("diag_eveningCommute");
+                pc.eveningCommute(mask_behavior);
+            }
             pc.interactEvening(mask_behavior);
             {
                 amrex::TinyProfileRegion ctx_region("ctx_hh");
