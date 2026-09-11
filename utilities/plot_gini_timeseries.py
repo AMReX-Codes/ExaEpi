@@ -135,6 +135,14 @@ def main():
         "ExaEpi and Epicast.",
     )
     parser.add_argument(
+        "--exaepi_day_shift", type=int, default=0,
+        help="Shift the ExaEpi day parsed from each --plot_dirs directory by this many days (e.g. "
+        "5 treats a plt00020 directory as day 25) before plotting it. Use this to correct for a "
+        "real start-date misalignment between the two runs (e.g. one simulator seeded a few days "
+        "later than the other) so the ExaEpi and Epicast series line up on the same day axis. Has "
+        "no effect on the Epicast series.",
+    )
+    parser.add_argument(
         "--metric", choices=["gini", "moran"], default="gini",
         help="Which spread metric to compute per day: 'gini' (concentration, no shapefile needed) "
         "or 'moran' (global Moran's I spatial autocorrelation, needs --shape_files) (default: gini)",
@@ -175,7 +183,7 @@ def main():
         geoid_order, W = None, None
         for plot_dir in args.plot_dirs:
             grid_stats_df = load_exaepi_grid_stats(plot_dir, tract_level=True, county_level=args.county_level)
-            day = _parse_day_from_plot_dir(plot_dir)
+            day = _parse_day_from_plot_dir(plot_dir) + args.exaepi_day_shift
             if args.metric == "moran":
                 if geoid_order is None:
                     geoid_order, W = _prepare_geo_weights(shp_data, grid_stats_df, geo_unit)
