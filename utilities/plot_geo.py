@@ -4,10 +4,12 @@
 
 Pass --exaepi_dir alone to plot only ExaEpi (one row), --events_file alone to plot only Epicast
 (one row), or both together to plot them stacked in two rows (Epicast on top, ExaEpi below) with
-each day's column additionally labeled with that day's Spearman rho, infection-weighted Pearson r,
-and infection-weighted RMSE between the two (see compare_day() for how these are computed and what
-they mean) -- a per-community comparison that plot_geo_compare.py also uses (importing the loaders
-and compare_day from here) to plot those same three quantities as a day-scalar time series instead.
+each day's column additionally labeled with that day's log-scale Pearson r and RMSLE of raw infected
+COUNT (see compare_day() for how these are computed and what they mean, and why they're shown here
+instead of the rate-based rho/r/RMSE compare_day() also returns -- those can look deceptively good
+once an epidemic has mostly burned out) -- a per-community comparison that plot_geo_compare.py also
+uses (importing the loaders and compare_day from here) to plot the rate-based quantities as a
+day-scalar time series instead.
 
 Days are given explicitly as a list (--day), since a single day value has to resolve independently
 to an Epicast snapshot (reconstructed from the events log) and/or a matching ExaEpi plotfile
@@ -229,30 +231,55 @@ def weighted_rmse(x, y, w):
 
 def compare_day(exaepi_df, epicast_df):
     """Merge one day's ExaEpi and Epicast per-community DataFrames on GEOID10 and return
-    (rho, pval, r, rmse, n, merged_df): the Spearman rank correlation, infection-weighted Pearson
-    correlation, and infection-weighted RMSE of infection rate (infected / pop) between the two.
-    Rate rather than raw infected count is compared so that communities of very different
-    population size are compared on a like-for-like basis. r and rmse are weighted by each
-    community's average infected count (across the two simulators) rather than its population, so
-    that a community currently at or near zero infection doesn't get outsized influence just
-    because it has a large population -- a rate difference there is mostly noise, whereas the same
-    difference in a heavily-infected community reflects a real, larger-magnitude disagreement.
+    (rho, pval, r, rmse, r_log, rmse_log, n, merged_df).
+
+    rho/r/rmse are the Spearman rank correlation, infection-weighted Pearson correlation, and
+    infection-weighted RMSE of infection RATE (infected / pop) between the two. Rate rather than raw
+    infected count is compared so that communities of very different population size are compared on
+    a like-for-like basis. r and rmse are weighted by each community's average infected count
+    (across the two simulators) rather than its population, so that a community currently at or near
+    zero infection doesn't get outsized influence just because it has a large population -- a rate
+    difference there is mostly noise, whereas the same difference in a heavily-infected community
+    reflects a real, larger-magnitude disagreement. The corollary is that once an epidemic has mostly
+    burned out and every community's rate is near zero, rmse necessarily shrinks toward zero right
+    along with it (two numbers close to zero can't differ by much in absolute terms) even if the two
+    simulators agree poorly on which of the few remaining cases are where -- rmse alone can look
+    deceptively good late in a run.
+
+    r_log/rmse_log are a log-scale counterpart computed on raw infected COUNT (not rate), unweighted
+    (every community counted equally), matching what the choropleth itself actually shows: it colors
+    every community by log(infected count) with no population weighting, so a small community's count
+    going from 2 to 20 is exactly as visible on the map as a large community's count going from 200 to
+    2000 -- a difference the rate-based rmse above washes out once both counts are small relative to
+    population. rmse_log is the root-mean-square log error (RMSLE), on log1p(count) so a count of 0 is
+    still defined; unlike rmse, it stays sensitive to disagreement in the residual tail of a mostly-
+    resolved epidemic, which is exactly where rmse's near-zero-by-construction floor is least
+    informative. rho isn't given a log counterpart since Spearman rank correlation is unchanged by any
+    monotonic transform (log included) of the values it ranks.
+
     merged_df carries a rate_exaepi/rate_epicast column per matched community (GEOID10) -- the
     community-by-community comparison underlying the summary scalars, for callers that want to look
-    beyond them. Returns (None, None, None, None, n, merged_df) if fewer than two communities match,
-    since none of these are meaningful below that.
+    beyond them. Returns (None, None, None, None, None, None, n, merged_df) if fewer than two
+    communities match, since none of these are meaningful below that.
     """
     df = pd.merge(exaepi_df, epicast_df, on="GEOID10", suffixes=("_exaepi", "_epicast"))
     df = df[(df.pop_exaepi > 0) & (df.pop_epicast > 0)].copy()
     df["rate_exaepi"] = df.infected_exaepi / df.pop_exaepi
     df["rate_epicast"] = df.infected_epicast / df.pop_epicast
     if len(df) < 2:
-        return None, None, None, None, len(df), df
+        return None, None, None, None, None, None, len(df), df
     rho, pval = spearmanr(df.rate_exaepi, df.rate_epicast)
     weight = (df.infected_exaepi + df.infected_epicast) / 2.0
     r = weighted_pearsonr(df.rate_exaepi, df.rate_epicast, weight)
     rmse = weighted_rmse(df.rate_exaepi, df.rate_epicast, weight)
-    return rho, pval, r, rmse, len(df), df
+
+    log_exaepi = np.log1p(df.infected_exaepi)
+    log_epicast = np.log1p(df.infected_epicast)
+    equal_weight = np.ones(len(df))
+    r_log = weighted_pearsonr(log_exaepi, log_epicast, equal_weight)
+    rmse_log = weighted_rmse(log_exaepi, log_epicast, equal_weight)
+
+    return rho, pval, r, rmse, r_log, rmse_log, len(df), df
 
 
 def main():
@@ -261,7 +288,8 @@ def main():
     parser = argparse.ArgumentParser(
         description="Plot ExaEpi and/or Epicast choropleths, one column per day. With both given, "
         "rows are stacked (Epicast on top, ExaEpi below) and each column is labeled with that "
-        "day's rho/r/RMSE; with only one given, that single row is plotted with no stats."
+        "day's log-scale Pearson r and RMSLE (count-based); with only one given, that single row "
+        "is plotted with no stats."
     )
     parser.add_argument(
         "--exaepi_dir",
@@ -418,11 +446,11 @@ def main():
             exaepi_df = load_exaepi_grid_stats(plot_dir, tract_level=tract_level, county_level=args.county_level)
 
         if both:
-            rho, pval, r, rmse, n, _ = compare_day(exaepi_df, epicast_df)
-            if rho is None:
+            _, _, _, _, r_log, rmse_log, n, _ = compare_day(exaepi_df, epicast_df)
+            if r_log is None:
                 stats_str = f"(only {n} matched {geo_unit_pl})"
             else:
-                stats_str = f"ρ={rho:.2f}, r={r:.2f}\nRMSE={rmse:.3f}"
+                stats_str = f"log r={r_log:.2f}\nRMSLE={rmse_log:.2f}"
         else:
             stats_str = None
         label = (f"Day {resolved_day}", stats_str)
