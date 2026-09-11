@@ -702,7 +702,8 @@ void runAgent () {
             // here (before that call) would permanently bake in their pre-assignment (garbage)
             // values, with no later plotfile ever getting a chance to capture the real ones. So
             // this first write is deferred to just after assignSchoolClasses() instead (see
-            // below); every other day's write is unaffected.
+            // below); every other day's write is unaffected. That deferred write also has to
+            // undo/redo this day's morningCommute() around it -- see the comment there for why.
             bool is_fresh_start = (i == start_day && params.restart_chkfile.empty());
             if ((params.plot_int > 0) && (i % params.plot_int == 0) && !is_fresh_start) {
                 ExaEpi::IO::writePlotFile(pc, disease_stats, nullptr, &urbanPopData.geoid_mf, &urbanPopData.community_mf,
@@ -875,15 +876,27 @@ void runAgent () {
             // IntIdx::school_class/school_class_group are persistent, checkpointed attributes, so a
             // restart must keep whatever classes the original run assigned rather than redrawing them.
             if (is_fresh_start) {
+                // assignSchoolClasses() requires agents to already be at their work location (see
+                // its doc comment), which is why the morningCommute() above couldn't be deferred
+                // past it. But every plot_int write on every other day captures agents at home
+                // (this day's own eveningCommute hasn't run yet, and the previous day's already
+                // restored them there) -- so writing here, right after morningCommute(), would
+                // record agents at work instead, misattributing initially-infected commuters to
+                // their workplace community/county rather than the seeded one (see
+                // InitializeInfections.cpp). Move agents back home for the deferred write below,
+                // then redo the commute so the interactions that follow still find them at work.
                 pc.assignSchoolClasses(params);
+                pc.eveningCommute(mask_behavior);
 
                 // Deferred from above: this is the write that is_fresh_start skipped, now done
                 // after school_class/school_class_group have real values instead of their
-                // pre-assignment defaults.
+                // pre-assignment defaults, and with agents back at home (see comment above).
                 if ((params.plot_int > 0) && (i % params.plot_int == 0)) {
                     ExaEpi::IO::writePlotFile(pc, disease_stats, nullptr, &urbanPopData.geoid_mf, &urbanPopData.community_mf,
                                               params.num_diseases, params.disease_names, cur_time, i, params.verbose);
                 }
+
+                pc.morningCommute(mask_behavior);
             }
 
             {
