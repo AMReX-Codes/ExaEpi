@@ -117,12 +117,15 @@ def load_community_density(plot_dir, shape_files):
     return df
 
 
-def _add_series(ax, df, pop_col, density_col, style, log, label_suffix=""):
-    """Scatter one (population, density) series plus its own binned-median trend line, and
-    return the Pearson correlation (log10 density, population) for the printed summary."""
+def _add_series(ax, df, pop_col, density_col, style, log):
+    """Scatter one (population, density) series plus its own binned-median trend line, and return
+    (scatter_handle, line_handle, corr, n) -- corr/n are the Pearson correlation (log10 density,
+    population) and community count for the printed summary. The caller lays the two handles out
+    as a two-column legend (dot+name, dash+"median") so each series is one row: see
+    plot_community_size_vs_density."""
     sub = df[df[pop_col] > 0]
-    ax.scatter(sub[pop_col], sub[density_col], s=20, alpha=0.35, color=style["scatter"],
-               linewidths=0, label=style["label"] + label_suffix)
+    scatter_handle = ax.scatter(sub[pop_col], sub[density_col], s=20, alpha=0.35, color=style["scatter"],
+                                 linewidths=0, label=style["label"])
 
     # Median community size within density bins -- shows the trend through the scatter's heavy
     # overplotting rather than relying on the eye to average it. Bin edges are spaced in
@@ -139,19 +142,22 @@ def _add_series(ax, df, pop_col, density_col, style, log, label_suffix=""):
             center = (bins[i - 1] + bins[i]) / 2
             bin_centers.append(10 ** center if log else center)
             bin_medians.append(sel.median())
-    ax.plot(bin_medians, bin_centers, color=style["trend"], lw=1.5,
-            label=f"{style['label']} median")
+    line_handle, = ax.plot(bin_medians, bin_centers, color=style["trend"], lw=1.5, label="median")
 
     log_density = np.log10(sub[density_col])
-    return np.corrcoef(log_density, sub[pop_col])[0, 1], len(sub)
+    return scatter_handle, line_handle, np.corrcoef(log_density, sub[pop_col])[0, 1], len(sub)
 
 
 def plot_community_size_vs_density(df, output, log=False):
     fig, ax = plt.subplots(figsize=(HALF_PAGE_WIDTH_IN, HALF_PAGE_HEIGHT_IN), layout="constrained")
 
+    scatter_handles, line_handles = [], []
     for series, pop_col, density_col in (("night", "night_pop", "density_night"),
                                           ("day", "day_pop", "density_day")):
-        corr, n = _add_series(ax, df, pop_col, density_col, SERIES_STYLE[series], log)
+        style = SERIES_STYLE[series]
+        scatter_handle, line_handle, corr, n = _add_series(ax, df, pop_col, density_col, style, log)
+        scatter_handles.append(scatter_handle)
+        line_handles.append(line_handle)
         print(f"{n} communities plotted ({series})")
         print(f"Pearson correlation (log10 density, community size), {series}: {corr:.3f}")
 
@@ -160,7 +166,11 @@ def plot_community_size_vs_density(df, output, log=False):
         ax.set_yscale("log")
     ax.set_xlabel("Community size (population)")
     ax.set_ylabel("Population density (people / km²)")
-    ax.legend(frameon=False, loc="upper left")
+    # Two-column legend, one row per series: dot + series name in column 1, dash + "median" in
+    # column 2 (matplotlib fills a multi-column legend's handles column-major, so all scatter
+    # handles first, then all line handles, lines up each series' pair on the same row).
+    ax.legend(handles=scatter_handles + line_handles, ncol=2, columnspacing=0.8, handletextpad=0.5,
+              frameon=False, loc="upper left")
     ax.set_ylim(0.01, 1000000)
     print("Plotting results to", output)
     plt.savefig(output)
