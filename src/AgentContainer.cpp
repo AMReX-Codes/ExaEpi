@@ -1587,7 +1587,7 @@ amrex::Real AgentContainer::sumContextInfections (int d) {
         // That's what makes it safe to parallelize this loop over threads while snapshotProbs()
         // itself stays a plain serial fill.
 #ifdef AMREX_USE_OMP
-#pragma omp parallel if (Gpu::notInLaunchRegion()) reduction(+:total)
+#pragma omp parallel if (Gpu::notInLaunchRegion()) reduction(+ : total)
 #endif
         for (MFIter mfi = MakeMFIter(lev); mfi.isValid(); ++mfi) {
             auto& ptile = ParticlesAt(lev, mfi);
