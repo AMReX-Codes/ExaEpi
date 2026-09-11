@@ -960,6 +960,8 @@ def plot_series(ax, epicast_data, exaepi_data, label, seir_dfs=None, fit_results
 
         return legend_label, auc, color, is_wildcard, y_for_gof
 
+    print(f"{col_name}")
+
     # Plot each Epicast group, shifted right by epicast_shift (nonzero only when an auto shift
     # came out negative and got swapped onto Epicast instead of ExaEpi -- see --shift "auto").
     for i, entry in enumerate(epicast_data):
@@ -1033,7 +1035,6 @@ def plot_series(ax, epicast_data, exaepi_data, label, seir_dfs=None, fit_results
 
     # Annotate per-series summary values in the upper-right corner (or lower-right for the
     # cumulative curve, since it rises into the upper-right area)
-    print(f"{col_name}")
     if col_name == "cumulative_exposed":
         # Collect (label, max_val, color) in the same top-to-bottom order used by the other
         # plots' AUC block below (fit_results, then Epicast, then ExaEpi, then manual SEIRHD).
@@ -1360,7 +1361,6 @@ def _write_exaepi_csv(fname, df, shift):
     })
     csv_out = fname + "-plot_values.csv"
     out.to_csv(csv_out, index=False)
-    print(f"Wrote plot values to {csv_out}")
 
 
 epicast_data = _load_grouped(args.epicast_file, load_epicast, None)
