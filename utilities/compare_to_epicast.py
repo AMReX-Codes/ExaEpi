@@ -3,6 +3,9 @@
 import sys
 import os
 import glob
+import io
+import contextlib
+import functools
 import multiprocessing as mp
 from concurrent.futures import ProcessPoolExecutor
 import pandas as pd
@@ -824,6 +827,7 @@ def plot_single_source(ax, epicast_data, exaepi_data, source_key, title, ylimit)
             y = _get_group_y(entry, col, args.xlimit)
             if entry["is_wildcard"] and len(entry["dfs"]) > 1:
                 y_mat = _align_arrays(entry["dfs"], col, args.xlimit)
+                print(f"  Medoid file (Epicast, {col}): {entry['fnames'][_medoid_index(y_mat)]}")
                 ax.fill_between(x[: y_mat.shape[1]], y_mat.min(axis=0), y_mat.max(axis=0),
                                 alpha=0.25, color="blue", zorder=1, label="_nolegend_")
             ax.plot(x[: len(y)], y, color="blue", linewidth=1, linestyle="-", label="Epicast")
@@ -846,6 +850,7 @@ def plot_single_source(ax, epicast_data, exaepi_data, source_key, title, ylimit)
             y = _get_group_y(entry, col, args.xlimit)
             if entry["is_wildcard"] and len(entry["dfs"]) > 1:
                 y_mat = _align_arrays(entry["dfs"], col, args.xlimit)
+                print(f"  Medoid file (ExaEpi, {col}): {entry['fnames'][_medoid_index(y_mat)]}")
                 ax.fill_between(x[: y_mat.shape[1]], y_mat.min(axis=0), y_mat.max(axis=0),
                                 alpha=0.25, color="red", zorder=1, label="_nolegend_")
             ax.plot(x[: len(y)], y, color="red", linewidth=1, linestyle="-", label="ExaEpi")
@@ -930,8 +935,11 @@ def plot_series(ax, epicast_data, exaepi_data, label, seir_dfs=None, fit_results
         plot_label   = legend_label if legend_label is not None else "_nolegend_"
 
         if is_wildcard and len(entry["dfs"]) > 1:
-            y_mat    = _align_arrays(entry["dfs"], col, args.xlimit)
-            y_medoid = y_mat[_medoid_index(y_mat)]
+            y_mat       = _align_arrays(entry["dfs"], col, args.xlimit)
+            medoid_idx  = _medoid_index(y_mat)
+            y_medoid    = y_mat[medoid_idx]
+            medoid_lbl  = legend_label if legend_label is not None else f"group {i}"
+            print(f"  Medoid file ({medoid_lbl}, {col}): {entry['fnames'][medoid_idx]}")
             y_min    = y_mat.min(axis=0)
             y_max    = y_mat.max(axis=0)
             n        = y_mat.shape[1]
@@ -1275,6 +1283,20 @@ if not args.epicast_file and not args.exaepi_file:
     parser.error("At least one -e/--epicast_file or -x/--exaepi_file must be specified.")
 
 
+def _load_and_capture(load_fn, fname):
+    """Run load_fn(fname) with its stdout captured, returning (result, log) instead of printing
+    directly. Used when load_fn runs in a worker process (see _load_grouped): each worker writes
+    to the same underlying stdout fd, and since this script runs unbuffered (-u), concurrent
+    writes from different processes interleave mid-line rather than one line at a time, garbling
+    load_epicast/load_exaepi's diagnostic prints. Capturing lets the parent process print each
+    file's log as a whole, in file order, once loading completes.
+    """
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        result = load_fn(fname)
+    return result, buf.getvalue()
+
+
 def _load_grouped(file_specs, load_fn, extra_csv_fn=None):
     """Expand each file spec into a group dict, loading DataFrames with load_fn.
 
@@ -1300,7 +1322,12 @@ def _load_grouped(file_specs, load_fn, extra_csv_fn=None):
             print(f"{fname}")
         if is_wc:
             with ProcessPoolExecutor(mp_context=mp.get_context("fork")) as executor:
-                dfs = list(executor.map(load_fn, fnames))
+                results = list(executor.map(functools.partial(_load_and_capture, load_fn), fnames))
+            dfs = []
+            for df, log in results:
+                if log:
+                    sys.stdout.write(log)
+                dfs.append(df)
         else:
             dfs = [load_fn(fname) for fname in fnames]
 
@@ -1317,7 +1344,6 @@ def _write_epicast_csv(fname, df, shift):
     out["day"] = out["day"] + shift
     csv_out = fname + "-plot_values.csv"
     out.to_csv(csv_out, index=False)
-    print(f"Wrote plot values to {csv_out}")
 
 
 def _write_exaepi_csv(fname, df, shift):
