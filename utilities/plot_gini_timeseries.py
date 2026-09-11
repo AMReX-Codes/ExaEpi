@@ -202,7 +202,9 @@ def main():
         print("Reading Epicast data from", args.events_file)
         events_df, demog_df = read_events_bin(args.events_file)
         print(f"Read {len(events_df):,} events, {len(demog_df)} Census tracts")
-        max_day = int(events_df.timestep.max() // 2)
+        # Matches reconstruct_epicast_snapshot's own max_day (see plot_geo.py) so this default day
+        # range doesn't stop one day short of what's actually reconstructable from the data.
+        max_day = (int(events_df.timestep.max()) + 1) // 2
         days = args.days if args.days is not None else list(range(0, max_day + 1))
         values = []
         geoid_order, W = None, None

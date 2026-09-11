@@ -110,29 +110,39 @@ _ACTIVE_STATES = {"exposed", "presymptomatic", "symptomatic", "asymptomatic"}
 
 def reconstruct_epicast_snapshot(events_df, demog_df, day=None, county_level=False):
     """Given already-loaded Epicast events/demographics (see read_events_bin), reconstruct a
-    snapshot DataFrame (columns GEOID10, pop, never_infected, infected, immune) as of the given
-    0-based day (default: the last day in the data; clamped if it exceeds that), aggregated up to
-    the county level if county_level is set (Epicast's native granularity is the tract). Returns
-    (grid_stats_df, day).
+    snapshot DataFrame (columns GEOID10, pop, never_infected, infected, immune) as of the START of
+    the given 0-based day (default: the last day in the data; clamped if it exceeds that),
+    aggregated up to the county level if county_level is set (Epicast's native granularity is the
+    tract). Returns (grid_stats_df, day).
 
     Epicast's run.events.bin file has no per-timestep snapshot the way an ExaEpi plotfile does --
-    it's a log of AgentTransition events (one row per disease_state change). To get a "snapshot as
-    of day D" comparable to ExaEpi's per-community pop/never_infected/infected/immune columns, this
-    reconstructs each agent's most recent disease_state (and the tract they were in when that
-    transition happened) among all their events with timestep <= day D, then buckets agents by
-    that tract:
+    it's a log of AgentTransition events (one row per disease_state change), two timesteps (a
+    "day" half-step and a "night" half-step) per calendar day. To get a "snapshot as of the start
+    of day D" comparable to ExaEpi's plt0000D (which is written before day D's own dynamics run --
+    plt00000 is the raw seed state, zero elapsed transmission), this reconstructs each agent's most
+    recent disease_state (and the tract they were in when that transition happened) among all their
+    events with timestep <= cutoff, then buckets agents by that tract:
         immune         = last state is "recovered"
         infected       = last state is exposed/presymptomatic/symptomatic/asymptomatic (still active)
         never_infected = tract population (from the file's demographics) minus the above two
-    Agents with zero events by day D never appear in the reconstruction and are implicitly counted
-    as never_infected via that subtraction.
+    Agents with zero events by the cutoff never appear in the reconstruction and are implicitly
+    counted as never_infected via that subtraction.
+
+    The cutoff is day D's day-half timestep (2*D) minus one -- i.e. everything through day D-1's
+    night-half -- EXCEPT day 0, which has no "day -1" to stop after: day 0's day-half (timestep 0)
+    IS the initial seeding itself (the same agents/tracts as ExaEpi's plt00000), so day 0 stops
+    right there instead, at timestep 0. Without this exception (i.e. the plain 2*day-1 formula
+    extended to day 0), day 0 would already include day 0's own night-half dynamics -- which lets
+    already-seeded agents' disease-state progression get logged from wherever they physically are
+    at that later timestep (e.g. a commuter's workplace tract), so tracts/counties with no seeded
+    infections of their own can appear "infected" at what's supposed to be the starting snapshot.
     """
-    max_day = int(events_df.timestep.max() // 2)
+    max_day = (int(events_df.timestep.max()) + 1) // 2
     day = max_day if day is None else day
     if day > max_day:
         print(f"WARNING: requested day {day} exceeds the last available day ({max_day}); using {max_day} instead")
         day = max_day
-    cutoff_timestep = 2 * day + 1
+    cutoff_timestep = 0 if day == 0 else 2 * day - 1
     print(f"Reconstructing snapshot at day {day} (timestep <= {cutoff_timestep})")
 
     # Reconstruct each agent's most recent disease_state (and the tract of that transition) among
