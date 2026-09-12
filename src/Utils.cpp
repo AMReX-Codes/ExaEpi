@@ -63,7 +63,7 @@ void ExaEpi::Utils::getTestParams (TestParams& params, /*!< Test parameters */
     pp.query("max_box_size", params.max_box_size);
 
     pp.query("aggregated_diag_int", params.aggregated_diag_int);
-    if (params.aggregated_diag_int >= 0) { pp.get("aggregated_diag_prefix", params.aggregated_diag_prefix); }
+    pp.query("aggregated_diag_prefix", params.aggregated_diag_prefix);
 
     pp.query("restart", params.restart_chkfile);
 
