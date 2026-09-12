@@ -866,10 +866,7 @@ void runAgent () {
                 if (params.context_diag) { diag = pc.sumContextInfections(0); }
             };
 
-            {
-                amrex::TinyProfileRegion diag_region("diag_morningCommute");
-                pc.morningCommute(mask_behavior);
-            }
+            pc.morningCommute(mask_behavior);
 
             // Split each (community, school_id, grade) group into fixed-size classes (see
             // AgentContainer::assignSchoolClasses). Only needs to happen once, on a fresh start:
@@ -899,52 +896,17 @@ void runAgent () {
                 pc.morningCommute(mask_behavior);
             }
 
-            {
-                // BL_PROFILE_REGION isn't used here: under TinyProfiler its expansion always
-                // declares a variable named tiny_profile_region_vname (not parameterized by the
-                // region name), so nesting it inside the enclosing "Evolution" region triggers a
-                // -Wshadow warning. Instantiating TinyProfileRegion directly with our own name
-                // sidesteps that.
-                amrex::TinyProfileRegion ctx_region("ctx_work");
-                interact(&AgentContainer::interactWork, diag_exp_work);
-            }
-            {
-                amrex::TinyProfileRegion ctx_region("ctx_hosp");
-                interact(&AgentContainer::interactHospital, diag_exp_hosp);
-            }
-            {
-                amrex::TinyProfileRegion ctx_region("ctx_school");
-                interact(&AgentContainer::interactSchool, diag_exp_school);
-            }
-            {
-                amrex::TinyProfileRegion ctx_region("ctx_nbhd");
-                interact(&AgentContainer::interactNborhoodDay, diag_exp_nbhd);
-            }
-            {
-                amrex::TinyProfileRegion ctx_region("ctx_commd");
-                interact(&AgentContainer::interactCommDay, diag_exp_commd);
-            }
-            {
-                amrex::TinyProfileRegion diag_region("diag_eveningCommute");
-                pc.eveningCommute(mask_behavior);
-            }
+            interact(&AgentContainer::interactWork, diag_exp_work);
+            interact(&AgentContainer::interactHospital, diag_exp_hosp);
+            interact(&AgentContainer::interactSchool, diag_exp_school);
+            interact(&AgentContainer::interactNborhoodDay, diag_exp_nbhd);
+            interact(&AgentContainer::interactCommDay, diag_exp_commd);
+            pc.eveningCommute(mask_behavior);
             pc.interactEvening(mask_behavior);
-            {
-                amrex::TinyProfileRegion ctx_region("ctx_hh");
-                interact(&AgentContainer::interactHH, diag_exp_hh);
-            }
-            {
-                amrex::TinyProfileRegion ctx_region("ctx_nc");
-                interact(&AgentContainer::interactNC, diag_exp_nc);
-            }
-            {
-                amrex::TinyProfileRegion ctx_region("ctx_nbhn");
-                interact(&AgentContainer::interactNborhoodNight, diag_exp_nbhn);
-            }
-            {
-                amrex::TinyProfileRegion ctx_region("ctx_commn");
-                interact(&AgentContainer::interactCommNight, diag_exp_commn);
-            }
+            interact(&AgentContainer::interactHH, diag_exp_hh);
+            interact(&AgentContainer::interactNC, diag_exp_nc);
+            interact(&AgentContainer::interactNborhoodNight, diag_exp_nbhn);
+            interact(&AgentContainer::interactCommNight, diag_exp_commn);
 
             // Each interact() call above collected a rank-local sum only (see
             // AgentContainer::sumContextInfections); reduce all 9 contexts across ranks in one
