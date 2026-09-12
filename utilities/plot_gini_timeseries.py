@@ -120,7 +120,7 @@ def main():
         description="Plot the Gini coefficient or global Moran's I of infection spread (ExaEpi and/or Epicast) over time"
     )
     parser.add_argument(
-        "--exaepi_files", "-p", nargs="+", default=None,
+        "--exaepi_files", "-g", nargs="+", default=None,
         help="ExaEpi aggregated-diagnostics CSV files, one per day (e.g. cases00000 cases00010 ... "
         "or a shell glob like cases000*, written via --aggregated_diag_int)",
     )

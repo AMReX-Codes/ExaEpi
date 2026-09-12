@@ -2,7 +2,7 @@
 
 """Plot ExaEpi and/or Epicast infection-spread choropleths over a sequence of days.
 
-Pass --exaepi_dir alone to plot only ExaEpi (one row), --events_file alone to plot only Epicast
+Pass --exaepi_files alone to plot only ExaEpi (one row), --events_file alone to plot only Epicast
 (one row), or both together to plot them stacked in two rows (Epicast on top, ExaEpi below) with
 each day's column additionally labeled with that day's log-scale Pearson r and RMSLE of raw infected
 COUNT (see compare_day() for how these are computed and what they mean, and why they're shown here
@@ -188,8 +188,13 @@ def _is_aggregated_file(path):
     """
     if not os.path.isfile(path):
         return False
-    with open(path) as f:
-        return f.readline().rstrip("\n") == "GEOID,total,never_infected,infected,immune"
+    try:
+        with open(path) as f:
+            return f.readline().rstrip("\n") == "GEOID,total,never_infected,infected,immune"
+    except UnicodeDecodeError:
+        # Not a text file at all (e.g. a compressed or binary file living alongside the CSVs in
+        # the same directory) -- not an aggregated-diagnostics file, but not an error either.
+        return False
 
 
 def expand_aggregated_files(paths):
@@ -312,21 +317,21 @@ def main():
         "is plotted with no stats."
     )
     parser.add_argument(
-        "--exaepi_dir",
-        "-p",
+        "--exaepi_files",
+        "-g",
         nargs="+",
         default=None,
         help="Where to find ExaEpi's aggregated-diagnostics CSV files (e.g. cases00050, written "
         "via --aggregated_diag_int -- see load_exaepi_grid_stats). Pass a parent directory "
         "containing many such files, individual files, or a glob pattern. Which specific day(s) "
         "get plotted is chosen by --day, not by which paths match here -- this just needs to cover "
-        "them. At least one of --exaepi_dir/--events_file is required.",
+        "them. At least one of --exaepi_files/--events_file is required.",
     )
     parser.add_argument(
         "--events_file",
         "-f",
         default=None,
-        help="Epicast run.events.bin file. At least one of --exaepi_dir/--events_file is required.",
+        help="Epicast run.events.bin file. At least one of --exaepi_files/--events_file is required.",
     )
     parser.add_argument(
         "--day",
@@ -385,10 +390,10 @@ def main():
     )
     args = parser.parse_args()
 
-    if not args.exaepi_dir and not args.events_file:
-        parser.error("At least one of --exaepi_dir/--events_file must be given")
+    if not args.exaepi_files and not args.events_file:
+        parser.error("At least one of --exaepi_files/--events_file must be given")
 
-    both = bool(args.exaepi_dir) and bool(args.events_file)
+    both = bool(args.exaepi_files) and bool(args.events_file)
     uses_epicast = bool(args.events_file)
     tract_level = (not args.county_level) if (uses_epicast or args.tract_level) else False
     geo_unit = "county" if args.county_level else ("tract" if tract_level else "block group")
@@ -404,8 +409,8 @@ def main():
         print(f"Read {len(events_df):,} events, {len(demog_df)} Census tracts")
 
     day_to_file = {}
-    if args.exaepi_dir:
-        exaepi_files = expand_aggregated_files(args.exaepi_dir)
+    if args.exaepi_files:
+        exaepi_files = expand_aggregated_files(args.exaepi_files)
         day_to_file = {_parse_day_from_filename(f): f for f in exaepi_files}
         print(f"Found {len(day_to_file)} ExaEpi days:", sorted(day_to_file))
 
@@ -437,7 +442,7 @@ def main():
     rows_spec = []
     if args.events_file:
         rows_spec.append(("Epicast", "epicast"))
-    if args.exaepi_dir:
+    if args.exaepi_files:
         rows_spec.append(("ExaEpi", "exaepi"))
 
     # For each requested day, reconstruct/load whichever data source(s) were given, compute the
@@ -456,11 +461,11 @@ def main():
             resolved_day = day if day is not None else max(day_to_file)
 
         exaepi_df = None
-        if args.exaepi_dir:
+        if args.exaepi_files:
             if resolved_day not in day_to_file:
                 available = ", ".join(str(d) for d in sorted(day_to_file))
                 raise SystemExit(
-                    f"No ExaEpi data found for day {resolved_day} among --exaepi_dir. Available "
+                    f"No ExaEpi data found for day {resolved_day} among --exaepi_files. Available "
                     f"days: {available}"
                 )
             csv_path = day_to_file[resolved_day]

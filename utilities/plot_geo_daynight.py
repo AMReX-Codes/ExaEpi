@@ -156,7 +156,7 @@ def main():
         "tract/county, optionally alongside a matching Epicast panel for side-by-side comparison"
     )
     parser.add_argument(
-        "--day_night_csv", "-p", required=True,
+        "--day_night_csv", "-n", required=True,
         help="ExaEpi's <prefix>_day_night_population.csv (written when --aggregated_diag_int is "
         "enabled -- see ExaEpi::IO::writeStaticAggregatedData in src/IO.cpp)",
     )

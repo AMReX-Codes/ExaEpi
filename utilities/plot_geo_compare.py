@@ -66,7 +66,7 @@ def main():
     )
     parser.add_argument(
         "--exaepi_files",
-        "-p",
+        "-g",
         required=True,
         nargs="+",
         help="ExaEpi aggregated-diagnostics CSV files to compare, one per day (e.g. cases00050, "
