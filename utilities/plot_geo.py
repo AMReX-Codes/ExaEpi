@@ -484,7 +484,7 @@ def main():
     if args.exaepi_dir:
         exaepi_dirs = expand_plot_dirs(args.exaepi_dir)
         day_to_plotdir = {_parse_day_from_plot_dir(d): d for d in exaepi_dirs}
-        print(f"Found {len(day_to_plotdir)} ExaEpi plotfile days:", sorted(day_to_plotdir))
+        print(f"Found {len(day_to_plotdir)} ExaEpi days:", sorted(day_to_plotdir))
 
     shp_dfs = []
     state_codes = []
@@ -537,7 +537,7 @@ def main():
             if resolved_day not in day_to_plotdir:
                 available = ", ".join(str(d) for d in sorted(day_to_plotdir))
                 raise SystemExit(
-                    f"No ExaEpi plotfile found for day {resolved_day} among --exaepi_dir. Available "
+                    f"No ExaEpi data found for day {resolved_day} among --exaepi_dir. Available "
                     f"days: {available}"
                 )
             plot_dir = day_to_plotdir[resolved_day]

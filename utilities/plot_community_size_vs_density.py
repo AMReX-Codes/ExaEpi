@@ -1,22 +1,19 @@
 #!/usr/bin/env python
 
 """Plot ExaEpi community size (population per community) against population density (people /
-km^2) for one ExaEpi plotfile directory, as two overlaid series: nighttime (home-based) and
+km^2) for one run's day/night population CSV, as two overlaid series: nighttime (home-based) and
 daytime (work-based) population.
 
-Each ExaEpi community is one AMReX grid cell. Nighttime population counts agents by home cell
-(home_i, home_j); daytime population counts the same agents by work/school cell (work_i,
-work_j) instead -- agents with no separate work/school location (retirees, preschoolers, ...)
-have work_i/work_j == home_i/home_j, so they contribute equally to both. This is the same
-home/work reconstruction plot_geo_daynight.py uses; see its docstring for why it's an exact,
-unbiased census of every agent rather than a partial sample.
+Each ExaEpi community is one AMReX grid cell. Nighttime population counts agents by home cell;
+daytime population counts the same agents by work/school cell instead -- agents with no separate
+work/school location (retirees, preschoolers, ...) contribute equally to both. This is the same
+home/work split plot_geo_daynight.py uses; see its docstring for why it's an exact, unbiased
+census of every agent rather than a partial sample.
 
 Density is computed from the same Census block group shapefiles (GEOID10 + ALAND10 land area,
 via --shape_files): when a Census unit's population exceeds 2000, ExaEpi splits it into several
 communities (grid cells) that all share the same GEOID10 and therefore the same land area, so
-this is a many-communities-to-one-area join, not one-to-one. Land area doesn't depend on the run,
-but population does (nighttime vs daytime) -- unlike land area, so is *not* static across a run's
-other plotfiles for a residential-vs-workplace split like this one.
+this is a many-communities-to-one-area join, not one-to-one.
 
 Population comes from the static, once-per-run <prefix>_day_night_population.csv ExaEpi writes
 when --aggregated_diag_int is enabled (see ExaEpi::IO::writeStaticAggregatedData in src/IO.cpp,
