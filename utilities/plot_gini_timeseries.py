@@ -7,7 +7,7 @@ Gini (--metric gini, the default) measures CONCENTRATION only, independent of ge
 infections are spread perfectly evenly across every tract/county, ->1 means they're concentrated in
 very few -- it doesn't care whether the affected units are next to each other or scattered across
 the map. It needs no shapefile, only each unit's infected count (from
-load_exaepi_stats/reconstruct_epicast_snapshot's GEOID10-keyed DataFrame).
+load_exaepi_grid_stats/reconstruct_epicast_snapshot's GEOID10-keyed DataFrame).
 
 Global Moran's I (--metric moran) measures spatial AUTOCORRELATION instead: ~+1 means neighboring
 tracts/counties tend to have similar infection levels (a contiguous outbreak region), ~0 means the
@@ -30,7 +30,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from plot_geo import load_exaepi_stats, _parse_day_from_plot_dir, reconstruct_epicast_snapshot  # noqa: E402
+from plot_geo import load_exaepi_grid_stats, _parse_day_from_filename, reconstruct_epicast_snapshot  # noqa: E402
 from read_epicast_events import read_events_bin  # noqa: E402
 from plos_compbio_style import apply_style, HALF_PAGE_WIDTH_IN, HALF_PAGE_HEIGHT_IN, AXES_LINEWIDTH  # noqa: E402
 
@@ -120,10 +120,9 @@ def main():
         description="Plot the Gini coefficient or global Moran's I of infection spread (ExaEpi and/or Epicast) over time"
     )
     parser.add_argument(
-        "--plot_dirs", "-p", nargs="+", default=None,
-        help="ExaEpi per-day data, one per day: plotfile directories (e.g. plt00000 plt00010 ... "
-        "or a shell glob like plt000*) and/or aggregated-diagnostics CSV files (e.g. cases00000 "
-        "cases00010 ..., written via --aggregated_diag_int), freely mixed",
+        "--exaepi_files", "-p", nargs="+", default=None,
+        help="ExaEpi aggregated-diagnostics CSV files, one per day (e.g. cases00000 cases00010 ... "
+        "or a shell glob like cases000*, written via --aggregated_diag_int)",
     )
     parser.add_argument("--events_file", "-c", default=None, help="Epicast run.events.bin file")
     parser.add_argument(
@@ -137,8 +136,8 @@ def main():
     )
     parser.add_argument(
         "--exaepi_day_shift", type=int, default=0,
-        help="Shift the ExaEpi day parsed from each --plot_dirs directory by this many days (e.g. "
-        "5 treats a plt00020 directory as day 25) before plotting it. Use this to correct for a "
+        help="Shift the ExaEpi day parsed from each --exaepi_files entry by this many days (e.g. "
+        "5 treats a cases00020 file as day 25) before plotting it. Use this to correct for a "
         "real start-date misalignment between the two runs (e.g. one simulator seeded a few days "
         "later than the other) so the ExaEpi and Epicast series line up on the same day axis. Has "
         "no effect on the Epicast series.",
@@ -157,8 +156,8 @@ def main():
     parser.add_argument("--output", "-o", default="spread_timeseries.png", help="Output plot file")
     args = parser.parse_args()
 
-    if not args.plot_dirs and not args.events_file:
-        parser.error("At least one of --plot_dirs or --events_file must be given")
+    if not args.exaepi_files and not args.events_file:
+        parser.error("At least one of --exaepi_files or --events_file must be given")
     if args.metric == "moran" and not args.shape_files:
         parser.error("--metric moran requires --shape_files (to build the spatial adjacency matrix)")
 
@@ -179,12 +178,12 @@ def main():
 
     fig, ax = plt.subplots(figsize=(HALF_PAGE_WIDTH_IN, HALF_PAGE_HEIGHT_IN), layout="constrained")
 
-    if args.plot_dirs:
+    if args.exaepi_files:
         days, values = [], []
         geoid_order, W = None, None
-        for plot_dir in args.plot_dirs:
-            grid_stats_df = load_exaepi_stats(plot_dir, tract_level=True, county_level=args.county_level)
-            day = _parse_day_from_plot_dir(plot_dir) + args.exaepi_day_shift
+        for csv_path in args.exaepi_files:
+            grid_stats_df = load_exaepi_grid_stats(csv_path, tract_level=True, county_level=args.county_level)
+            day = _parse_day_from_filename(csv_path) + args.exaepi_day_shift
             if args.metric == "moran":
                 if geoid_order is None:
                     geoid_order, W = _prepare_geo_weights(shp_data, grid_stats_df, geo_unit)

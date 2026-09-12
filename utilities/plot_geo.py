@@ -12,9 +12,9 @@ uses (importing the loaders and compare_day from here) to plot the rate-based qu
 day-scalar time series instead.
 
 Days are given explicitly as a list (--day), since a single day value has to resolve independently
-to an Epicast snapshot (reconstructed from the events log) and/or a matching ExaEpi plotfile
-directory (looked up by the day parsed from its name) -- there's no single natural sequence of
-"days" shared by both data sources the way there is for ExaEpi's plotfile directories alone.
+to an Epicast snapshot (reconstructed from the events log) and/or a matching ExaEpi per-day file
+(looked up by the day parsed from its name) -- there's no single natural sequence of "days" shared
+by both data sources the way there is for ExaEpi's own per-day files alone.
 
 Epicast's finest geographic unit is the Census tract, not the block group ExaEpi communities use --
 so ExaEpi is aggregated up to the tract by default (or further to the county, with
@@ -38,7 +38,6 @@ from scipy.stats import spearmanr
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 import matplotlib as mp  # noqa: E402
-import yt  # noqa: E402
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from geo_agg_utils import aggregate_to_county  # noqa: E402
@@ -52,43 +51,26 @@ from plos_compbio_style import (  # noqa: E402
 )
 
 
-def _parse_day_from_plot_dir(plot_dir):
-    """Extract the trailing step/day number from an ExaEpi plotfile directory name, e.g.
-    'plt00050' or 'plt00050/' -> 50.
+def _parse_day_from_filename(fname):
+    """Extract the trailing step/day number from an ExaEpi per-day file/dir name, e.g.
+    'cases00050' or 'cases00050/' -> 50.
     """
-    m = re.search(r"(\d+)$", plot_dir.rstrip("/"))
+    m = re.search(r"(\d+)$", fname.rstrip("/"))
     if not m:
-        raise SystemExit(f"Could not parse a trailing day/step number from plotfile directory: {plot_dir}")
+        raise SystemExit(f"Could not parse a trailing day/step number from: {fname}")
     return int(m.group(1))
 
 
-def load_exaepi_grid_stats(plot_dir, tract_level=False, county_level=False):
-    """Read an ExaEpi AMReX plotfile directory and return a per-community DataFrame with columns:
-    GEOID10, pop, never_infected, infected, immune -- aggregated up to the Census tract level if
-    tract_level is set, or further to the county level if county_level is set (which takes
-    precedence over tract_level if both are set).
+def load_exaepi_grid_stats(csv_path, tract_level=False, county_level=False):
+    """Read one of ExaEpi's lightweight aggregated-diagnostics CSV files (written directly by the
+    simulation via --aggregated_diag_int, see ExaEpi::IO::writeAggregatedData in src/IO.cpp) and
+    return a per-community DataFrame with columns: GEOID10, pop, never_infected, infected, immune
+    -- aggregated up to the Census tract level if tract_level is set, or further to the county
+    level if county_level is set (which takes precedence over tract_level if both are set).
     """
-    print("Reading ExaEpi data from directory", plot_dir)
-    ds = yt.load(plot_dir)  # type: ignore
-    ad = ds.all_data()
-    print(ds._field_list)
-    grid_stats_df = pd.DataFrame(
-        {
-            "FIPS": ad["FIPS"],
-            "Tract": ad["Tract"],
-            "pop": ad["total"],
-            "never_infected": ad["never_infected"],
-            "infected": ad["infected"],
-            "immune": ad["immune"],
-            # "dead": ad["dead"],
-        }
-    )
-    # FIPS is the first 5 digits of the block group code, and tract is the last 7. These need to be
-    # combined to give the geoids found in the urbanpop file mapping geoids to lng/lat
-    grid_stats_df = grid_stats_df[grid_stats_df.FIPS != -1].reset_index(drop=True)
-    grid_stats_df["FIPS"] = grid_stats_df["FIPS"].astype("int").astype(str).str.zfill(5)
-    grid_stats_df["Tract"] = grid_stats_df["Tract"].astype("int").astype(str).str.zfill(7)
-    grid_stats_df["GEOID10"] = grid_stats_df["FIPS"] + grid_stats_df["Tract"]
+    print("Reading ExaEpi aggregated diagnostic data from", csv_path)
+    grid_stats_df = pd.read_csv(csv_path)
+    grid_stats_df = grid_stats_df.rename(columns={"GEOID": "GEOID10", "total": "pop"})
     grid_stats_df["GEOID10"] = grid_stats_df["GEOID10"].astype("int64")
 
     if county_level:
@@ -105,56 +87,16 @@ def load_exaepi_grid_stats(plot_dir, tract_level=False, county_level=False):
     return grid_stats_df
 
 
-def load_exaepi_aggregated_stats(csv_path, tract_level=False, county_level=False):
-    """Read one of ExaEpi's lightweight aggregated-diagnostics CSV files (written directly by the
-    simulation via --aggregated_diag_int, see ExaEpi::IO::writeAggregatedData in src/IO.cpp) and
-    return a per-community DataFrame with columns: GEOID10, pop, never_infected, infected, immune
-    -- the same shape load_exaepi_grid_stats returns from a full AMReX plotfile, aggregated up to
-    the Census tract level if tract_level is set, or further to the county level if county_level
-    is set (which takes precedence over tract_level if both are set).
-
-    This is a drop-in, much cheaper alternative to load_exaepi_grid_stats for any use that only
-    needs these four per-community counts.
-    """
-    print("Reading ExaEpi aggregated diagnostic data from", csv_path)
-    grid_stats_df = pd.read_csv(csv_path)
-    grid_stats_df = grid_stats_df.rename(columns={"GEOID": "GEOID10", "total": "pop"})
-    grid_stats_df["GEOID10"] = grid_stats_df["GEOID10"].astype("int64")
-
-    if county_level:
-        grid_stats_df = aggregate_to_county(grid_stats_df)
-    elif tract_level:
-        # Same block-group -> tract rollup as load_exaepi_grid_stats -- see its comment above.
-        grid_stats_df["GEOID10"] = grid_stats_df["GEOID10"] // 10
-        grid_stats_df = grid_stats_df.groupby("GEOID10", as_index=False)[
-            ["pop", "never_infected", "infected", "immune"]
-        ].sum()
-    return grid_stats_df
-
-
-def load_exaepi_stats(path, tract_level=False, county_level=False):
-    """Load one day's per-community ExaEpi data from whichever of the two interchangeable sources
-    `path` is: an AMReX plotfile directory (read via yt, see load_exaepi_grid_stats) or a
-    lightweight aggregated-diagnostics CSV file (see load_exaepi_aggregated_stats). Both return the
-    same GEOID10/pop/never_infected/infected/immune shape, so callers can treat the two sources
-    interchangeably -- pick whichever this run was actually configured to write (--plot_int for a
-    plotfile directory, --aggregated_diag_int for a CSV file).
-    """
-    if os.path.isdir(path):
-        return load_exaepi_grid_stats(path, tract_level=tract_level, county_level=county_level)
-    return load_exaepi_aggregated_stats(path, tract_level=tract_level, county_level=county_level)
-
-
 def load_exaepi_day_night_population(csv_path):
     """Read the static, once-per-run <prefix>_day_night_population.csv ExaEpi writes when
     --aggregated_diag_int is enabled (see ExaEpi::IO::writeStaticAggregatedData in src/IO.cpp) and
     return a per-community DataFrame with columns: GEOID10, night_pop, night_workers,
     night_students, day_pop, day_workers, day_students -- everyone/workers/students counted by
-    home cell (night) and by work/school cell (day). Unlike load_exaepi_grid_stats/
-    load_exaepi_aggregated_stats, this is not aggregated up to tract/county level here -- callers
-    needing that should roll it up themselves the same way (see geo_agg_utils.aggregate_to_county
-    and load_exaepi_grid_stats's tract-level groupby for the pattern), since which columns to sum
-    depends on which of the 6 they actually need.
+    home cell (night) and by work/school cell (day). Unlike load_exaepi_grid_stats, this is not
+    aggregated up to tract/county level here -- callers needing that should roll it up themselves
+    the same way (see geo_agg_utils.aggregate_to_county and load_exaepi_grid_stats's tract-level
+    groupby for the pattern), since which columns to sum depends on which of the 6 they actually
+    need.
     """
     print("Reading ExaEpi day/night population data from", csv_path)
     df = pd.read_csv(csv_path)
@@ -179,11 +121,11 @@ def reconstruct_epicast_snapshot(events_df, demog_df, day=None, county_level=Fal
     aggregated up to the county level if county_level is set (Epicast's native granularity is the
     tract). Returns (grid_stats_df, day).
 
-    Epicast's run.events.bin file has no per-timestep snapshot the way an ExaEpi plotfile does --
-    it's a log of AgentTransition events (one row per disease_state change), two timesteps (a
-    "day" half-step and a "night" half-step) per calendar day. To get a "snapshot as of the start
-    of day D" comparable to ExaEpi's plt0000D (which is written before day D's own dynamics run --
-    plt00000 is the raw seed state, zero elapsed transmission), this reconstructs each agent's most
+    Epicast's run.events.bin file has no per-timestep snapshot the way ExaEpi's own per-day output
+    does -- it's a log of AgentTransition events (one row per disease_state change), two timesteps
+    (a "day" half-step and a "night" half-step) per calendar day. To get a "snapshot as of the
+    start of day D" comparable to ExaEpi's own day-D data (written before day D's own dynamics run
+    -- day 0 is the raw seed state, zero elapsed transmission), this reconstructs each agent's most
     recent disease_state (and the tract they were in when that transition happened) among all their
     events with timestep <= cutoff, then buckets agents by that tract:
         immune         = last state is "recovered"
@@ -238,19 +180,11 @@ def reconstruct_epicast_snapshot(events_df, demog_df, day=None, county_level=Fal
     return grid_stats_df, day
 
 
-def _is_plotfile_dir(path):
-    """An ExaEpi/AMReX plotfile directory always contains a top-level 'Header' file -- use that,
-    rather than just the directory name, to tell an individual plotfile apart from a parent
-    directory that merely holds several of them.
-    """
-    return os.path.isdir(path) and os.path.isfile(os.path.join(path, "Header"))
-
-
 def _is_aggregated_file(path):
     """An ExaEpi aggregated-diagnostics file (see ExaEpi::IO::writeAggregatedData / --
-    load_exaepi_aggregated_stats) is a plain file whose first line is the fixed CSV header this
-    reader expects -- check that, rather than just the filename, to tell it apart from an
-    unrelated file a glob/parent-directory listing might also pick up.
+    load_exaepi_grid_stats) is a plain file whose first line is the fixed CSV header this reader
+    expects -- check that, rather than just the filename, to tell it apart from an unrelated file
+    a glob/parent-directory listing might also pick up.
     """
     if not os.path.isfile(path):
         return False
@@ -258,45 +192,35 @@ def _is_aggregated_file(path):
         return f.readline().rstrip("\n") == "GEOID,total,never_infected,infected,immune"
 
 
-def _is_exaepi_data_path(path):
-    """True if `path` is either an ExaEpi plotfile directory or an aggregated-diagnostics CSV file
-    -- the two interchangeable per-day data sources load_exaepi_stats can load from."""
-    return _is_plotfile_dir(path) or _is_aggregated_file(path)
-
-
-def expand_plot_dirs(paths):
-    """Expand each of `paths` into the individual ExaEpi per-day data paths it refers to (plotfile
-    directories and/or aggregated-diagnostics CSV files, freely mixed -- see load_exaepi_stats), so
-    callers can point at a whole run's worth of output without listing every plt*/cases* entry by
-    hand. Each entry in `paths` may be: a single plotfile directory (e.g. plt00050) or aggregated
-    CSV file (e.g. cases00050), a parent directory containing many such entries (e.g. a run's
-    output directory), or a glob pattern (e.g. "results/plt*" or "results/cases*"). Returns the
-    resulting paths deduplicated and sorted by the day parsed from their name.
+def expand_aggregated_files(paths):
+    """Expand each of `paths` into the individual ExaEpi aggregated-diagnostics CSV files it refers
+    to (see load_exaepi_grid_stats), so callers can point at a whole run's worth of output without
+    listing every cases* file by hand. Each entry in `paths` may be: a single CSV file (e.g.
+    cases00050), a parent directory containing many such files (e.g. a run's output directory), or
+    a glob pattern (e.g. "results/cases*"). Returns the resulting paths deduplicated and sorted by
+    the day parsed from their name.
     """
     expanded = []
     for path in paths:
         path = path.rstrip("/")
-        if _is_exaepi_data_path(path):
+        if _is_aggregated_file(path):
             expanded.append(path)
         elif os.path.isdir(path):
             children = sorted(
-                os.path.join(path, name) for name in os.listdir(path) if _is_exaepi_data_path(os.path.join(path, name))
+                os.path.join(path, name) for name in os.listdir(path) if _is_aggregated_file(os.path.join(path, name))
             )
             if not children:
-                raise SystemExit(
-                    f"No plotfile subdirectories (containing a Header file) or aggregated-diagnostics "
-                    f"CSV files found under {path}"
-                )
+                raise SystemExit(f"No aggregated-diagnostics CSV files found under {path}")
             expanded.extend(children)
         else:
-            matches = sorted(p for p in glob.glob(path) if _is_exaepi_data_path(p))
+            matches = sorted(p for p in glob.glob(path) if _is_aggregated_file(p))
             if not matches:
-                raise SystemExit(f"No plotfile directories or aggregated-diagnostics CSV files matched: {path}")
+                raise SystemExit(f"No aggregated-diagnostics CSV files matched: {path}")
             expanded.extend(matches)
 
     seen = set()
     unique = [d for d in expanded if not (d in seen or seen.add(d))]
-    unique.sort(key=_parse_day_from_plot_dir)
+    unique.sort(key=_parse_day_from_filename)
     return unique
 
 
@@ -392,12 +316,11 @@ def main():
         "-p",
         nargs="+",
         default=None,
-        help="Where to find ExaEpi per-day data: plotfile directories (e.g. plt00050) and/or "
-        "aggregated-diagnostics CSV files (e.g. cases00050, written via --aggregated_diag_int -- "
-        "see load_exaepi_aggregated_stats), freely mixed. Pass a parent directory containing many "
-        "such entries, individual entries, or a glob pattern. Which specific day(s) get plotted is "
-        "chosen by --day, not by which paths match here -- this just needs to cover them. At least "
-        "one of --exaepi_dir/--events_file is required.",
+        help="Where to find ExaEpi's aggregated-diagnostics CSV files (e.g. cases00050, written "
+        "via --aggregated_diag_int -- see load_exaepi_grid_stats). Pass a parent directory "
+        "containing many such files, individual files, or a glob pattern. Which specific day(s) "
+        "get plotted is chosen by --day, not by which paths match here -- this just needs to cover "
+        "them. At least one of --exaepi_dir/--events_file is required.",
     )
     parser.add_argument(
         "--events_file",
@@ -413,7 +336,7 @@ def main():
         default=[None],
         help="One or more 0-based days to plot, one column each (default: the last day available). "
         "Each day is used to reconstruct the Epicast snapshot and/or look up the matching ExaEpi "
-        "plotfile (by the day parsed from its directory name), whichever apply.",
+        "CSV file (by the day parsed from its filename), whichever apply.",
     )
     parser.add_argument(
         "--shape_files",
@@ -480,11 +403,11 @@ def main():
         events_df, demog_df = read_events_bin(args.events_file)
         print(f"Read {len(events_df):,} events, {len(demog_df)} Census tracts")
 
-    day_to_plotdir = {}
+    day_to_file = {}
     if args.exaepi_dir:
-        exaepi_dirs = expand_plot_dirs(args.exaepi_dir)
-        day_to_plotdir = {_parse_day_from_plot_dir(d): d for d in exaepi_dirs}
-        print(f"Found {len(day_to_plotdir)} ExaEpi days:", sorted(day_to_plotdir))
+        exaepi_files = expand_aggregated_files(args.exaepi_dir)
+        day_to_file = {_parse_day_from_filename(f): f for f in exaepi_files}
+        print(f"Found {len(day_to_file)} ExaEpi days:", sorted(day_to_file))
 
     shp_dfs = []
     state_codes = []
@@ -530,18 +453,18 @@ def main():
             if day is not None and resolved_day != day:
                 print(f"WARNING: requested day {day}, but Epicast clamped it to day {resolved_day}")
         else:
-            resolved_day = day if day is not None else max(day_to_plotdir)
+            resolved_day = day if day is not None else max(day_to_file)
 
         exaepi_df = None
         if args.exaepi_dir:
-            if resolved_day not in day_to_plotdir:
-                available = ", ".join(str(d) for d in sorted(day_to_plotdir))
+            if resolved_day not in day_to_file:
+                available = ", ".join(str(d) for d in sorted(day_to_file))
                 raise SystemExit(
                     f"No ExaEpi data found for day {resolved_day} among --exaepi_dir. Available "
                     f"days: {available}"
                 )
-            plot_dir = day_to_plotdir[resolved_day]
-            exaepi_df = load_exaepi_stats(plot_dir, tract_level=tract_level, county_level=args.county_level)
+            csv_path = day_to_file[resolved_day]
+            exaepi_df = load_exaepi_grid_stats(csv_path, tract_level=tract_level, county_level=args.county_level)
 
         if both:
             _, _, _, _, r_log, rmse_log, n, _ = compare_day(exaepi_df, epicast_df)
