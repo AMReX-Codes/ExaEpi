@@ -1474,9 +1474,10 @@ int AgentContainer::getMaxGroup (const int group_idx) {
 
 /*! \brief Compute the realized group-size distributions for workgroups, schools, and school
     classes -- see the doc comment on the declaration in AgentContainer.H for the timing
-    requirement (agents must be at their work location) and why a per-community collapse via
-    UrbanPopData::community_mf is valid at that point, exactly as ExaEpi::IO::writeAggregatedData's
-    own community_mf-based collapse already is for disease-status data.
+    requirement (agents must be at their work location). Workgroup/school tallies are done one
+    grid tile at a time using GetCommunityIndex (the same per-tile-local community indexing
+    InteractionModWork.H's hot path uses) -- see the comment further down for why a single array
+    spanning every community in the run does not work here.
 */
 GroupSizeAggregates AgentContainer::computeGroupSizeDistributions (const UrbanPopData& urbanpopData) {
     BL_PROFILE("AgentContainer::computeGroupSizeDistributions");
@@ -1489,83 +1490,82 @@ GroupSizeAggregates AgentContainer::computeGroupSizeDistributions (const UrbanPo
     int max_school_id = getMaxGroup(IntIdx::school_id) + 1;
     int max_school_class_group = getMaxGroup(IntIdx::school_class_group) + 1;
 
-    const long n_comm = urbanpopData.block_groups.size();
     const int lev = 0;
-    const auto& geom = Geom(lev);
-    const auto plo = geom.ProbLoArray();
-    const auto dxi = geom.InvCellSizeArray();
-    const auto domain = geom.Domain();
 
-    // Workgroup tally: one mesh component per (naics, workgroup) pair -- ids are only unique
-    // within a (work cell, naics) pair, so the community key comes from the mesh cell itself (via
-    // the collapse below), not a separate lookup.
-    const int wg_ncomp = max_naics * max_workgroup;
-    MultiFab wg_mf(ParticleBoxArray(lev), ParticleDistributionMap(lev), wg_ncomp, 0);
-    wg_mf.setVal(0.0);
-    ParticleToMesh(
-            *this, wg_mf, lev,
-            [=] AMREX_GPU_DEVICE (const AgentContainer::ParticleTileType::ConstParticleTileDataType& ptd, int i,
-                                 Array4<Real> const& count) {
-                int workgroup = ptd.m_idata[IntIdx::workgroup][i];
-                if (workgroup <= 0) { return; }
-                auto p = ptd.m_aos[i];
-                auto iv = getParticleCell(p, plo, dxi, domain);
-                int naics = ptd.m_idata[IntIdx::naics][i];
-                Gpu::Atomic::AddNoRet(&count(iv, naics * max_workgroup + workgroup), 1.0_rt);
-            },
-            false);
+    // Workgroup/school tally, one grid tile at a time: a scratch array with one component per
+    // (community, naics, workgroup) [or (community, school_id)] triple, sized only by the
+    // communities actually present in the CURRENT tile (via GetCommunityIndex), not by every
+    // community in the whole run. workgroup/school_id ids are only unique within one (work cell,
+    // naics) pair (see their IntIdx comments), so an array spanning every community with a
+    // component count sized by the *global* max reserves room for every community to have as
+    // many groups as the single worst cell in the entire dataset -- this does not fit in memory
+    // at CA scale, even though any one tile's actual footprint is tiny. Each community's cell
+    // belongs to exactly one box/tile/rank, so the per-rank results gathered further down are
+    // disjoint across ranks and need only be concatenated, not merged.
+    GroupSizeAggregates local_result;
+    std::vector<Real> wg_h, sch_h;
+    for (MFIter mfi = MakeMFIter(lev); mfi.isValid(); ++mfi) {
+        auto& ptile = ParticlesAt(lev, mfi);
+        const auto np = ptile.GetArrayOfStructs().numParticles();
+        if (np == 0) { continue; }
 
-    // School tally: one mesh component per school_id -- school_id is only unique within a work
-    // cell, same reasoning as workgroup above.
-    MultiFab sch_mf(ParticleBoxArray(lev), ParticleDistributionMap(lev), max_school_id, 0);
-    sch_mf.setVal(0.0);
-    ParticleToMesh(
-            *this, sch_mf, lev,
-            [=] AMREX_GPU_DEVICE (const AgentContainer::ParticleTileType::ConstParticleTileDataType& ptd, int i,
-                                 Array4<Real> const& count) {
-                int school_id = ptd.m_idata[IntIdx::school_id][i];
-                if (school_id <= 0) { return; }
-                auto p = ptd.m_aos[i];
-                auto iv = getParticleCell(p, plo, dxi, domain);
-                Gpu::Atomic::AddNoRet(&count(iv, school_id), 1.0_rt);
-            },
-            false);
+        // GetCommunityIndex::init only reads comm_arr -- const_cast works around it taking a
+        // non-const Array4<int> (its only other caller, InteractionModWork.H, always has
+        // non-const access to begin with, so no const-accepting overload exists).
+        auto& community_mf_nc = const_cast<iMultiFab&>(urbanpopData.community_mf);
+        GetCommunityIndex<PTDType> getCommunityIndex;
+        getCommunityIndex.init(Geom(lev), mfi.tilebox(), community_mf_nc[mfi].array());
+        const int n_local_comm = getCommunityIndex.max();
+        if (n_local_comm == 0) { continue; }
+        auto plo = getCommunityIndex.plo;
+        auto dxi = getCommunityIndex.dxi;
+        auto domain = getCommunityIndex.domain;
+        auto valid_box = getCommunityIndex.valid_box;
+        auto bin_size = getCommunityIndex.bin_size;
+        auto d_ptr = getCommunityIndex.comm_to_local_index_d.data();
 
-    // Collapse both mesh MultiFabs down to per-community (bi-indexed) dense arrays, exactly like
-    // ExaEpi::IO::writeAggregatedData's own community_mf-based collapse for disease-status data.
-    std::vector<Real> wg_h((size_t)n_comm * wg_ncomp, 0.0_rt);
-    std::vector<Real> sch_h((size_t)n_comm * max_school_id, 0.0_rt);
-    {
-        Gpu::DeviceVector<Real> wg_d((size_t)n_comm * wg_ncomp, 0.0_rt);
-        Gpu::DeviceVector<Real> sch_d((size_t)n_comm * max_school_id, 0.0_rt);
+        const auto& ptd = ptile.getParticleTileData();
+        auto& soa = ptile.GetStructOfArrays();
+        auto workgroup_ptr = soa.GetIntData(IntIdx::workgroup).data();
+        auto naics_ptr = soa.GetIntData(IntIdx::naics).data();
+        auto school_id_ptr = soa.GetIntData(IntIdx::school_id).data();
+
+        // Constructed fresh (zero-filled) each tile, rather than resized/reused across
+        // iterations -- resize() only fills newly-added elements, like std::vector, so reusing
+        // a shrunk-then-regrown buffer would leave stale, nonzero counts from a previous tile
+        // for atomic-add to accumulate on top of.
+        Gpu::DeviceVector<Real> wg_d((size_t)n_local_comm * max_naics * max_workgroup, 0.0_rt);
+        Gpu::DeviceVector<Real> sch_d((size_t)n_local_comm * max_school_id, 0.0_rt);
         auto* wg_ptr = wg_d.dataPtr();
         auto* sch_ptr = sch_d.dataPtr();
 
-        for (MFIter mfi(wg_mf); mfi.isValid(); ++mfi) {
-            auto block_group_indices_arr = urbanpopData.community_mf[mfi].array();
-            auto wg_cell_arr = wg_mf[mfi].array();
-            auto sch_cell_arr = sch_mf[mfi].array();
-            auto bx = mfi.tilebox();
-            amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-                int bi = block_group_indices_arr(i, j, k);
-                if (bi == -1) { return; }
-                // Each block group is at a separate i,j location, so no atomic needed.
-                for (int c = 0; c < wg_ncomp; ++c) {
-                    wg_ptr[(long)bi * wg_ncomp + c] = wg_cell_arr(i, j, k, c);
-                }
-                for (int c = 0; c < max_school_id; ++c) {
-                    sch_ptr[(long)bi * max_school_id + c] = sch_cell_arr(i, j, k, c);
-                }
-            });
-        }
+        amrex::ParallelFor(np, [=] AMREX_GPU_DEVICE (int ip) noexcept {
+            Box tbx;
+            auto iv = getParticleCell(ptd, ip, plo, dxi, domain);
+            auto tidx = getTileIndex(iv, valid_box, true, bin_size, tbx);
+            int local_comm = d_ptr[tidx];
 
+            int workgroup = workgroup_ptr[ip];
+            if (workgroup > 0) {
+                int naics = naics_ptr[ip];
+                Gpu::Atomic::AddNoRet(&wg_ptr[((long)local_comm * max_naics + naics) * max_workgroup + workgroup], 1.0_rt);
+            }
+            int school_id = school_id_ptr[ip];
+            if (school_id > 0) { Gpu::Atomic::AddNoRet(&sch_ptr[(long)local_comm * max_school_id + school_id], 1.0_rt); }
+        });
+
+        wg_h.resize(wg_d.size());
+        sch_h.resize(sch_d.size());
         Gpu::copy(Gpu::deviceToHost, wg_d.begin(), wg_d.end(), wg_h.begin());
         Gpu::copy(Gpu::deviceToHost, sch_d.begin(), sch_d.end(), sch_h.begin());
+
+        for (Real v : wg_h) {
+            if (v > 0) { local_result.workgroup_sizes.push_back((Long)v); }
+        }
+        for (Real v : sch_h) {
+            if (v > 0) { local_result.school_sizes.push_back((Long)v); }
+        }
     }
-    // Reduced to the IOProcessor only (not all ranks), since only that rank writes output files --
-    // cheaper than an all-reduce.
-    ParallelDescriptor::ReduceRealSum(wg_h.data(), (int)wg_h.size(), ParallelDescriptor::IOProcessorNumber());
-    ParallelDescriptor::ReduceRealSum(sch_h.data(), (int)sch_h.size(), ParallelDescriptor::IOProcessorNumber());
 
     // School-class tally: school_class_group is already a globally dense, unique id (assigned in
     // assignSchoolClasses()) -- not community-scoped, so tallied directly by attribute value, with
@@ -1590,20 +1590,36 @@ GroupSizeAggregates AgentContainer::computeGroupSizeDistributions (const UrbanPo
     Gpu::copy(Gpu::deviceToHost, scg_d.begin(), scg_d.end(), scg_h.begin());
     ParallelDescriptor::ReduceIntSum(scg_h.data(), (int)scg_h.size(), ParallelDescriptor::IOProcessorNumber());
 
-    GroupSizeAggregates result;
-    if (ParallelDescriptor::IOProcessor()) {
-        for (long bi = 0; bi < n_comm; ++bi) {
-            for (int naics = 0; naics < max_naics; ++naics) {
-                for (int wg = 0; wg < max_workgroup; ++wg) {
-                    Real v = wg_h[(size_t)bi * wg_ncomp + naics * max_workgroup + wg];
-                    if (v > 0) { result.workgroup_sizes.push_back((Long)v); }
-                }
+    // Gather each rank's realized-group-size lists onto the IO processor (the only rank that
+    // writes output files). No merge-by-key is needed: each community's cell belongs to exactly
+    // one rank, so every rank's local list is already disjoint from every other rank's -- a
+    // concatenation, not a same-key reduction.
+    auto gather_to_io_proc = [] (std::vector<Long>& local_sizes) {
+        const int root = ParallelDescriptor::IOProcessorNumber();
+        const int nprocs = ParallelDescriptor::NProcs();
+        const int local_n = (int)local_sizes.size();
+        std::vector<int> counts = ParallelDescriptor::Gather(local_n, root);
+
+        std::vector<Long> all_sizes;
+        std::vector<int> recv_counts, displs;
+        if (ParallelDescriptor::IOProcessor()) {
+            recv_counts = counts;
+            displs.resize(nprocs);
+            int total = 0;
+            for (int i = 0; i < nprocs; ++i) {
+                displs[i] = total;
+                total += recv_counts[i];
             }
-            for (int sid = 0; sid < max_school_id; ++sid) {
-                Real v = sch_h[(size_t)bi * max_school_id + sid];
-                if (v > 0) { result.school_sizes.push_back((Long)v); }
-            }
+            all_sizes.resize(total);
         }
+        ParallelDescriptor::Gatherv(local_sizes.data(), local_n, all_sizes.data(), recv_counts, displs, root);
+        return all_sizes;
+    };
+
+    GroupSizeAggregates result;
+    result.workgroup_sizes = gather_to_io_proc(local_result.workgroup_sizes);
+    result.school_sizes = gather_to_io_proc(local_result.school_sizes);
+    if (ParallelDescriptor::IOProcessor()) {
         for (int scg = 0; scg < max_school_class_group; ++scg) {
             if (scg_h[scg] > 0) { result.school_class_sizes.push_back((Long)scg_h[scg]); }
         }
