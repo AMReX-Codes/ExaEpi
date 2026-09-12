@@ -1,0 +1,85 @@
+{
+  "name": "ExaEpi",
+
+  // Build from our Dockerfile so we run as UID 1000 (not root)
+  "build": {
+    "context": "..",
+    "dockerfile": "Dockerfile",
+    "args": {
+      "USERNAME": "user",
+      "USER_UID": "1000",
+      "USER_GID": "1000"
+    }
+  },
+
+  // Pass through all GPUs from the host
+    "runArgs": ["--gpus", "all", "--memory=48g", "--memory-swap=48g"],
+
+  // Mount named volumes so ccache and Claude Code's login/config persist across rebuilds (user home, not /root)
+  //
+  // The third entry is an optional personal bind mount, opt-in via host env vars so this file
+  // stays generic/host-agnostic: set EXAEPI_LOCAL_MOUNT_SRC/EXAEPI_LOCAL_MOUNT_DST in your own
+  // shell environment (e.g. ~/.bashrc) before launching VS Code to bind-mount something of your
+  // own into the container. Left unset, it defaults to bind-mounting the workspace folder onto an
+  // unused scratch path, which is a harmless no-op.
+  "mounts": [
+    "source=exaepi-ccache,target=/home/user/.ccache,type=volume",
+    "source=exaepi-claude-config,target=/home/user/.claude,type=volume",
+    "source=${localEnv:EXAEPI_LOCAL_MOUNT_SRC:${localWorkspaceFolder}},target=${localEnv:EXAEPI_LOCAL_MOUNT_DST:/tmp/.exaepi-unused-local-mount},type=bind"
+  ],
+
+  // Run VS Code server and all terminal sessions as UID 1000
+  "remoteUser": "user",
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        // Required by user
+        "ms-vscode-remote.remote-containers",
+        "ms-python.python",
+        // C/C++ tooling
+        "ms-vscode.cpptools",
+        "ms-vscode.cpptools-extension-pack",
+        "ms-vscode.cmake-tools",
+        "twxs.cmake",
+        // Code formatting
+        "xaver.clang-format",
+        // Git
+        "vscode.git",
+        "eamodio.gitlens",
+        // Task buttons
+        "spencerwmiles.vscode-task-buttons",
+        "Anthropic.claude-code",
+        // LaTeX editing
+        "james-yu.latex-workshop",
+        // Emacs keybindings
+        "tuttieee.emacs-mcx"
+      ],
+      "settings": {
+        "C_Cpp.default.cppStandard": "c++17",
+        "C_Cpp.default.compilerPath": "/usr/bin/g++",
+        "cmake.sourceDirectory": "${workspaceFolder}",
+        "cmake.buildDirectory": "${workspaceFolder}/.build/CUDA/Release",
+        "cmake.configureArgs": [
+          "-DAMReX_OMP=ON",
+          "-DAMReX_GPU_BACKEND=CUDA"
+        ],
+        "cmake.configureSettings": {
+          "CMAKE_CXX_COMPILER_LAUNCHER": "ccache",
+          "CMAKE_C_COMPILER_LAUNCHER": "ccache"
+        },
+        "editor.formatOnSave": true,
+        "[cpp]": {
+          "editor.defaultFormatter": "xaver.clang-format"
+        },
+        "python.defaultInterpreterPath": "/usr/bin/python3"
+      }
+    }
+  },
+
+  // Configure the project after the container is created. Both build dirs are wiped and
+  // reconfigured from scratch every time, since a stale CMakeCache.txt from a prior CUDA
+  // toolkit version (e.g. after bumping the base image) can cache now-invalid toolchain
+  // paths/library versions rather than just failing loudly.
+  "postCreateCommand": "sudo npm install -g @anthropic-ai/claude-code && rm -rf .build/CUDA/Release .build/CUDA/Debug && cmake -S . -B .build/CUDA/Release -DCMAKE_BUILD_TYPE=Release -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DAMReX_OMP=ON -DAMReX_GPU_BACKEND=CUDA -DCMAKE_CXX_COMPILER_LAUNCHER=ccache && cmake -S . -B .build/CUDA/Debug -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DAMReX_OMP=ON -DAMReX_GPU_BACKEND=CUDA -DCMAKE_CXX_COMPILER_LAUNCHER=ccache && ln -sf .build/CUDA/Release/compile_commands.json compile_commands.json"
+}
