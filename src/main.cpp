@@ -882,6 +882,8 @@ void runAgent () {
                 // their workplace community/county rather than the seeded one (see
                 // InitializeInfections.cpp). Move agents back home for the deferred write below,
                 // then redo the commute so the interactions that follow still find them at work.
+                pc.assignSchoolClasses(params);
+
                 // Static (run-long-constant) day/night population and workgroup/school/school-class
                 // size distributions -- see ExaEpi::IO::writeStaticAggregatedData. Computed once,
                 // here, on a fresh start only (never on restart -- these never change once assigned,
