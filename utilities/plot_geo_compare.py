@@ -233,8 +233,8 @@ def main():
     # plot itself) since this whole figure is only ~3.1in wide in the paper -- a long label/legend
     # string simply has no room to fit at PLOS's 8-12pt font floor, regardless of layout engine.
     fig, ax = plt.subplots(figsize=(HALF_PAGE_WIDTH_IN, HALF_PAGE_HEIGHT_IN), layout="constrained")
-    ax.plot(result_df.day, result_df.pearson_r_tract, label="Tract", lw=1)
-    ax.plot(result_df.day, result_df.pearson_r_county, label="County", lw=1)
+    ax.plot(result_df.day, result_df.pearson_r_tract, label="Tract", lw=1, color="#eb6834")
+    ax.plot(result_df.day, result_df.pearson_r_county, label="County", lw=1, color="#4a3aa7")
     ax.set_xlabel("Day")
     ax.set_ylabel("Pearson's r")
     ax.set_xlim(left=0)
