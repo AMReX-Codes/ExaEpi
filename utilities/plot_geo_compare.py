@@ -17,7 +17,7 @@ loaders and compare_day() this reuses). Two outputs are produced:
     superimpose two point clouds at different resolutions.
 
 Both simulators' loaders already return a per-community DataFrame keyed by GEOID10 (see
-load_exaepi_grid_stats / reconstruct_epicast_snapshot), so the two are simply merged on GEOID10 per
+load_exaepi_stats / reconstruct_epicast_snapshot), so the two are simply merged on GEOID10 per
 day. Epicast's finest geographic unit is the Census tract, so tract level is the finest granularity
 at which the two can be compared; county level aggregates further.
 
@@ -40,7 +40,7 @@ import matplotlib.pyplot as plt  # noqa: E402
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from plot_geo import (  # noqa: E402
-    load_exaepi_grid_stats,
+    load_exaepi_stats,
     _parse_day_from_plot_dir,
     reconstruct_epicast_snapshot,
     expand_plot_dirs,
@@ -69,11 +69,13 @@ def main():
         "-p",
         required=True,
         nargs="+",
-        help="ExaEpi plotfile directories to compare, one per day. Each entry may be a single "
-        "plotfile directory (e.g. plt00050), a parent directory containing many plotfile "
-        "subdirectories (e.g. a run's whole output directory), or a glob pattern (e.g. "
-        "'results/plt*') -- so a whole run's output can be pointed at directly instead of listing "
-        "every plotfile by hand. The day for each is parsed from its trailing digits.",
+        help="ExaEpi per-day data to compare, one per day: plotfile directories (e.g. plt00050) "
+        "and/or aggregated-diagnostics CSV files (e.g. cases00050, written via "
+        "--aggregated_diag_int), freely mixed. Each entry may be a single plotfile directory or "
+        "CSV file, a parent directory containing many such entries (e.g. a run's whole output "
+        "directory), or a glob pattern (e.g. 'results/plt*' or 'results/cases*') -- so a whole "
+        "run's output can be pointed at directly instead of listing every entry by hand. The day "
+        "for each is parsed from its trailing digits.",
     )
     parser.add_argument(
         "--events_file",
@@ -151,7 +153,7 @@ def main():
             raise SystemExit(f"Could not parse a day number from plot directory name: {plot_dir}")
         day = parsed_day + args.exaepi_day_shift
 
-        exaepi_df = load_exaepi_grid_stats(
+        exaepi_df = load_exaepi_stats(
             plot_dir, tract_level=not args.county_level, county_level=args.county_level
         )
         epicast_day = day + args.epicast_day_offset
@@ -175,7 +177,7 @@ def main():
         # scatter plot). Reload/reconstruct at whichever level wasn't already loaded above, so
         # both r_tract and r_county are available.
         other_county_level = not args.county_level
-        other_exaepi_df = load_exaepi_grid_stats(
+        other_exaepi_df = load_exaepi_stats(
             plot_dir, tract_level=not other_county_level, county_level=other_county_level
         )
         other_epicast_df, _ = reconstruct_epicast_snapshot(

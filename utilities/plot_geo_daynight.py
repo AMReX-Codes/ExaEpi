@@ -2,29 +2,30 @@
 
 """Plot an ExaEpi choropleth of daytime-minus-nighttime population per Census tract (or county).
 
-Nighttime population = agents counted by home tract (this exactly reproduces the standard
-plotfile's per-community "total" field -- see the sanity check in main()). Daytime population =
-the same agents counted by work/school tract instead. Agents with no separate work/school location
-assigned (retirees, preschoolers, ...) have work_i/work_j == home_i/home_j, so they contribute
-equally to both and don't affect the difference; agents who work/attend school locally (same grid
-cell as home) likewise net out to zero even though they do have a job/school assigned.
+Nighttime population = agents counted by home cell; daytime population = the same agents counted
+by work/school cell instead. Agents with no separate work/school location assigned (retirees,
+preschoolers, ...) have work_i/work_j == home_i/home_j, so they contribute equally to both and
+don't affect the difference; agents who work/attend school locally (same grid cell as home)
+likewise net out to zero even though they do have a job/school assigned.
 
 Positive (red) tracts gain population during the day (workplace/school destinations); negative
 (blue) tracts lose population (bedroom communities). This is the direct ExaEpi analogue of the
 Epicast day/night investigation -- unlike Epicast's run.events.bin (which only records a location
 for an agent's single exposure event, so household- and work/school-exposed agents are mutually
-exclusive and can never be paired into a home+work commute), ExaEpi's agents plotfile has an
-explicit, static home_i/home_j/work_i/work_j pair for every agent, so this is an exact
-reconstruction, not a partial/biased sample -- see read_exaepi_agents.py's docstring.
+exclusive and can never be paired into a home+work commute), ExaEpi's static, once-per-run
+day/night population CSV (see below) is built from every agent's explicit home_i/home_j/work_i/
+work_j pair, so this is an exact reconstruction, not a partial/biased sample.
 
-Needs the plotfile directory AT STEP 0 specifically (e.g. plt00000): home_i/home_j/work_i/work_j
-are static per agent and only written into the "agents" particle plotfile at that step (see
-read_exaepi_agents.py).
+Population comes from the static, once-per-run <prefix>_day_night_population.csv ExaEpi writes
+when --aggregated_diag_int is enabled (see ExaEpi::IO::writeStaticAggregatedData in src/IO.cpp,
+and plot_geo.load_exaepi_day_night_population) -- already broken out by everyone/workers/students,
+so no plotfile/agent data is needed at all.
 
 Pass --population workers or --population students to restrict the whole analysis (both the
 night/home and day/work side) to just that subset of agents, instead of everyone -- e.g.
 --population workers isolates commuting to workplaces from the (usually larger, more local)
-school-run pattern.
+school-run pattern. This is purely a choice of which pre-computed CSV columns to use, not a
+recomputation -- the CSV always carries all three breakdowns.
 """
 
 import os
@@ -36,10 +37,9 @@ import geopandas as gp
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import matplotlib.cm as mcm
-import yt
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from read_exaepi_agents import read_agent_fields  # noqa: E402
+from plot_geo import load_exaepi_day_night_population  # noqa: E402
 from plos_compbio_style import (  # noqa: E402
     apply_style,
     HALF_PAGE_WIDTH_IN,
@@ -48,85 +48,30 @@ from plos_compbio_style import (  # noqa: E402
     FONT_TICK,
 )
 
-# Same worker/student definition used by check_nt_dt.py: naics != -1 identifies a worker
-# (regardless of school_id); among the rest, school_id != 0 identifies a student. The two are
-# mutually exclusive by construction.
-_POPULATION_FILTERS = {
-    "all": None,
-    "workers": lambda naics, school_id: naics != -1,
-    "students": lambda naics, school_id: (naics == -1) & (school_id != 0),
+# Which pair of load_exaepi_day_night_population's columns each --population choice selects --
+# "workers"/"students" match ExaEpi::IO::writeStaticAggregatedData's own naics!=-1 /
+# (naics==-1 & school_id!=0) split. ("all" uses night_pop/day_pop, the loader's renamed form of
+# the CSV's night_total/day_total columns.)
+_POPULATION_COLUMNS = {
+    "all": ("night_pop", "day_pop"),
+    "workers": ("night_workers", "day_workers"),
+    "students": ("night_students", "day_students"),
 }
 
 
-def _build_geoid_grid(ds):
-    """Return a 2D int64 array geoid_grid[i, j] = 12-digit block-group GEOID10 for that grid cell
-    (-1 for inactive/off-domain cells), aligned with the same (i, j) indexing used by agents'
-    home_i/home_j/work_i/work_j.
-    """
-    dims = ds.domain_dimensions
-    cg = ds.covering_grid(level=0, left_edge=ds.domain_left_edge, dims=dims)
-    fips = cg["boxlib", "FIPS"][:, :, 0].astype("int64")
-    tract = cg["boxlib", "Tract"][:, :, 0].astype("int64")
-    return np.where(fips >= 0, fips * 10_000_000 + tract, -1)
-
-
-def compute_day_night_pop(plot_dir, county_level=False, population="all"):
+def compute_day_night_pop(day_night_csv, county_level=False, population="all"):
     """Return a DataFrame (GEOID10, night_pop, day_pop, diff) at the tract level (or county level
-    if county_level is set), built from every agent's home/work grid cell.
+    if county_level is set), built from ExaEpi's static day/night population CSV (see
+    plot_geo.load_exaepi_day_night_population).
 
     population : {"all", "workers", "students"}
-        Restrict to just the agents with a job (naics != -1) or just those enrolled in school
-        (school_id != 0 among the non-workers) before counting -- see _POPULATION_FILTERS. With
-        "all" (default), every agent is counted, matching the plotfile's own census exactly.
+        Which of the CSV's pre-computed everyone/workers/students breakdowns to use -- see
+        _POPULATION_COLUMNS. This is purely a column choice: the CSV always carries all three, so
+        nothing is recomputed here.
     """
-    print("Reading ExaEpi mesh data from", plot_dir)
-    ds = yt.load(plot_dir)  # type: ignore
-    geoid_grid = _build_geoid_grid(ds)
-
-    fields = ["home_i", "home_j", "work_i", "work_j"]
-    if population != "all":
-        fields += ["naics", "school_id"]
-    print("Reading agent home/work assignments from", plot_dir)
-    agents = read_agent_fields(plot_dir, fields)
-    home_geoid = geoid_grid[agents["home_i"], agents["home_j"]]
-    work_geoid = geoid_grid[agents["work_i"], agents["work_j"]]
-    print(f"Read {len(home_geoid):,} agents")
-
-    if population != "all":
-        mask = _POPULATION_FILTERS[population](agents["naics"], agents["school_id"])
-        home_geoid = home_geoid[mask]
-        work_geoid = work_geoid[mask]
-        print(f"Restricted to {population}: {mask.sum():,} of {len(mask):,} agents")
-
-    night = pd.Series(home_geoid).value_counts().rename("night_pop")
-    day = pd.Series(work_geoid).value_counts().rename("day_pop")
-    df = pd.concat([night, day], axis=1).fillna(0).astype("int64")
-    df.index.name = "GEOID10"
-    df = df.reset_index()
-    df = df[df.GEOID10 >= 0].reset_index(drop=True)
-
-    if population == "all":
-        # Sanity check: night_pop (agents by home cell) must exactly reproduce the standard
-        # plotfile's per-community "total" field, since both are simply a census of agents by
-        # home cell. Only valid for the full population -- a worker/student subset is expected to
-        # undercount "total" by construction.
-        cg = ds.covering_grid(level=0, left_edge=ds.domain_left_edge, dims=ds.domain_dimensions)
-        total_grid = cg["boxlib", "total"][:, :, 0].astype("int64")
-        mesh_total = (
-            pd.DataFrame({"GEOID10": geoid_grid.ravel(), "mesh_total": total_grid.ravel()})
-            .loc[lambda d: d.GEOID10 >= 0]
-            .groupby("GEOID10", as_index=False)
-            .mesh_total.sum()
-        )
-        check = df.merge(mesh_total, on="GEOID10", how="outer").fillna(0)
-        n_mismatch = int((check.night_pop != check.mesh_total).sum())
-        if n_mismatch:
-            print(
-                f"WARNING: {n_mismatch} of {len(check)} block groups have a night_pop that doesn't "
-                "match the plotfile's own 'total' field -- home_i/home_j to GEOID10 mapping may be off."
-            )
-        else:
-            print(f"Sanity check passed: night_pop matches the plotfile's 'total' field for all {len(check)} block groups")
+    night_col, day_col = _POPULATION_COLUMNS[population]
+    df = load_exaepi_day_night_population(day_night_csv)[["GEOID10", night_col, day_col]]
+    df = df.rename(columns={night_col: "night_pop", day_col: "day_pop"})
 
     geo_unit = "county" if county_level else "tract"
     divisor = 10 ** 7 if county_level else 10  # block group (12-digit) -> county (5) or tract (11)
@@ -211,9 +156,9 @@ def main():
         "tract/county, optionally alongside a matching Epicast panel for side-by-side comparison"
     )
     parser.add_argument(
-        "--plot_dir", "-p", required=True,
-        help="ExaEpi plotfile directory AT STEP 0 (e.g. plt00000) -- home/work assignments are "
-        "only written there (see read_exaepi_agents.py)",
+        "--day_night_csv", "-p", required=True,
+        help="ExaEpi's <prefix>_day_night_population.csv (written when --aggregated_diag_int is "
+        "enabled -- see ExaEpi::IO::writeStaticAggregatedData in src/IO.cpp)",
     )
     parser.add_argument(
         "--epicast_file", "-c", default=None,
@@ -241,7 +186,7 @@ def main():
         "Pass a Census county shapefile (not a tract one) via --shape_files when using this.",
     )
     parser.add_argument(
-        "--population", choices=list(_POPULATION_FILTERS), default=None,
+        "--population", choices=list(_POPULATION_COLUMNS), default=None,
         help="Restrict ExaEpi to just the day/night movement of workers (naics != -1) or students "
         "(enrolled in school, among the non-workers) instead of the whole population. Default: "
         "'all' -- unless --epicast_file is given, in which case it defaults to 'workers' instead, "
@@ -267,7 +212,7 @@ def main():
     geo_unit = "county" if args.county_level else "tract"
     geo_unit_pl = "counties" if args.county_level else "tracts"
 
-    exaepi_df = compute_day_night_pop(args.plot_dir, county_level=args.county_level, population=population)
+    exaepi_df = compute_day_night_pop(args.day_night_csv, county_level=args.county_level, population=population)
     epicast_df = (
         compute_day_night_pop_epicast(args.epicast_file, county_level=args.county_level)
         if args.epicast_file else None

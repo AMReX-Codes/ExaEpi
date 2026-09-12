@@ -109,9 +109,9 @@ struct TestParams {
     amrex::Real college_instructional_fraction = amrex::Real(0.1);
 
     int aggregated_diag_int = -1;                 /*!< interval for writing aggregated diagnostic data
-                                                       (see: ExaEpi::IO::writeFIPSData) */
+                                                       (see: ExaEpi::IO::writeAggregatedData) */
     std::string aggregated_diag_prefix = "cases"; /*!< filename prefix for diagnostic data, used only if
-                                                       aggregated_diag_int >= 0 (see: ExaEpi::IO::writeFIPSData) */
+                                                       aggregated_diag_int >= 0 (see: ExaEpi::IO::writeAggregatedData) */
 
     std::string restart_chkfile = "";             /*!< the name of the checkpoint to restart from */
 

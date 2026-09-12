@@ -882,7 +882,22 @@ void runAgent () {
                 // their workplace community/county rather than the seeded one (see
                 // InitializeInfections.cpp). Move agents back home for the deferred write below,
                 // then redo the commute so the interactions that follow still find them at work.
-                pc.assignSchoolClasses(params);
+                // Static (run-long-constant) day/night population and workgroup/school/school-class
+                // size distributions -- see ExaEpi::IO::writeStaticAggregatedData. Computed once,
+                // here, on a fresh start only (never on restart -- these never change once assigned,
+                // so a restarted run just keeps relying on whatever files a prior fresh start wrote).
+                // The day-side/group-size pieces must be captured now, while agents are still at
+                // work (assignSchoolClasses() just above establishes that as a valid moment to read
+                // per-community data straight off agents' current position -- see
+                // AgentContainer::generatePopulationBreakdown()'s doc comment); the night-side piece
+                // is captured below, once agents are back home.
+                ExaEpi::IO::PopulationBreakdown day_breakdown;
+                GroupSizeAggregates group_sizes;
+                if (params.aggregated_diag_int > 0) {
+                    day_breakdown = ExaEpi::IO::computePopulationBreakdownCsvData(pc, urbanPopData);
+                    group_sizes = pc.computeGroupSizeDistributions(urbanPopData);
+                }
+
                 pc.eveningCommute(mask_behavior);
 
                 // Deferred from above: this is the write that is_fresh_start skipped, now done
@@ -891,6 +906,11 @@ void runAgent () {
                 if ((params.plot_int > 0) && (i % params.plot_int == 0)) {
                     ExaEpi::IO::writePlotFile(pc, disease_stats, nullptr, &urbanPopData.geoid_mf, &urbanPopData.community_mf,
                                               params.num_diseases, params.disease_names, cur_time, i, params.verbose);
+                }
+                if (params.aggregated_diag_int > 0) {
+                    auto night_breakdown = ExaEpi::IO::computePopulationBreakdownCsvData(pc, urbanPopData);
+                    ExaEpi::IO::writeStaticAggregatedData(day_breakdown, night_breakdown, group_sizes, urbanPopData,
+                                                          params.aggregated_diag_prefix);
                 }
 
                 pc.morningCommute(mask_behavior);

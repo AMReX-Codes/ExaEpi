@@ -9,6 +9,7 @@
 
 #include "IO.H"
 
+#include <array>
 #include <vector>
 
 using namespace amrex;
@@ -337,13 +338,17 @@ void writeCheckpointFile (const AgentContainer& pc,                      /*!< Ag
 
 /*! \brief Writes diagnostic data aggregated by block group
 
-    Writes a file with the total number of infected agents for each census block group;
-    it writes out the number of infected agents in the same order as the block groups in the UrbanPop .idx input file.
-    + Creates a output vector of size #UrbanPopData::num_communities
+    Writes a CSV file per disease (suffixed by disease name if there is more than one disease),
+    named <prefix><step, 5 digits>[_<disease_name>], with a header row (GEOID,total,
+    never_infected,infected,immune) followed by one row per census block group community giving
+    that community's GEOID and its total/never_infected/infected/immune agent counts -- everything
+    needed to reconstruct the plotfile's own per-community grid fields, without writing a full
+    AMReX plotfile.
+    + Creates an output MultiFab of size #UrbanPopData::num_communities x 4 stats
     + Gets the disease status in agents from AgentContainer::generateCellData().
-    + On each processor, sets the block-group-th element of the output vector to the number of
-      infected agents in the block group on this processor belonging to that unit.
-    + Sum across all processors and write to file.
+    + On each processor, sets the block-group-th element of each stat's output vector to that
+      stat's count in the block group on this processor.
+    + Sum across all processors and write GEOID + all 4 stats to file, one community per row.
 */
 void writeAggregatedData (const AgentContainer& agents,                  /*!< Agents (particle) container */
                           const UrbanPopData& urbanpopData,              /*!< UrbanPop data */
@@ -363,11 +368,22 @@ void writeAggregatedData (const AgentContainer& agents,                  /*!< Ag
         agents.generateCellData(*mf_vec[lev], ncomp_d);
     }
 
+    // Component offsets (within each disease's ncomp_d-sized block) of the 4 stats written out --
+    // matches writePlotFile's status_names order {"total","never_infected","infected","immune",
+    // "susceptible"}; susceptible is skipped since no diagnostic reads it today.
+    static const int n_stats = 4;
+    static const std::array<const char*, n_stats> stat_names = {"total", "never_infected", "infected", "immune"};
+
+    const long n_comm = urbanpopData.block_groups.size();
+
     for (int d = 0; d < num_diseases; d++) {
         amrex::Print() << "Generating diagnostic data by census block group " << "for " << disease_names[d] << "\n";
-        std::vector<amrex::Real> data(urbanpopData.block_groups.size(), 0.0);
-        amrex::Gpu::DeviceVector<amrex::Real> d_data(data.size(), 0.0);
-        amrex::Real* const AMREX_RESTRICT data_ptr = d_data.dataPtr();
+        std::array<amrex::Gpu::DeviceVector<amrex::Real>, n_stats> d_data;
+        amrex::GpuArray<amrex::Real*, n_stats> data_ptr_arr;
+        for (int c = 0; c < n_stats; ++c) {
+            d_data[c].resize(n_comm, 0.0);
+            data_ptr_arr[c] = d_data[c].dataPtr();
+        }
 
         for (int lev = 0; lev < nlevs; ++lev) {
 #ifdef AMREX_USE_OMP
@@ -382,38 +398,133 @@ void writeAggregatedData (const AgentContainer& agents,                  /*!< Ag
                     amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
                         int block_group_i = block_group_indices_arr(i, j, k);
                         if (block_group_i == -1) { return; }
-                        int num_infected = int(cell_data_arr(i, j, k, 5 * d + 2));
                         // This should not require an atomic operation because each block group is at a separate i,j location
-                        // amrex::Gpu::Atomic::AddNoRet(&data_ptr[block_group_i], (amrex::Real)num_infected);
-                        data_ptr[block_group_i] = (amrex::Real)num_infected;
+                        for (int c = 0; c < n_stats; ++c) {
+                            data_ptr_arr[c][block_group_i] = cell_data_arr(i, j, k, ncomp_d * d + c);
+                        }
                     });
                 }
             }
         }
 
-        // blocking copy from device to host
-        amrex::Gpu::copy(amrex::Gpu::deviceToHost, d_data.begin(), d_data.end(), data.begin());
+        std::array<std::vector<amrex::Real>, n_stats> data;
+        for (int c = 0; c < n_stats; ++c) {
+            // blocking copy from device to host
+            data[c].resize(n_comm);
+            amrex::Gpu::copy(amrex::Gpu::deviceToHost, d_data[c].begin(), d_data[c].end(), data[c].begin());
 
-        // reduced sum over mpi ranks
-        ParallelDescriptor::ReduceRealSum(data.data(), data.size(), ParallelDescriptor::IOProcessorNumber());
+            // reduced sum over mpi ranks
+            ParallelDescriptor::ReduceRealSum(data[c].data(), data[c].size(), ParallelDescriptor::IOProcessorNumber());
+        }
 
         if (ParallelDescriptor::IOProcessor()) {
             std::string fn = amrex::Concatenate(prefix, step, 5);
             if (num_diseases > 1) { fn += ("_" + disease_names[d]); }
-            std::ofstream ofs{fn, std::ofstream::out | std::ofstream::app};
+            std::ofstream ofs{fn, std::ofstream::out};
 
-            // set precision
-            ofs << std::fixed << std::setprecision(14) << std::scientific;
-
-            // loop over data size and write
-            for (const auto& item : data) {
-                ofs << " " << item;
+            ofs << "GEOID";
+            for (const auto* stat_name : stat_names) {
+                ofs << "," << stat_name;
             }
+            ofs << "\n";
 
-            ofs << std::endl;
+            ofs << std::fixed << std::setprecision(0);
+            for (long ci = 0; ci < n_comm; ++ci) {
+                ofs << urbanpopData.block_groups[ci].geoid;
+                for (int c = 0; c < n_stats; ++c) {
+                    ofs << "," << data[c][ci];
+                }
+                ofs << "\n";
+            }
             ofs.close();
         }
     }
+}
+
+/*! \brief Compute PopulationBreakdown from pc's agents' CURRENT positions -- see
+    AgentContainer::generatePopulationBreakdown()'s doc comment for the home/work timing
+    requirement this relies on. Collapses the 3-component mesh result down to one row per
+    community via urbanpopData.community_mf, exactly like writeAggregatedData's own collapse
+    above, just with a fixed 3-stat (total/workers/students) layout instead of a per-disease one.
+    Result is valid (non-empty) on the IOProcessor only.
+*/
+PopulationBreakdown computePopulationBreakdownCsvData (const AgentContainer& pc, const UrbanPopData& urbanpopData) {
+    static const int n_stats = 3;
+
+    MultiFab mf(pc.ParticleBoxArray(0), pc.ParticleDistributionMap(0), n_stats, 0);
+    mf.setVal(0.0);
+    pc.generatePopulationBreakdown(mf);
+
+    const long n_comm = urbanpopData.block_groups.size();
+    std::array<Gpu::DeviceVector<Real>, n_stats> d_data;
+    GpuArray<Real*, n_stats> data_ptr_arr;
+    for (int c = 0; c < n_stats; ++c) {
+        d_data[c].resize(n_comm, 0.0);
+        data_ptr_arr[c] = d_data[c].dataPtr();
+    }
+
+    for (MFIter mfi(mf); mfi.isValid(); ++mfi) {
+        auto block_group_indices_arr = urbanpopData.community_mf[mfi].array();
+        auto cell_data_arr = mf[mfi].array();
+        auto bx = mfi.tilebox();
+        amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
+            int bi = block_group_indices_arr(i, j, k);
+            if (bi == -1) { return; }
+            // Each block group is at a separate i,j location, so no atomic needed.
+            for (int c = 0; c < n_stats; ++c) {
+                data_ptr_arr[c][bi] = cell_data_arr(i, j, k, c);
+            }
+        });
+    }
+
+    std::array<std::vector<Real>, n_stats> data;
+    for (int c = 0; c < n_stats; ++c) {
+        data[c].resize(n_comm);
+        amrex::Gpu::copy(amrex::Gpu::deviceToHost, d_data[c].begin(), d_data[c].end(), data[c].begin());
+        ParallelDescriptor::ReduceRealSum(data[c].data(), data[c].size(), ParallelDescriptor::IOProcessorNumber());
+    }
+
+    PopulationBreakdown result;
+    if (ParallelDescriptor::IOProcessor()) {
+        result.total.resize(n_comm);
+        result.workers.resize(n_comm);
+        result.students.resize(n_comm);
+        for (long ci = 0; ci < n_comm; ++ci) {
+            result.total[ci] = (Long)data[0][ci];
+            result.workers[ci] = (Long)data[1][ci];
+            result.students[ci] = (Long)data[2][ci];
+        }
+    }
+    return result;
+}
+
+/*! \brief Write the static (run-long-constant), once-per-run aggregated diagnostics -- see IO.H
+    for the exact file names/formats. IOProcessor only (day/night/groups are only populated there
+    to begin with -- see computePopulationBreakdownCsvData / AgentContainer::computeGroupSizeDistributions).
+*/
+void writeStaticAggregatedData (const PopulationBreakdown& day, const PopulationBreakdown& night,
+                                const GroupSizeAggregates& groups, const UrbanPopData& urbanpopData, const std::string& prefix) {
+    if (!ParallelDescriptor::IOProcessor()) { return; }
+
+    const long n_comm = urbanpopData.block_groups.size();
+    {
+        std::ofstream ofs{prefix + "_day_night_population.csv", std::ofstream::out};
+        ofs << "GEOID,night_total,night_workers,night_students,day_total,day_workers,day_students\n";
+        for (long ci = 0; ci < n_comm; ++ci) {
+            ofs << urbanpopData.block_groups[ci].geoid << "," << night.total[ci] << "," << night.workers[ci] << ","
+                << night.students[ci] << "," << day.total[ci] << "," << day.workers[ci] << "," << day.students[ci] << "\n";
+        }
+    }
+
+    auto write_sizes = [&] (const std::string& suffix, const std::vector<amrex::Long>& sizes) {
+        std::ofstream ofs{prefix + "_" + suffix + "_sizes.txt", std::ofstream::out};
+        for (auto s : sizes) {
+            ofs << s << "\n";
+        }
+    };
+    write_sizes("workgroup", groups.workgroup_sizes);
+    write_sizes("class", groups.school_class_sizes);
+    write_sizes("school", groups.school_sizes);
 }
 
 } // namespace IO

@@ -7,6 +7,7 @@
 
 #include "AgentContainer.H"
 #include "AgentDefinitions.H"
+#include "UrbanPopData.H"
 
 namespace {
 // Deterministic hash, usable on host or device, with no shared RNG state -- see
@@ -1237,6 +1238,45 @@ void AgentContainer::generateCellData (MultiFab& mf, /*!< MultiFab with at least
             false);
 }
 
+/*! \brief Computes, in each grid cell, the count of agents CURRENTLY located there (see the
+    doc comment on the declaration in AgentContainer.H for the home/work timing requirement),
+    broken out into 3 components: 0 = everyone, 1 = workers (naics != -1), 2 = students
+    (naics == -1 && school_id != 0) -- matches the same worker/student split
+    utilities/plot_geo_daynight.py's _POPULATION_FILTERS uses.
+*/
+void AgentContainer::generatePopulationBreakdown (
+        MultiFab& mf /*!< 3-component MultiFab, same BoxArray/DistributionMapping as this container */) const {
+    BL_PROFILE("AgentContainer::generatePopulationBreakdown");
+
+    const int lev = 0;
+
+    AMREX_ASSERT(OK());
+    AMREX_ASSERT(numParticlesOutOfRange(*this, 0) == 0);
+    AMREX_ASSERT(mf.nComp() == 3);
+
+    const auto& geom = Geom(lev);
+    const auto plo = geom.ProbLoArray();
+    const auto dxi = geom.InvCellSizeArray();
+    const auto domain = geom.Domain();
+
+    ParticleToMesh(
+            *this, mf, lev,
+            [=] AMREX_GPU_DEVICE (const AgentContainer::ParticleTileType::ConstParticleTileDataType& ptd, int i,
+                                 Array4<Real> const& count) {
+                auto p = ptd.m_aos[i];
+                auto iv = getParticleCell(p, plo, dxi, domain);
+
+                Gpu::Atomic::AddNoRet(&count(iv, 0), 1.0_rt);
+                int naics = ptd.m_idata[IntIdx::naics][i];
+                if (naics != -1) {
+                    Gpu::Atomic::AddNoRet(&count(iv, 1), 1.0_rt);
+                } else if (ptd.m_idata[IntIdx::school_id][i] != 0) {
+                    Gpu::Atomic::AddNoRet(&count(iv, 2), 1.0_rt);
+                }
+            },
+            false);
+}
+
 /*! \brief Computes the total number of agents with each #OutputStatus
 
     Returns a vector with nattrib components corresponding to each value of #OutputStatus; each element is
@@ -1430,6 +1470,145 @@ int AgentContainer::getMaxGroup (const int group_idx) {
         max_attribute_values[group_idx] = local_max;
     }
     return max_attribute_values[group_idx];
+}
+
+/*! \brief Compute the realized group-size distributions for workgroups, schools, and school
+    classes -- see the doc comment on the declaration in AgentContainer.H for the timing
+    requirement (agents must be at their work location) and why a per-community collapse via
+    UrbanPopData::community_mf is valid at that point, exactly as ExaEpi::IO::writeAggregatedData's
+    own community_mf-based collapse already is for disease-status data.
+*/
+GroupSizeAggregates AgentContainer::computeGroupSizeDistributions (const UrbanPopData& urbanpopData) {
+    BL_PROFILE("AgentContainer::computeGroupSizeDistributions");
+
+    // getMaxGroup performs an MPI collective on first use per attribute -- must be called once,
+    // single-threaded, here, never from inside an omp-parallel region (see InteractionModWork.H
+    // for the same warning at its own call site).
+    int max_naics = getMaxGroup(IntIdx::naics) + 1;
+    int max_workgroup = getMaxGroup(IntIdx::workgroup) + 1;
+    int max_school_id = getMaxGroup(IntIdx::school_id) + 1;
+    int max_school_class_group = getMaxGroup(IntIdx::school_class_group) + 1;
+
+    const long n_comm = urbanpopData.block_groups.size();
+    const int lev = 0;
+    const auto& geom = Geom(lev);
+    const auto plo = geom.ProbLoArray();
+    const auto dxi = geom.InvCellSizeArray();
+    const auto domain = geom.Domain();
+
+    // Workgroup tally: one mesh component per (naics, workgroup) pair -- ids are only unique
+    // within a (work cell, naics) pair, so the community key comes from the mesh cell itself (via
+    // the collapse below), not a separate lookup.
+    const int wg_ncomp = max_naics * max_workgroup;
+    MultiFab wg_mf(ParticleBoxArray(lev), ParticleDistributionMap(lev), wg_ncomp, 0);
+    wg_mf.setVal(0.0);
+    ParticleToMesh(
+            *this, wg_mf, lev,
+            [=] AMREX_GPU_DEVICE (const AgentContainer::ParticleTileType::ConstParticleTileDataType& ptd, int i,
+                                 Array4<Real> const& count) {
+                int workgroup = ptd.m_idata[IntIdx::workgroup][i];
+                if (workgroup <= 0) { return; }
+                auto p = ptd.m_aos[i];
+                auto iv = getParticleCell(p, plo, dxi, domain);
+                int naics = ptd.m_idata[IntIdx::naics][i];
+                Gpu::Atomic::AddNoRet(&count(iv, naics * max_workgroup + workgroup), 1.0_rt);
+            },
+            false);
+
+    // School tally: one mesh component per school_id -- school_id is only unique within a work
+    // cell, same reasoning as workgroup above.
+    MultiFab sch_mf(ParticleBoxArray(lev), ParticleDistributionMap(lev), max_school_id, 0);
+    sch_mf.setVal(0.0);
+    ParticleToMesh(
+            *this, sch_mf, lev,
+            [=] AMREX_GPU_DEVICE (const AgentContainer::ParticleTileType::ConstParticleTileDataType& ptd, int i,
+                                 Array4<Real> const& count) {
+                int school_id = ptd.m_idata[IntIdx::school_id][i];
+                if (school_id <= 0) { return; }
+                auto p = ptd.m_aos[i];
+                auto iv = getParticleCell(p, plo, dxi, domain);
+                Gpu::Atomic::AddNoRet(&count(iv, school_id), 1.0_rt);
+            },
+            false);
+
+    // Collapse both mesh MultiFabs down to per-community (bi-indexed) dense arrays, exactly like
+    // ExaEpi::IO::writeAggregatedData's own community_mf-based collapse for disease-status data.
+    std::vector<Real> wg_h((size_t)n_comm * wg_ncomp, 0.0_rt);
+    std::vector<Real> sch_h((size_t)n_comm * max_school_id, 0.0_rt);
+    {
+        Gpu::DeviceVector<Real> wg_d((size_t)n_comm * wg_ncomp, 0.0_rt);
+        Gpu::DeviceVector<Real> sch_d((size_t)n_comm * max_school_id, 0.0_rt);
+        auto* wg_ptr = wg_d.dataPtr();
+        auto* sch_ptr = sch_d.dataPtr();
+
+        for (MFIter mfi(wg_mf); mfi.isValid(); ++mfi) {
+            auto block_group_indices_arr = urbanpopData.community_mf[mfi].array();
+            auto wg_cell_arr = wg_mf[mfi].array();
+            auto sch_cell_arr = sch_mf[mfi].array();
+            auto bx = mfi.tilebox();
+            amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
+                int bi = block_group_indices_arr(i, j, k);
+                if (bi == -1) { return; }
+                // Each block group is at a separate i,j location, so no atomic needed.
+                for (int c = 0; c < wg_ncomp; ++c) {
+                    wg_ptr[(long)bi * wg_ncomp + c] = wg_cell_arr(i, j, k, c);
+                }
+                for (int c = 0; c < max_school_id; ++c) {
+                    sch_ptr[(long)bi * max_school_id + c] = sch_cell_arr(i, j, k, c);
+                }
+            });
+        }
+
+        Gpu::copy(Gpu::deviceToHost, wg_d.begin(), wg_d.end(), wg_h.begin());
+        Gpu::copy(Gpu::deviceToHost, sch_d.begin(), sch_d.end(), sch_h.begin());
+    }
+    // Reduced to the IOProcessor only (not all ranks), since only that rank writes output files --
+    // cheaper than an all-reduce.
+    ParallelDescriptor::ReduceRealSum(wg_h.data(), (int)wg_h.size(), ParallelDescriptor::IOProcessorNumber());
+    ParallelDescriptor::ReduceRealSum(sch_h.data(), (int)sch_h.size(), ParallelDescriptor::IOProcessorNumber());
+
+    // School-class tally: school_class_group is already a globally dense, unique id (assigned in
+    // assignSchoolClasses()) -- not community-scoped, so tallied directly by attribute value, with
+    // no mesh/position involvement at all.
+    Gpu::DeviceVector<int> scg_d(max_school_class_group, 0);
+    auto* scg_ptr = scg_d.dataPtr();
+    for (int scg_lev = 0; scg_lev <= finestLevel(); ++scg_lev) {
+        auto& plev = GetParticles(scg_lev);
+        for (MFIter mfi = MakeMFIter(scg_lev); mfi.isValid(); ++mfi) {
+            auto& ptile = plev[std::make_pair(mfi.index(), mfi.LocalTileIndex())];
+            const auto np = ptile.GetArrayOfStructs().numParticles();
+            if (np == 0) { continue; }
+            auto& soa = ptile.GetStructOfArrays();
+            auto naics_ptr = soa.GetIntData(IntIdx::naics).data();
+            auto scg_attr_ptr = soa.GetIntData(IntIdx::school_class_group).data();
+            amrex::ParallelFor(np, [=] AMREX_GPU_DEVICE (int ip) noexcept {
+                if (naics_ptr[ip] == -1 && scg_attr_ptr[ip] >= 0) { Gpu::Atomic::AddNoRet(&scg_ptr[scg_attr_ptr[ip]], 1); }
+            });
+        }
+    }
+    std::vector<int> scg_h(max_school_class_group, 0);
+    Gpu::copy(Gpu::deviceToHost, scg_d.begin(), scg_d.end(), scg_h.begin());
+    ParallelDescriptor::ReduceIntSum(scg_h.data(), (int)scg_h.size(), ParallelDescriptor::IOProcessorNumber());
+
+    GroupSizeAggregates result;
+    if (ParallelDescriptor::IOProcessor()) {
+        for (long bi = 0; bi < n_comm; ++bi) {
+            for (int naics = 0; naics < max_naics; ++naics) {
+                for (int wg = 0; wg < max_workgroup; ++wg) {
+                    Real v = wg_h[(size_t)bi * wg_ncomp + naics * max_workgroup + wg];
+                    if (v > 0) { result.workgroup_sizes.push_back((Long)v); }
+                }
+            }
+            for (int sid = 0; sid < max_school_id; ++sid) {
+                Real v = sch_h[(size_t)bi * max_school_id + sid];
+                if (v > 0) { result.school_sizes.push_back((Long)v); }
+            }
+        }
+        for (int scg = 0; scg < max_school_class_group; ++scg) {
+            if (scg_h[scg] > 0) { result.school_class_sizes.push_back((Long)scg_h[scg]); }
+        }
+    }
+    return result;
 }
 
 /*! \brief Interaction and movement of agents during morning commute

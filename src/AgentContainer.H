@@ -28,6 +28,17 @@
 #include "Utils.H"
 #include "WeatherData.H"
 
+struct UrbanPopData; // fwd decl only -- avoids a circular include with UrbanPopData.H, which
+                     // itself forward-declares AgentContainer for the same reason
+
+/*! \brief Realized group-size distributions for workgroups, schools, and school classes -- one
+    entry per nonzero-count group (the group's size), not a per-community scalar. See
+    AgentContainer::computeGroupSizeDistributions(). Populated (non-empty) on the IOProcessor
+    only. */
+struct GroupSizeAggregates {
+    std::vector<amrex::Long> workgroup_sizes, school_sizes, school_class_sizes;
+};
+
 /*! \brief Derived class from ParticleContainer that defines agents and their functions */
 class AgentContainer : public amrex::ParticleContainer<0, 0, RealIdx::nattribs, IntIdx::nattribs> {
 
@@ -92,6 +103,18 @@ class AgentContainer : public amrex::ParticleContainer<0, 0, RealIdx::nattribs, 
 
     void generateCellData(amrex::MultiFab& mf, const int ncomp) const;
 
+    /*! \brief Fill a 3-component MultiFab (same BoxArray/DistributionMapping as this container)
+        with, per grid cell, the count of agents CURRENTLY located there, broken out as:
+        component 0 = everyone, 1 = workers (naics != -1), 2 = students (naics == -1 &&
+        school_id != 0). Uses each agent's own current physical position (via ParticleToMesh), so
+        the result reflects home population if called while agents are at home, or work/school
+        population if called right after moveAgentsToWork() -- see main.cpp's
+        assignSchoolClasses() call site, which relies on the same guarantee: moveAgentsToWork()'s
+        Redistribute() ensures every agent's tile matches its current (work) position, so a
+        per-tile community lookup (e.g. UrbanPopData::community_mf) is valid there exactly as it
+        is for the resting (home) state generateCellData() already assumes. */
+    void generatePopulationBreakdown(amrex::MultiFab& mf) const;
+
     std::array<amrex::Long, OutputStatus::nattribs> getTotals(const int);
 
     std::array<amrex::Long, AgeGroups::total> getNewStatusByAge(const int a_d, const int output_status);
@@ -101,6 +124,17 @@ class AgentContainer : public amrex::ParticleContainer<0, 0, RealIdx::nattribs, 
     std::array<amrex::Long, AgeGroups::total> getInfectedByAge(const int a_d);
 
     int getMaxGroup(const int group_idx);
+
+    /*! \brief Compute the realized size distributions of workgroups, schools, and school classes
+        (see GroupSizeAggregates) from agents' static work_i/work_j/naics/workgroup/school_id/
+        school_class_group attributes. NOT const: calls getMaxGroup(), which mutates a cached
+        MPI-reduced value the first time each attribute is queried. Must be called once, while
+        agents are at their work location (see main.cpp's call site, immediately after
+        assignSchoolClasses()) -- workgroup/school_id are only unique within a work community, so
+        this relies on the same current-position-is-work-cell guarantee generatePopulationBreakdown()
+        documents above. Reduces to the IOProcessor only (not all ranks), since only the
+        IOProcessor writes the resulting output files. */
+    GroupSizeAggregates computeGroupSizeDistributions(const UrbanPopData& urbanpopData);
 
     void moveAgentsToWork();
 

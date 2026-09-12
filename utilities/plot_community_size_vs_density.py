@@ -14,15 +14,14 @@ unbiased census of every agent rather than a partial sample.
 Density is computed from the same Census block group shapefiles (GEOID10 + ALAND10 land area,
 via --shape_files): when a Census unit's population exceeds 2000, ExaEpi splits it into several
 communities (grid cells) that all share the same GEOID10 and therefore the same land area, so
-this is a many-communities-to-one-area join, not one-to-one. Land area doesn't depend on which
-plotfile you pass, but population does (nighttime vs daytime) -- unlike land area, so is *not*
-static across a run's other plotfiles for a residential-vs-workplace split like this one.
+this is a many-communities-to-one-area join, not one-to-one. Land area doesn't depend on the run,
+but population does (nighttime vs daytime) -- unlike land area, so is *not* static across a run's
+other plotfiles for a residential-vs-workplace split like this one.
 
-Needs the plotfile directory AT STEP 0 specifically (e.g. plt00000): home_i/home_j/work_i/work_j
-are static per agent and only written into the "agents" particle plotfile at that step (see
-read_exaepi_agents.py). Only Census-initialized runs (ic_type=Census) are supported, same as
-plot_geo.py/plot_geo_daynight.py -- the plotfile's FIPS/Tract mesh fields this depends on aren't
-populated for UrbanPop runs.
+Population comes from the static, once-per-run <prefix>_day_night_population.csv ExaEpi writes
+when --aggregated_diag_int is enabled (see ExaEpi::IO::writeStaticAggregatedData in src/IO.cpp,
+and plot_geo.load_exaepi_day_night_population) -- already per-community, so no plotfile/agent data
+is needed at all.
 """
 
 import os
@@ -32,10 +31,9 @@ import numpy as np
 import pandas as pd
 import geopandas as gp
 import matplotlib.pyplot as plt
-import yt
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from read_exaepi_agents import read_agent_fields  # noqa: E402
+from plot_geo import load_exaepi_day_night_population  # noqa: E402
 from plos_compbio_style import apply_style, HALF_PAGE_WIDTH_IN, HALF_PAGE_HEIGHT_IN  # noqa: E402
 
 SQ_M_PER_SQ_KM = 1_000_000.0
@@ -50,45 +48,11 @@ SERIES_STYLE = {
 }
 
 
-def _build_geoid_grid(ds):
-    """Return a 2D int64 array geoid_grid[i, j] = 12-digit block-group GEOID10 for that grid cell
-    (-1 for inactive/off-domain cells), aligned with the same (i, j) indexing used by agents'
-    home_i/home_j/work_i/work_j -- see plot_geo_daynight.py, which this is copied from."""
-    dims = ds.domain_dimensions
-    cg = ds.covering_grid(level=0, left_edge=ds.domain_left_edge, dims=dims)
-    fips = cg["boxlib", "FIPS"][:, :, 0].astype("int64")
-    tract = cg["boxlib", "Tract"][:, :, 0].astype("int64")
-    return np.where(fips >= 0, fips * 10_000_000 + tract, -1)
-
-
-def load_community_density(plot_dir, shape_files):
-    """Return a DataFrame with one row per ExaEpi community (grid cell): GEOID10, night_pop,
-    day_pop, area_km2, density_night, density_day."""
-    print("Reading ExaEpi mesh data from", plot_dir)
-    ds = yt.load(plot_dir)  # type: ignore
-    geoid_grid = _build_geoid_grid(ds)
-    ni, nj = geoid_grid.shape
-
-    print("Reading agent home/work assignments from", plot_dir)
-    agents = read_agent_fields(plot_dir, ["home_i", "home_j", "work_i", "work_j"])
-    print(f"Read {len(agents['home_i']):,} agents")
-
-    def cell_counts(i_arr, j_arr):
-        flat = i_arr.astype(np.int64) * nj + j_arr.astype(np.int64)
-        return np.bincount(flat, minlength=ni * nj).reshape(ni, nj)
-
-    night_grid = cell_counts(agents["home_i"], agents["home_j"])
-    day_grid = cell_counts(agents["work_i"], agents["work_j"])
-
-    df = pd.DataFrame(
-        {
-            "GEOID10": geoid_grid.ravel(),
-            "night_pop": night_grid.ravel(),
-            "day_pop": day_grid.ravel(),
-        }
-    )
-    # Inactive/off-domain cells (GEOID10 == -1) and cells nobody lives or works in either.
-    df = df[(df["GEOID10"] >= 0) & ((df["night_pop"] > 0) | (df["day_pop"] > 0))].reset_index(drop=True)
+def load_community_density(day_night_csv, shape_files):
+    """Return a DataFrame with one row per ExaEpi community: GEOID10, night_pop, day_pop,
+    area_km2, density_night, density_day."""
+    df = load_exaepi_day_night_population(day_night_csv)[["GEOID10", "night_pop", "day_pop"]]
+    n_communities = len(df)
 
     shp_dfs = []
     for fname in shape_files:
@@ -104,7 +68,7 @@ def load_community_density(plot_dir, shape_files):
     df = pd.merge(df, shp_data[["GEOID10", "area_km2"]], on="GEOID10", how="inner")
     if df.empty:
         raise SystemExit(
-            f"No rows matched after merging: 0 of {geoid_grid[geoid_grid >= 0].size} ExaEpi community "
+            f"No rows matched after merging: 0 of {n_communities} ExaEpi community "
             f"GEOIDs were found among the {len(shp_data)} shapefile rows. Pass the Census block group "
             "shapefile(s) (tl_2010_NN_bg10.shp) matching this run's state(s)."
         )
@@ -180,9 +144,9 @@ def main():
     apply_style()
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument(
-        "--plot_dir", "-p", required=True,
-        help="ExaEpi plotfile directory AT STEP 0 (e.g. plt00000) -- home/work assignments are "
-        "only written there (see read_exaepi_agents.py)",
+        "--day_night_csv", "-p", required=True,
+        help="ExaEpi's <prefix>_day_night_population.csv (written when --aggregated_diag_int is "
+        "enabled -- see ExaEpi::IO::writeStaticAggregatedData in src/IO.cpp)",
     )
     parser.add_argument(
         "--shape_files",
@@ -198,7 +162,7 @@ def main():
     )
     args = parser.parse_args()
 
-    df = load_community_density(args.plot_dir, args.shape_files)
+    df = load_community_density(args.day_night_csv, args.shape_files)
     plot_community_size_vs_density(df, args.output, log=args.log)
 
 

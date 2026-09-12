@@ -7,7 +7,7 @@ Gini (--metric gini, the default) measures CONCENTRATION only, independent of ge
 infections are spread perfectly evenly across every tract/county, ->1 means they're concentrated in
 very few -- it doesn't care whether the affected units are next to each other or scattered across
 the map. It needs no shapefile, only each unit's infected count (from
-load_exaepi_grid_stats/reconstruct_epicast_snapshot's GEOID10-keyed DataFrame).
+load_exaepi_stats/reconstruct_epicast_snapshot's GEOID10-keyed DataFrame).
 
 Global Moran's I (--metric moran) measures spatial AUTOCORRELATION instead: ~+1 means neighboring
 tracts/counties tend to have similar infection levels (a contiguous outbreak region), ~0 means the
@@ -30,7 +30,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from plot_geo import load_exaepi_grid_stats, _parse_day_from_plot_dir, reconstruct_epicast_snapshot  # noqa: E402
+from plot_geo import load_exaepi_stats, _parse_day_from_plot_dir, reconstruct_epicast_snapshot  # noqa: E402
 from read_epicast_events import read_events_bin  # noqa: E402
 from plos_compbio_style import apply_style, HALF_PAGE_WIDTH_IN, HALF_PAGE_HEIGHT_IN, AXES_LINEWIDTH  # noqa: E402
 
@@ -121,8 +121,9 @@ def main():
     )
     parser.add_argument(
         "--plot_dirs", "-p", nargs="+", default=None,
-        help="ExaEpi plotfile directories, one per day (e.g. plt00000 plt00010 ... or a shell glob "
-        "like plt000*)",
+        help="ExaEpi per-day data, one per day: plotfile directories (e.g. plt00000 plt00010 ... "
+        "or a shell glob like plt000*) and/or aggregated-diagnostics CSV files (e.g. cases00000 "
+        "cases00010 ..., written via --aggregated_diag_int), freely mixed",
     )
     parser.add_argument("--events_file", "-c", default=None, help="Epicast run.events.bin file")
     parser.add_argument(
@@ -182,7 +183,7 @@ def main():
         days, values = [], []
         geoid_order, W = None, None
         for plot_dir in args.plot_dirs:
-            grid_stats_df = load_exaepi_grid_stats(plot_dir, tract_level=True, county_level=args.county_level)
+            grid_stats_df = load_exaepi_stats(plot_dir, tract_level=True, county_level=args.county_level)
             day = _parse_day_from_plot_dir(plot_dir) + args.exaepi_day_shift
             if args.metric == "moran":
                 if geoid_order is None:

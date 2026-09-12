@@ -7,10 +7,11 @@ Epicast side: data/results/emerge-paper/epicast/epicast_nm_{workgroup,schoolgrou
 -- plain text, one integer (group size) per line. "workgroup" is a workplace peer group,
 "schoolgroup" is a classroom-level cohort, "school" is a whole school.
 
-ExaEpi side: there is no direct per-group-size output, so this reads step-0 per-agent
-fields (work_i, work_j, naics, workgroup, school_id, school_class_group -- see
-read_exaepi_agents.py) from an ExaEpi plotfile and reconstructs the same three
-distributions by grouping agents:
+ExaEpi side: reads <prefix>_workgroup_sizes.txt / _class_sizes.txt / _school_sizes.txt, the
+static, once-per-run group-size distributions ExaEpi writes when --aggregated_diag_int is
+enabled (see ExaEpi::IO::writeStaticAggregatedData in src/IO.cpp), in the same plain
+one-integer-per-line format as the Epicast files below -- computed by ExaEpi itself from
+agents' work_i/work_j/naics/workgroup/school_id/school_class_group attributes:
 
   - Workgroup size: agents with workgroup > 0 (0 means not assigned to a workgroup --
     not working, or working from home), grouped by (work_i, work_j, naics, workgroup).
@@ -31,10 +32,6 @@ distributions by grouping agents:
   - School size: agents with school_id > 0 (both students and staff), grouped by
     (work_i, work_j, school_id) -- school_id is only unique within a community, like
     workgroup.
-
-All three ExaEpi fields above are static per agent, so ExaEpi only writes them to the
-first plotfile of a run (typically plt00000); see read_exaepi_agents.py's module
-docstring.
 """
 
 import argparse
@@ -43,10 +40,8 @@ import sys
 
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 
 sys.path.insert(0, os.path.dirname(__file__))
-from read_exaepi_agents import read_agent_fields
 from plos_compbio_style import apply_style, HALF_PAGE_WIDTH_IN, HALF_PAGE_HEIGHT_IN
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -87,41 +82,12 @@ def load_epicast_sizes(fname):
     return sizes
 
 
-def exaepi_workgroup_sizes(fields):
-    df = pd.DataFrame(fields)
-    df = df[df["workgroup"] > 0]
-    return df.groupby(["work_i", "work_j", "naics", "workgroup"]).size().to_numpy()
-
-
-def exaepi_class_sizes(fields):
-    df = pd.DataFrame(fields)
-    df = df[(df["naics"] == -1) & (df["school_class_group"] >= 0)]
-    return df.groupby("school_class_group").size().to_numpy()
-
-
-def exaepi_school_sizes(fields):
-    df = pd.DataFrame(fields)
-    df = df[df["school_id"] > 0]
-    return df.groupby(["work_i", "work_j", "school_id"]).size().to_numpy()
-
-
-EXAEPI_FIELDS = {
-    "workgroup": ("work_i", "work_j", "naics", "workgroup"),
-    "class": ("naics", "school_class_group"),
-    "school": ("work_i", "work_j", "school_id"),
-}
-
-EXAEPI_COMPUTE = {
-    "workgroup": exaepi_workgroup_sizes,
-    "class": exaepi_class_sizes,
-    "school": exaepi_school_sizes,
-}
-
-
-def exaepi_sizes(plot_dir, group_name):
-    fields = read_agent_fields(plot_dir, EXAEPI_FIELDS[group_name])
-    sizes = EXAEPI_COMPUTE[group_name](fields)
-    print(f"Found {len(sizes):,} ExaEpi {group_name}s from {plot_dir}")
+def exaepi_sizes(prefix, group_name):
+    """Read <prefix>_<basename>.txt (see GROUP_INFO), the group-size distribution ExaEpi itself
+    computed and wrote -- same plain one-integer-per-line format load_epicast_sizes reads."""
+    fname = f"{prefix}_{GROUP_INFO[group_name]['basename']}.txt"
+    sizes = np.loadtxt(fname, dtype=int)
+    print(f"Read {len(sizes):,} ExaEpi {group_name}s from {fname}")
     return sizes
 
 
@@ -275,8 +241,10 @@ def main():
     apply_style()
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument(
-        "--plot_dir", "-p", required=True,
-        help="ExaEpi step-0 plotfile directory (e.g. plt00000) to read agent fields from",
+        "--prefix", "-p", required=True,
+        help="ExaEpi's --aggregated_diag_prefix (matching the run's <prefix>_workgroup_sizes.txt / "
+        "_class_sizes.txt / _school_sizes.txt files, written when --aggregated_diag_int is enabled "
+        "-- see ExaEpi::IO::writeStaticAggregatedData in src/IO.cpp)",
     )
     parser.add_argument(
         "--groups", "-g", nargs="+", choices=list(GROUP_INFO), default=list(GROUP_INFO),
@@ -332,7 +300,7 @@ def main():
     for ax, group_name in zip(axes, args.groups):
         info = GROUP_INFO[group_name]
         epicast_data = load_epicast_sizes(epicast_files[group_name])
-        exaepi_data = exaepi_sizes(args.plot_dir, group_name)
+        exaepi_data = exaepi_sizes(args.prefix, group_name)
         plot_comparison(ax, epicast_data, exaepi_data, info["xlabel"], info["title"], cdf,
                          weight_noun=info["weight_noun"], logx=args.logx, logy=args.logy,
                          xlim=args.xlim)
