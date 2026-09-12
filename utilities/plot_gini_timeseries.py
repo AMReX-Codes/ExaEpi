@@ -233,7 +233,6 @@ def main():
         ax.set_ylabel("Gini coefficient")
         #ax.set_title("Geographic spread of infections over time")
     ax.grid(True, alpha=0.3)
-    ax.set_xlim(0, 120)
     ax.legend()
 
     plt.savefig(args.output)
