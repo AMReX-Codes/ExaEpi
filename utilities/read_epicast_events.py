@@ -68,6 +68,25 @@ _CONTEXT_DTYPE = pd.CategoricalDtype(
     ordered=False,
 )
 
+
+def _code_lookup(mapping, categories):
+    """256-entry int16 table mapping each raw byte code in `mapping` to its index in
+    `categories` (or -1 for a code not in `mapping`), for building a pandas Categorical via
+    Categorical.from_codes(lookup[raw_codes], categories=categories).
+
+    This exists purely for speed: on a ~103M-event CA file, Series.map(mapping).astype(dtype)
+    over the raw codes takes ~2.6s per column, and the separate Series.isin(mapping.keys())
+    unmapped-code check (previously used for disease_state) takes ~3.6s on top of that --
+    Series.map/isin apparently don't take the fast path one might expect for this few distinct
+    values against ~1e8 rows. A single numpy fancy-index lookup (this table, indexed by the raw
+    uint8 codes) replaces both: ~0.2s total, and the same -1-means-unmapped codes double as the
+    unmapped-code check with no separate pass over the data (see read_events_bin).
+    """
+    lookup = np.full(256, -1, dtype=np.int16)
+    for code, name in mapping.items():
+        lookup[code] = categories.index(name)
+    return lookup
+
 # Mapping from disease_state integer codes to human-readable labels
 DISEASE_STATE_CATEGORIES = [
     "recovered",  # 0x00
@@ -85,6 +104,11 @@ _DISEASE_STATE_DTYPE = pd.CategoricalDtype(
     ordered=False,
 )
 
+# See _code_lookup: fast Categorical.from_codes construction for read_events_bin, built once
+# here rather than per-file/per-call.
+_CONTEXT_CODE_LOOKUP = _code_lookup(_CONTEXT_MAP, list(_CONTEXT_DTYPE.categories))
+_DISEASE_STATE_CODE_LOOKUP = _code_lookup(_DISEASE_STATE_MAP, list(_DISEASE_STATE_DTYPE.categories))
+
 # AgentTransition struct layout (24 bytes total, little-endian)
 # Q  = UInt64 (8 bytes)
 # H  = UInt16 (2 bytes)
@@ -95,7 +119,7 @@ _AGENT_TRANSITION_SIZE = struct.calcsize(_AGENT_TRANSITION_FMT)  # should be 24
 assert _AGENT_TRANSITION_SIZE == 24, f"Unexpected struct size: {_AGENT_TRANSITION_SIZE}"
 
 
-def read_events_bin(path: str) -> tuple[pd.DataFrame, pd.DataFrame]:
+def read_events_bin(path: str, full: bool = True) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
     Read a run.events.bin file.
 
@@ -103,13 +127,25 @@ def read_events_bin(path: str) -> tuple[pd.DataFrame, pd.DataFrame]:
     ----------
     path : str
         Path to the .events.bin file.
+    full : bool, optional
+        If True (default), events_df has every column listed below. If False, only timestep,
+        context, and disease_state are built, skipping agent_id, location_id, variant,
+        home_state, true_agent_id, tract_fips, and tract_community entirely. Those three are
+        the only columns aggregate_events/aggregate_infections_by_source ever use, and skipping
+        the rest measurably matters: for a ~2.5 GB CA events.bin (~103M events), building all
+        ten columns peaks around 18 GB RSS, versus ~7.6 GB for just the three (see
+        compare_to_epicast.py's load_epicast, the first caller that never touches agent/location
+        identity). Pass False only when you're sure you won't need
+        agent_id/location_id/variant/home_state/true_agent_id/tract_fips/tract_community on the
+        returned events_df.
 
     Returns
     -------
     events_df : pd.DataFrame
-        One row per AgentTransition event with columns:
+        One row per AgentTransition event. Columns when full=True:
           agent_id, location_id, timestep, context, disease_state, variant,
           home_state, true_agent_id, tract_fips, tract_community
+        Columns when full=False: timestep, context, disease_state
     demog_df : pd.DataFrame
         One row per FIPS tract with columns: fips, <demographic column names>
     """
@@ -168,45 +204,47 @@ def read_events_bin(path: str) -> tuple[pd.DataFrame, pd.DataFrame]:
 
     records = np.frombuffer(event_bytes[: n_events * _AGENT_TRANSITION_SIZE], dtype=dtype)
 
-    agent_id = records["agent_id"].astype(np.uint64)
-    location_id = records["location_id"].astype(np.uint64)
-
-    # Derived columns (matching Julia helper functions)
-    home_state = (agent_id >> np.uint64(58)).astype(np.uint8)
-    mask = ~(np.uint64(0b0111111) << np.uint64(58))
-    true_agent_id = agent_id & mask
-    tract_fips = location_id >> np.uint64(8)
-    tract_community = (location_id & np.uint64(0xFF)).astype(np.uint8)
-
-    raw_disease_state = pd.Series(records["disease_state"], dtype="uint8")
-    unmapped_mask = ~raw_disease_state.isin(_DISEASE_STATE_MAP.keys())
-    n_unmapped = unmapped_mask.sum()
+    # Fast lookup-table-based Categorical construction (see _code_lookup) instead of
+    # Series.map(dict).astype(dtype): ~15x faster on a ~103M-row file. The disease_state lookup's
+    # -1 ("not in the table") entries double as the unmapped-code check below, with no separate
+    # Series.isin() pass over the data (that used to cost ~3.6s by itself).
+    disease_state_codes = _DISEASE_STATE_CODE_LOOKUP[records["disease_state"]]
+    unmapped_mask = disease_state_codes == -1
+    n_unmapped = int(unmapped_mask.sum())
     if n_unmapped > 0:
         import warnings
 
-        unmapped_codes = raw_disease_state[unmapped_mask].unique().tolist()
+        unmapped_codes = np.unique(records["disease_state"][unmapped_mask]).tolist()
         warnings.warn(
             f"{n_unmapped} event(s) have unmapped disease_state code(s) {unmapped_codes} "
             "(expected codes: 0x00–0x03, 0x07). These events will have NaN disease_state "
             "and will be excluded from disease_state counts and 'total' in aggregate_events()."
         )
 
-    events_df = pd.DataFrame(
-        {
-            "agent_id": agent_id,
-            "location_id": location_id,
-            "timestep": records["timestep"],
-            "context": pd.Series(records["context"], dtype="uint8")
-            .map(_CONTEXT_MAP)
-            .astype(_CONTEXT_DTYPE),
-            "disease_state": raw_disease_state.map(_DISEASE_STATE_MAP).astype(_DISEASE_STATE_DTYPE),
-            "variant": records["variant"],
-            "home_state": home_state,
-            "true_agent_id": true_agent_id,
-            "tract_fips": tract_fips,
-            "tract_community": tract_community,
-        }
+    # Column order matches the full=True case in the docstring above.
+    columns = {}
+    if full:
+        agent_id = records["agent_id"].astype(np.uint64)
+        location_id = records["location_id"].astype(np.uint64)
+        columns["agent_id"] = agent_id
+        columns["location_id"] = location_id
+    columns["timestep"] = records["timestep"]
+    columns["context"] = pd.Categorical.from_codes(
+        _CONTEXT_CODE_LOOKUP[records["context"]], categories=_CONTEXT_DTYPE.categories
     )
+    columns["disease_state"] = pd.Categorical.from_codes(
+        disease_state_codes, categories=_DISEASE_STATE_DTYPE.categories
+    )
+    if full:
+        # Derived columns (matching Julia helper functions)
+        columns["variant"] = records["variant"]
+        columns["home_state"] = (agent_id >> np.uint64(58)).astype(np.uint8)
+        mask = ~(np.uint64(0b0111111) << np.uint64(58))
+        columns["true_agent_id"] = agent_id & mask
+        columns["tract_fips"] = location_id >> np.uint64(8)
+        columns["tract_community"] = (location_id & np.uint64(0xFF)).astype(np.uint8)
+
+    events_df = pd.DataFrame(columns)
 
     # ------------------------------------------------------------------ #
     # Demographics DataFrame
@@ -256,10 +294,15 @@ def aggregate_events(events_df: pd.DataFrame, split_day_night: bool = False) -> 
     df = events_df.copy()
     # day = which 24-hour calendar day (timestep // 2)
     df["day"] = (df["timestep"] // 2).astype(int)
-    # period: even timestep → "night" half (household/household_cluster context events occur
-    # exclusively here), odd timestep → "day" half (school/work/teacher context events occur
-    # exclusively here) -- confirmed empirically via context vs. timestep-parity cross-tabulation.
-    df["period"] = np.where(df["timestep"] % 2 == 0, "night", "day")
+    if split_day_night:
+        # period: even timestep → "night" half (household/household_cluster context events occur
+        # exclusively here), odd timestep → "day" half (school/work/teacher context events occur
+        # exclusively here) -- confirmed empirically via context vs. timestep-parity
+        # cross-tabulation. Computed only when actually grouped on below: assigning this object
+        # (plain Python string) column into a ~103M-row DataFrame costs ~3.3s by itself (measured
+        # directly), pure waste whenever split_day_night is left at its default False (e.g. every
+        # call from compare_to_epicast.py's load_epicast).
+        df["period"] = np.where(df["timestep"] % 2 == 0, "night", "day")
 
     group_keys = ["day", "period"] if split_day_night else ["day"]
 
@@ -342,7 +385,10 @@ def aggregate_infections_by_source(events_df: pd.DataFrame) -> pd.DataFrame:
     exposed = events_df.loc[events_df["disease_state"] == "exposed"].copy()
     exposed = exposed.loc[exposed["context"] != "ctx_index_case"]
 
-    source = exposed["context"].astype(str).map(_CONTEXT_TO_SOURCE)
+    # map() directly on the categorical column (no .astype(str)) maps just its ~22 categories
+    # once and broadcasts by code, instead of materializing a full-length string column first --
+    # ~3.4x faster measured on the exposed-events subset of a ~103M-row file.
+    source = exposed["context"].map(_CONTEXT_TO_SOURCE)
     unmapped_mask = source.isna()
     if unmapped_mask.any():
         import warnings

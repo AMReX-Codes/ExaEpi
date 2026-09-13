@@ -8,6 +8,7 @@ import contextlib
 import functools
 import multiprocessing as mp
 from concurrent.futures import ProcessPoolExecutor
+import psutil
 import pandas as pd
 import numpy as np
 import argparse
@@ -29,7 +30,11 @@ apply_style()
 
 def load_epicast(fname):
     print(f"Reading binary Epicast file {fname} ...")
-    events_df, _ = read_events_bin(fname)
+    # full=False: only aggregate_events/aggregate_infections_by_source below ever touch this
+    # events_df, and they only use timestep/context/disease_state -- skipping the other columns
+    # (agent/location identity) roughly halves peak memory for large files (see
+    # read_events_bin's docstring), which matters a lot when -e matches many such files at once.
+    events_df, _ = read_events_bin(fname, full=False)
     print(f"Read {len(events_df):,} events from {fname}")
 
     agg_df = aggregate_events(events_df)
@@ -593,6 +598,42 @@ def _peak_day(y, smooth_window=5):
     return int(np.argmax(smoothed))
 
 
+_ENVELOPE_SMOOTH_WINDOW = 9
+
+
+def _smoothed_minmax_band(y_mat, window=_ENVELOPE_SMOOTH_WINDOW):
+    """Pointwise min/max across the rows in y_mat (files x days), lightly smoothed (a
+    `window`-day moving average) to remove the day-to-day jaggedness inherent in taking an
+    extreme statistic over few samples: at any single day the max is whichever one run happens to
+    be highest *that day*, and which run "wins" can flip from day to day as different runs pass
+    through their own rise/peak/fall, producing a spurious multi-humped trace even though every
+    run is a clean single-peaked curve (confirmed against the emerge-paper CA replicate runs,
+    output_ca_epicast_p01-c35-r*.dat: the raw pointwise max had 5 local extrema in a 70-day window
+    spanning the peak; a 9-day moving average brings that down to 1, while changing the peak
+    height by under 1% and every far-field value by only a few percent).
+
+    Two approaches that were tried and rejected in favor of this one (see git history):
+    - Shifting/aligning each run's curve to a common peak day before taking mean +/- std: this
+      assumes every run is a simple time-translate of one shape, which can silently hide or
+      distort a run whose shape genuinely differs (steeper rise, different width) rather than
+      just being phase-shifted -- and a follow-on band built by sliding the aligned/medoid curve
+      to represent the timing spread reintroduced the same multi-humped artifact this function
+      fixes, only worse (built from just 2-3 widely-spaced translated copies instead of blending
+      all N runs).
+    - Plotting every run as its own translucent line: faithful to the data, but alpha-blending
+      means whatever region happens to have the most overlapping runs (typically right around the
+      shared peak) renders visibly more solid/opaque than the sparser flanks, which can compete
+      with an overlaid reference curve (e.g. Epicast) for visual attention. A single smoothed fill
+      has uniform opacity everywhere regardless of how many runs agree in a given region.
+
+    Returns (lo, hi), both smoothed, same length as y_mat's columns.
+    """
+    kernel = np.ones(window) / window
+    lo = np.convolve(y_mat.min(axis=0), kernel, mode="same")
+    hi = np.convolve(y_mat.max(axis=0), kernel, mode="same")
+    return lo, hi
+
+
 # Mapping from plot/series labels to ExaEpi column names, shared by plot_series below.
 COL_MAPPING = {
     "exposed": "NewI",
@@ -616,7 +657,9 @@ def _auto_shift_per_exaepi_group(epicast_data, exaepi_data, xlimit, shift_range=
     RMSE over the whole curve) is used because RMSE picks a poor alignment whenever the two
     curves' overall shapes disagree, even though the peaks themselves are well separated and
     matching them is what actually gives a sensible alignment. Wildcard groups (multiple files
-    matched by one -e/-x pattern) are averaged first, same as elsewhere in this script.
+    matched by one -e/-x pattern) use their medoid file's curve (via _get_group_y), the same
+    representative curve plotted as that group's line elsewhere in this script, so the shift
+    lines up with what's drawn.
 
     Returns a list parallel to exaepi_data (one shift per group), or a list of 0.0s if there's no
     Epicast reference to align against.
@@ -625,18 +668,11 @@ def _auto_shift_per_exaepi_group(epicast_data, exaepi_data, xlimit, shift_range=
         return [0.0] * len(exaepi_data)
 
     e_entry = epicast_data[0]
-    if e_entry["is_wildcard"] and len(e_entry["dfs"]) > 1:
-        e = _align_arrays(e_entry["dfs"], "exposed", xlimit).mean(axis=0)
-    else:
-        e = e_entry["dfs"][0]["exposed"].values[:xlimit]
-    e_peak = _peak_day(e)
+    e_peak = _peak_day(_get_group_y(e_entry, "exposed", xlimit))
 
     shifts = []
     for x_entry in exaepi_data:
-        if x_entry["is_wildcard"] and len(x_entry["dfs"]) > 1:
-            x = _align_arrays(x_entry["dfs"], "NewI", xlimit).mean(axis=0)
-        else:
-            x = x_entry["dfs"][0]["NewI"].values[:xlimit]
+        x = _get_group_y(x_entry, "NewI", xlimit)
         shift = e_peak - _peak_day(x)
         shifts.append(float(np.clip(shift, -shift_range, shift_range)))
     return shifts
@@ -794,7 +830,8 @@ def plot_single_source(ax, epicast_data, exaepi_data, source_key, title, ylimit)
     attribution. ExaEpi's curve (dashed) is the analytic E<source>/(run-wide total E) share from
     its context_diag columns, grouped so neighborhood/community day+night match Epicast's single
     merged context (see _EXAEPI_SOURCE_MAPPING). Only the first -e and first -x group are shown
-    (averaged, with a min/max shaded band, if a wildcard group matches multiple files).
+    (as the medoid curve, with a smoothed min/max shaded band, if a wildcard group matches
+    multiple files -- see _smoothed_minmax_band).
 
     ylimit sets the shared y-axis peak across all "Source: ..." subplots in this run (see
     _source_frac_max) so they're visually comparable rather than each auto-scaling to its own
@@ -827,8 +864,13 @@ def plot_single_source(ax, epicast_data, exaepi_data, source_key, title, ylimit)
             y = _get_group_y(entry, col, args.xlimit)
             if entry["is_wildcard"] and len(entry["dfs"]) > 1:
                 y_mat = _align_arrays(entry["dfs"], col, args.xlimit)
-                print(f"  Medoid file (Epicast, {col}): {entry['fnames'][_medoid_index(y_mat)]}")
-                ax.fill_between(x[: y_mat.shape[1]], y_mat.min(axis=0), y_mat.max(axis=0),
+                medoid_idx = _medoid_index(y_mat)
+                print(f"  Medoid file (Epicast, {col}): {entry['fnames'][medoid_idx]}")
+                peak_days = [_peak_day(row) for row in y_mat]
+                print(f"  Peak-day range (Epicast, {col}): "
+                      f"[{min(peak_days)}, {max(peak_days)}]  std={np.std(peak_days):.1f}d")
+                band_lo, band_hi = _smoothed_minmax_band(y_mat)
+                ax.fill_between(x[: y_mat.shape[1]], band_lo, band_hi,
                                 alpha=0.25, color="blue", zorder=1, label="_nolegend_")
             ax.plot(x[: len(y)], y, color="blue", linewidth=1, linestyle="-", label="Epicast")
             auc = float(np.sum(y))
@@ -850,8 +892,13 @@ def plot_single_source(ax, epicast_data, exaepi_data, source_key, title, ylimit)
             y = _get_group_y(entry, col, args.xlimit)
             if entry["is_wildcard"] and len(entry["dfs"]) > 1:
                 y_mat = _align_arrays(entry["dfs"], col, args.xlimit)
-                print(f"  Medoid file (ExaEpi, {col}): {entry['fnames'][_medoid_index(y_mat)]}")
-                ax.fill_between(x[: y_mat.shape[1]], y_mat.min(axis=0), y_mat.max(axis=0),
+                medoid_idx = _medoid_index(y_mat)
+                print(f"  Medoid file (ExaEpi, {col}): {entry['fnames'][medoid_idx]}")
+                peak_days = [_peak_day(row) for row in y_mat]
+                print(f"  Peak-day range (ExaEpi, {col}): "
+                      f"[{min(peak_days)}, {max(peak_days)}]  std={np.std(peak_days):.1f}d")
+                band_lo, band_hi = _smoothed_minmax_band(y_mat)
+                ax.fill_between(x[: y_mat.shape[1]], band_lo, band_hi,
                                 alpha=0.25, color="red", zorder=1, label="_nolegend_")
             ax.plot(x[: len(y)], y, color="red", linewidth=1, linestyle="-", label="ExaEpi")
             auc = float(np.sum(y))
@@ -876,8 +923,9 @@ def plot_series(ax, epicast_data, exaepi_data, label, seir_dfs=None, fit_results
 
     Both epicast_data and exaepi_data are lists of group dicts:
         {'label': str|None, 'is_wildcard': bool, 'dfs': [df, ...], 'fnames': [str, ...]}
-    A wildcard group with N>1 files is rendered as an average line with a
-    semi-transparent band between the per-day min and max.
+    A wildcard group with N>1 files is rendered as its medoid file's curve with a
+    semi-transparent band showing the smoothed per-day min/max across files
+    (see _smoothed_minmax_band).
 
     Args:
         label: the data series to plot (e.g., 'exposed', 'symptomatic')
@@ -940,13 +988,15 @@ def plot_series(ax, epicast_data, exaepi_data, label, seir_dfs=None, fit_results
             y_medoid    = y_mat[medoid_idx]
             medoid_lbl  = legend_label if legend_label is not None else f"group {i}"
             print(f"  Medoid file ({medoid_lbl}, {col}): {entry['fnames'][medoid_idx]}")
-            y_min    = y_mat.min(axis=0)
-            y_max    = y_mat.max(axis=0)
+            peak_days = [_peak_day(row) for row in y_mat]
+            print(f"  Peak-day range ({medoid_lbl}, {col}): "
+                  f"[{min(peak_days)}, {max(peak_days)}]  std={np.std(peak_days):.1f}d")
             n        = y_mat.shape[1]
             x_vals = (entry["dfs"][0][x_col].values[:n] + x_shift) if x_col else np.arange(n)
 
-            ax.fill_between(x_vals, y_min, y_max, alpha=0.25, color=color,
-                            zorder=1, label="_nolegend_")
+            band_lo, band_hi = _smoothed_minmax_band(y_mat)
+            ax.fill_between(x_vals, band_lo, band_hi, alpha=0.25, color=color, zorder=1,
+                            label="_nolegend_")
             ax.plot(x_vals, y_medoid, label=plot_label, color=color, linewidth=1, zorder=2)
             auc = float(np.sum(y_medoid))
             y_for_gof = _shift_array(y_medoid, x_shift, args.xlimit)
@@ -1119,8 +1169,8 @@ parser = argparse.ArgumentParser(
         "File specifications can include optional labels using the format: 'filename:Label'. "
         "Both -e and -x can be repeated and accept glob patterns, "
         "e.g.: -e 'runs/*.bin:Epicast' -x 'runs/*.csv:ExaEpi'. "
-        "When a pattern matches multiple files, their average is plotted with a "
-        "semi-transparent min/max band in the same color as the line."
+        "When a pattern matches multiple files, the medoid file's curve is plotted with a "
+        "semi-transparent smoothed min/max band in the same color as the line."
     ),
 )
 parser.add_argument(
@@ -1133,7 +1183,8 @@ parser.add_argument(
     action="append", default=[], metavar="FILE[:LABEL]",
     help=(
         "ExaEpi csv file or glob pattern, optionally with a label. Can be repeated. "
-        "Multiple matched files are averaged with a min/max band."
+        "Multiple matched files are shown as the medoid file's curve with a smoothed "
+        "min/max band."
     ),
 )
 def _xlimit_type(value):
@@ -1298,6 +1349,38 @@ def _load_and_capture(load_fn, fname):
     return result, buf.getvalue()
 
 
+_PEAK_RSS_PER_FILE_SIZE = 7.5  # see _safe_max_workers
+
+
+def _safe_max_workers(fnames):
+    """Cap the process pool's worker count so loading a wildcard match in parallel can't
+    overcommit available RAM.
+
+    A single load_epicast call (one worker, one file) peaks at roughly 4.4x a file's on-disk
+    size in RSS in isolation (measured directly against the actual code path: a 2.47 GB CA
+    events.bin file peaked at 10.8 GB while its minimal-columns events_df -- see
+    read_events_bin's `full` parameter -- aggregate_events, and aggregate_infections_by_source
+    were all live at once). But that isolated number understates real concurrent demand: a live
+    run with 4 such workers (a 5.0x multiplier, i.e. only ~15% headroom over the 4.4x measurement)
+    drove free system memory to near zero and pushed ~1.7 GB into swap before finishing -- it
+    survived only because swap was there to absorb the gap, not because 4 workers actually fit
+    comfortably. _PEAK_RSS_PER_FILE_SIZE=7.5 leaves real headroom instead of relying on swap as a
+    safety net (swap isn't guaranteed to be configured, and even when it is, running from swap is
+    much slower than the point of parallelizing in the first place).
+
+    Running N workers needs roughly N times one worker's estimated peak, so with e.g. 10 such
+    files and ~57 GB available, unrestricted parallelism (one worker per file, or per CPU)
+    reliably OOMs; this sizes the pool down to however many can run at once within that estimate.
+
+    load_exaepi's already-aggregated per-day CSVs are tiny, so this same on-disk-size-based
+    estimate naturally comes out generous for them too -- no separate case is needed.
+    """
+    largest_file = max(os.path.getsize(f) for f in fnames)
+    available = psutil.virtual_memory().available
+    mem_limited = max(1, int(available // (largest_file * _PEAK_RSS_PER_FILE_SIZE)))
+    return max(1, min(len(fnames), mp.cpu_count(), mem_limited))
+
+
 def _load_grouped(file_specs, load_fn, extra_csv_fn=None):
     """Expand each file spec into a group dict, loading DataFrames with load_fn.
 
@@ -1306,7 +1389,10 @@ def _load_grouped(file_specs, load_fn, extra_csv_fn=None):
     rows, multiple pandas groupbys per file in load_epicast) that's expensive enough that
     loading a large wildcard match sequentially can take minutes. ExaEpi's already-aggregated
     per-day CSVs are cheap enough that the parallelism is close to free either way. A single
-    explicit file loads directly, with no process-pool startup overhead.
+    explicit file loads directly, with no process-pool startup overhead. The worker count is
+    capped by _safe_max_workers so this parallelism can't overcommit available RAM (see its
+    docstring) -- with large enough files/matches that can mean falling back to well below one
+    worker per file, trading speed for not OOMing.
 
     Returns a list of {'label', 'is_wildcard', 'dfs', 'fnames'} dicts.
     """
@@ -1322,7 +1408,12 @@ def _load_grouped(file_specs, load_fn, extra_csv_fn=None):
         for fname in fnames:
             print(f"{fname}")
         if is_wc:
-            with ProcessPoolExecutor(mp_context=mp.get_context("fork")) as executor:
+            max_workers = _safe_max_workers(fnames)
+            if max_workers < len(fnames):
+                print(f"  Loading with {max_workers} parallel worker(s) (capped to fit "
+                      f"available memory; {len(fnames)} files matched)")
+            with ProcessPoolExecutor(max_workers=max_workers,
+                                      mp_context=mp.get_context("fork")) as executor:
                 results = list(executor.map(functools.partial(_load_and_capture, load_fn), fnames))
             dfs = []
             for df, log in results:
